@@ -1,21 +1,26 @@
 """
-配置管理器
+配置管理器（线程安全版本）
 """
 import os
+import threading
 from pathlib import Path
 from typing import Any, Optional
 import toml
 
 
 class ConfigManager:
-    """配置管理器"""
+    """配置管理器（线程安全的单例模式）"""
 
     _instance = None
+    _lock = threading.Lock()  # 用于单例创建的锁
 
     def __new__(cls):
-        """单例模式"""
+        """线程安全的单例模式"""
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
+            with cls._lock:
+                # 双重检查锁定
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
         return cls._instance
 
     def __init__(self):
@@ -26,6 +31,7 @@ class ConfigManager:
             self.user_config_path = self.user_config_dir / 'config.toml'
 
             self._config = {}
+            self._rw_lock = threading.RLock()  # 用于配置读写的可重入锁
             self._load_config()
             self.initialized = True
 
@@ -67,7 +73,7 @@ class ConfigManager:
 
     def get(self, key: str, default: Any = None) -> Any:
         """
-        获取配置值
+        获取配置值（线程安全）
 
         Args:
             key: 配置键，支持点号分隔的路径，如 'api.model'
@@ -76,41 +82,44 @@ class ConfigManager:
         Returns:
             配置值
         """
-        keys = key.split('.')
-        value = self._config
+        with self._rw_lock:
+            keys = key.split('.')
+            value = self._config
 
-        for k in keys:
-            if isinstance(value, dict) and k in value:
-                value = value[k]
-            else:
-                return default
+            for k in keys:
+                if isinstance(value, dict) and k in value:
+                    value = value[k]
+                else:
+                    return default
 
-        return value
+            return value
 
     def set(self, key: str, value: Any):
         """
-        设置配置值
+        设置配置值（线程安全）
 
         Args:
             key: 配置键
             value: 配置值
         """
-        keys = key.split('.')
-        config = self._config
+        with self._rw_lock:
+            keys = key.split('.')
+            config = self._config
 
-        for k in keys[:-1]:
-            if k not in config:
-                config[k] = {}
-            config = config[k]
+            for k in keys[:-1]:
+                if k not in config:
+                    config[k] = {}
+                config = config[k]
 
-        config[keys[-1]] = value
+            config[keys[-1]] = value
 
     def save(self):
-        """保存配置到用户配置文件"""
-        self.user_config_dir.mkdir(parents=True, exist_ok=True)
+        """保存配置到用户配置文件（线程安全）"""
+        with self._rw_lock:
+            self.user_config_dir.mkdir(parents=True, exist_ok=True)
 
-        with open(self.user_config_path, 'w', encoding='utf-8') as f:
-            toml.dump(self._config, f)
+            with open(self.user_config_path, 'w', encoding='utf-8') as f:
+                toml.dump(self._config, f)
 
     @property
     def api_endpoint(self) -> str:

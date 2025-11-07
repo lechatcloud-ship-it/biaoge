@@ -1,8 +1,9 @@
 """
-翻译缓存（SQLite）
+翻译缓存（SQLite，线程安全版本）
 """
 import sqlite3
 import hashlib
+import threading
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Tuple
 from pathlib import Path
@@ -12,35 +13,52 @@ from ..utils.config_manager import ConfigManager
 
 
 class TranslationCache:
-    """翻译缓存管理器"""
-    
+    """翻译缓存管理器（线程安全）"""
+
+    # SQLite连接参数（线程安全配置）
+    DB_TIMEOUT = 10.0  # 10秒超时，避免死锁
+
     def __init__(self, db_path: Optional[str] = None):
         """
         初始化缓存
-        
+
         Args:
             db_path: 数据库文件路径，默认使用用户目录
         """
         config = ConfigManager()
-        
+
         if db_path is None:
             cache_dir = Path.home() / '.biaoge' / 'cache'
             cache_dir.mkdir(parents=True, exist_ok=True)
             db_path = str(cache_dir / 'translation.db')
-        
+
         self.db_path = db_path
         self.ttl_days = config.get('translation.cache_ttl_days', 7)
-        
-        # 统计信息
+
+        # 线程安全：每个操作都获取独立连接
+        self._lock = threading.Lock()
+
+        # 统计信息（使用锁保护）
         self.hits = 0
         self.misses = 0
-        
+
         self._init_database()
-        logger.info(f"翻译缓存初始化: {self.db_path}, TTL={self.ttl_days}天")
+        logger.info(f"翻译缓存初始化（线程安全）: {self.db_path}, TTL={self.ttl_days}天")
     
+    def _get_connection(self) -> sqlite3.Connection:
+        """获取线程安全的数据库连接"""
+        conn = sqlite3.connect(
+            self.db_path,
+            timeout=self.DB_TIMEOUT,
+            check_same_thread=False  # 允许跨线程访问
+        )
+        # 启用WAL模式以提高并发性能
+        conn.execute('PRAGMA journal_mode=WAL')
+        return conn
+
     def _init_database(self):
         """初始化数据库表"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_connection() as conn:
             conn.execute('''
                 CREATE TABLE IF NOT EXISTS translations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -71,45 +89,46 @@ class TranslationCache:
     
     def get(self, text: str, from_lang: str, to_lang: str) -> Optional[str]:
         """
-        获取缓存的翻译
-        
+        获取缓存的翻译（线程安全）
+
         Args:
             text: 原文
             from_lang: 源语言
             to_lang: 目标语言
-        
+
         Returns:
             Optional[str]: 翻译结果，如果未找到则返回None
         """
         text_hash = self._hash_text(text)
         expiry_date = datetime.now() - timedelta(days=self.ttl_days)
-        
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute('''
-                SELECT translated_text FROM translations
-                WHERE text_hash = ? AND from_lang = ? AND to_lang = ?
-                AND created_at > ?
-            ''', (text_hash, from_lang, to_lang, expiry_date))
-            
-            result = cursor.fetchone()
-            
-            if result:
-                self.hits += 1
-                
-                # 更新访问时间和计数
-                conn.execute('''
-                    UPDATE translations
-                    SET accessed_at = CURRENT_TIMESTAMP,
-                        access_count = access_count + 1
+
+        with self._lock:
+            with self._get_connection() as conn:
+                cursor = conn.execute('''
+                    SELECT translated_text FROM translations
                     WHERE text_hash = ? AND from_lang = ? AND to_lang = ?
-                ''', (text_hash, from_lang, to_lang))
-                conn.commit()
-                
-                logger.debug(f"缓存命中: {text[:20]}... -> {result[0][:20]}...")
-                return result[0]
-            else:
-                self.misses += 1
-                return None
+                    AND created_at > ?
+                ''', (text_hash, from_lang, to_lang, expiry_date))
+
+                result = cursor.fetchone()
+
+                if result:
+                    self.hits += 1
+
+                    # 更新访问时间和计数
+                    conn.execute('''
+                        UPDATE translations
+                        SET accessed_at = CURRENT_TIMESTAMP,
+                            access_count = access_count + 1
+                        WHERE text_hash = ? AND from_lang = ? AND to_lang = ?
+                    ''', (text_hash, from_lang, to_lang))
+                    conn.commit()
+
+                    logger.debug(f"缓存命中: {text[:20]}... -> {result[0][:20]}...")
+                    return result[0]
+                else:
+                    self.misses += 1
+                    return None
     
     def set(
         self,
@@ -119,8 +138,8 @@ class TranslationCache:
         to_lang: str
     ):
         """
-        保存翻译到缓存
-        
+        保存翻译到缓存（线程安全）
+
         Args:
             text: 原文
             translated_text: 译文
@@ -128,27 +147,28 @@ class TranslationCache:
             to_lang: 目标语言
         """
         text_hash = self._hash_text(text)
-        
-        with sqlite3.connect(self.db_path) as conn:
-            try:
-                conn.execute('''
-                    INSERT INTO translations 
-                    (text_hash, original_text, translated_text, from_lang, to_lang)
-                    VALUES (?, ?, ?, ?, ?)
-                ''', (text_hash, text, translated_text, from_lang, to_lang))
-                conn.commit()
-                logger.debug(f"缓存保存: {text[:20]}... -> {translated_text[:20]}...")
-            except sqlite3.IntegrityError:
-                # 已存在，更新
-                conn.execute('''
-                    UPDATE translations
-                    SET translated_text = ?,
-                        accessed_at = CURRENT_TIMESTAMP,
-                        access_count = access_count + 1
-                    WHERE text_hash = ? AND from_lang = ? AND to_lang = ?
-                ''', (translated_text, text_hash, from_lang, to_lang))
-                conn.commit()
-                logger.debug(f"缓存更新: {text[:20]}...")
+
+        with self._lock:
+            with self._get_connection() as conn:
+                try:
+                    conn.execute('''
+                        INSERT INTO translations
+                        (text_hash, original_text, translated_text, from_lang, to_lang)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (text_hash, text, translated_text, from_lang, to_lang))
+                    conn.commit()
+                    logger.debug(f"缓存保存: {text[:20]}... -> {translated_text[:20]}...")
+                except sqlite3.IntegrityError:
+                    # 已存在，更新
+                    conn.execute('''
+                        UPDATE translations
+                        SET translated_text = ?,
+                            accessed_at = CURRENT_TIMESTAMP,
+                            access_count = access_count + 1
+                        WHERE text_hash = ? AND from_lang = ? AND to_lang = ?
+                    ''', (translated_text, text_hash, from_lang, to_lang))
+                    conn.commit()
+                    logger.debug(f"缓存更新: {text[:20]}...")
     
     def get_batch(
         self,
@@ -195,51 +215,53 @@ class TranslationCache:
     
     def clear_expired(self) -> int:
         """
-        清理过期缓存
-        
+        清理过期缓存（线程安全）
+
         Returns:
             int: 清理的记录数
         """
         expiry_date = datetime.now() - timedelta(days=self.ttl_days)
-        
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute('''
-                DELETE FROM translations WHERE created_at < ?
-            ''', (expiry_date,))
-            deleted_count = cursor.rowcount
-            conn.commit()
-        
-        if deleted_count > 0:
-            logger.info(f"清理过期缓存: {deleted_count}条记录")
-        
-        return deleted_count
-    
+
+        with self._lock:
+            with self._get_connection() as conn:
+                cursor = conn.execute('''
+                    DELETE FROM translations WHERE created_at < ?
+                ''', (expiry_date,))
+                deleted_count = cursor.rowcount
+                conn.commit()
+
+                if deleted_count > 0:
+                    logger.info(f"清理过期缓存: {deleted_count}条记录")
+
+                return deleted_count
+
     def get_statistics(self) -> Dict:
         """
-        获取缓存统计信息
-        
+        获取缓存统计信息（线程安全）
+
         Returns:
             Dict: 统计信息
         """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.execute('SELECT COUNT(*) FROM translations')
-            total_count = cursor.fetchone()[0]
-            
-            cursor = conn.execute('''
-                SELECT 
-                    from_lang || '->' || to_lang as lang_pair,
-                    COUNT(*) as count
-                FROM translations
-                GROUP BY lang_pair
-            ''')
-            lang_pairs = dict(cursor.fetchall())
-            
-            cursor = conn.execute('''
-                SELECT SUM(access_count) FROM translations
-            ''')
-            total_accesses = cursor.fetchone()[0] or 0
-        
-        hit_rate = self.hits / (self.hits + self.misses) if (self.hits + self.misses) > 0 else 0
+        with self._lock:
+            with self._get_connection() as conn:
+                cursor = conn.execute('SELECT COUNT(*) FROM translations')
+                total_count = cursor.fetchone()[0]
+
+                cursor = conn.execute('''
+                    SELECT
+                        from_lang || '->' || to_lang as lang_pair,
+                        COUNT(*) as count
+                    FROM translations
+                    GROUP BY lang_pair
+                ''')
+                lang_pairs = dict(cursor.fetchall())
+
+                cursor = conn.execute('''
+                    SELECT SUM(access_count) FROM translations
+                ''')
+                total_accesses = cursor.fetchone()[0] or 0
+
+            hit_rate = self.hits / (self.hits + self.misses) if (self.hits + self.misses) > 0 else 0
         
         return {
             'total_entries': total_count,
