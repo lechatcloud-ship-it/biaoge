@@ -21,6 +21,7 @@ except ImportError:
 
 from ..dwg.parser import DWGParser, DWGParseError
 from ..dwg.entities import DWGDocument
+from ..dwg.renderer import DWGCanvas
 from ..utils.logger import logger
 
 
@@ -47,17 +48,9 @@ class DWGViewerInterface(QWidget):
         self.infoLabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.infoLabel)
 
-        # TODO: 添加图纸渲染画布
-        # self.canvas = DWGCanvas(self)
-        # layout.addWidget(self.canvas)
-
-        # 占位符
-        placeholder = QLabel("图纸渲染画布（开发中...）")
-        placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        placeholder.setStyleSheet(
-            "background-color: #f5f5f5; border: 2px dashed #cccccc; min-height: 400px;"
-        )
-        layout.addWidget(placeholder, 1)
+        # DWG渲染画布
+        self.canvas = DWGCanvas(self)
+        layout.addWidget(self.canvas, 1)
 
     def _createToolbar(self):
         """创建工具栏"""
@@ -74,10 +67,35 @@ class DWGViewerInterface(QWidget):
         self.openBtn.clicked.connect(self.onOpenFile)
         layout.addWidget(self.openBtn)
 
-        # TODO: 添加更多工具按钮
-        # zoomInBtn = PushButton("放大", self)
-        # zoomOutBtn = PushButton("缩小", self)
-        # ...
+        layout.addSpacing(10)
+
+        # 视图控制按钮
+        if FLUENT_WIDGETS_AVAILABLE:
+            self.zoomInBtn = PushButton("放大", self)
+            self.zoomOutBtn = PushButton("缩小", self)
+            self.fitViewBtn = PushButton("适应窗口", self)
+            self.resetViewBtn = PushButton("重置视图", self)
+        else:
+            self.zoomInBtn = QPushButton("放大", self)
+            self.zoomOutBtn = QPushButton("缩小", self)
+            self.fitViewBtn = QPushButton("适应窗口", self)
+            self.resetViewBtn = QPushButton("重置视图", self)
+
+        self.zoomInBtn.clicked.connect(self.onZoomIn)
+        self.zoomOutBtn.clicked.connect(self.onZoomOut)
+        self.fitViewBtn.clicked.connect(self.onFitView)
+        self.resetViewBtn.clicked.connect(self.onResetView)
+
+        layout.addWidget(self.zoomInBtn)
+        layout.addWidget(self.zoomOutBtn)
+        layout.addWidget(self.fitViewBtn)
+        layout.addWidget(self.resetViewBtn)
+
+        # 初始禁用（未加载图纸时）
+        self.zoomInBtn.setEnabled(False)
+        self.zoomOutBtn.setEnabled(False)
+        self.fitViewBtn.setEnabled(False)
+        self.resetViewBtn.setEnabled(False)
 
         layout.addStretch(1)
 
@@ -115,6 +133,15 @@ class DWGViewerInterface(QWidget):
             )
             self.infoLabel.setText(info_text)
 
+            # 渲染图纸
+            self.canvas.setDocument(self.document)
+
+            # 启用视图控制按钮
+            self.zoomInBtn.setEnabled(True)
+            self.zoomOutBtn.setEnabled(True)
+            self.fitViewBtn.setEnabled(True)
+            self.resetViewBtn.setEnabled(True)
+
             # 显示成功提示
             if FLUENT_WIDGETS_AVAILABLE:
                 InfoBar.success(
@@ -132,9 +159,6 @@ class DWGViewerInterface(QWidget):
                     "加载成功",
                     f"已加载 {self.document.entity_count} 个实体"
                 )
-
-            # TODO: 渲染图纸
-            # self.canvas.setDocument(self.document)
 
             logger.info("图纸加载成功")
 
@@ -167,3 +191,23 @@ class DWGViewerInterface(QWidget):
                 )
             else:
                 QMessageBox.critical(self, "加载失败", f"未知错误: {e}")
+
+    def onZoomIn(self):
+        """放大"""
+        if self.canvas:
+            self.canvas.zoomIn()
+
+    def onZoomOut(self):
+        """缩小"""
+        if self.canvas:
+            self.canvas.zoomOut()
+
+    def onFitView(self):
+        """适应窗口"""
+        if self.canvas:
+            self.canvas.fitToView()
+
+    def onResetView(self):
+        """重置视图"""
+        if self.canvas:
+            self.canvas.resetView()
