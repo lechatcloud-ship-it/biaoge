@@ -1,0 +1,40 @@
+# DWG智能翻译算量系统 - Python依赖清单
+# Python 3.11+
+
+# GUI框架
+PyQt6>=6.6.0
+PyQt6-Qt6>=6.6.0
+PyQt-Fluent-Widgets>=1.5.0
+
+# DWG/DXF解析
+ezdxf>=1.1.0
+
+# 数值计算和加速
+numpy>=1.26.0
+numba>=0.58.0
+
+# HTTP客户端
+requests>=2.31.0
+
+# Excel导出
+openpyxl>=3.1.0
+
+# PDF生成
+reportlab>=4.0.0
+
+# 高性能绘图
+pyqtgraph>=0.13.0
+
+# 系统密钥管理
+keyring>=24.0.0
+
+# 配置文件
+toml>=0.10.2
+
+# 几何计算（可选）
+shapely>=2.0.0
+
+# 开发工具
+pytest>=7.4.0
+pytest-qt>=4.2.0
+black>=23.0.0

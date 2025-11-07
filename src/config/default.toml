@@ -1,0 +1,37 @@
+# DWG智能翻译算量系统 - 默认配置文件
+
+[app]
+name = "DWG智能翻译算量系统"
+version = "1.0.0-alpha"
+author = "BiaoGe Team"
+
+[api]
+provider = "aliyun-bailian"
+endpoint = "https://dashscope.aliyuncs.com/api/v1"
+model = "qwen-plus"
+timeout = 60
+max_retries = 3
+
+[translation]
+cache_enabled = true
+cache_ttl_days = 7
+batch_size = 50
+default_source_lang = "zh-CN"
+default_target_lang = "en"
+
+[calculation]
+default_waste_factor = 0.03
+auto_deduction = true
+use_numba_acceleration = true
+
+[ui]
+theme = "auto"  # auto | light | dark
+language = "zh-CN"
+font_size = "medium"
+window_width = 1400
+window_height = 900
+
+[paths]
+data_dir = "~/.biaoge"
+cache_db = "~/.biaoge/cache.db"
+log_dir = "~/.biaoge/logs"
