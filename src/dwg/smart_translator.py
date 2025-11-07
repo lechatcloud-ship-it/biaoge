@@ -37,42 +37,53 @@ class TerminologyDatabase:
     """
 
     def __init__(self):
-        # 内置建筑术语库
+        # 内置建筑术语库（英文→中文）
         self.terminology = {
-            # 房间类型
-            "卧室": "Bedroom",
-            "客厅": "Living Room",
-            "厨房": "Kitchen",
-            "卫生间": "Bathroom",
-            "餐厅": "Dining Room",
-            "书房": "Study",
-            "阳台": "Balcony",
-            "走廊": "Corridor",
-            "储藏室": "Storage",
+            # 房间类型（Room Types）
+            "Bedroom": "卧室",
+            "Living Room": "客厅",
+            "Kitchen": "厨房",
+            "Bathroom": "卫生间",
+            "Dining Room": "餐厅",
+            "Study": "书房",
+            "Balcony": "阳台",
+            "Corridor": "走廊",
+            "Hallway": "走廊",
+            "Storage": "储藏室",
+            "Closet": "衣柜间",
+            "Laundry": "洗衣房",
+            "Garage": "车库",
 
-            # 建筑元素
-            "墙": "Wall",
-            "门": "Door",
-            "窗": "Window",
-            "柱": "Column",
-            "梁": "Beam",
-            "板": "Slab",
-            "楼梯": "Staircase",
-            "电梯": "Elevator",
+            # 建筑元素（Building Elements）
+            "Wall": "墙",
+            "Door": "门",
+            "Window": "窗",
+            "Column": "柱",
+            "Beam": "梁",
+            "Slab": "板",
+            "Staircase": "楼梯",
+            "Stair": "楼梯",
+            "Elevator": "电梯",
+            "Roof": "屋顶",
+            "Floor": "地板",
+            "Ceiling": "天花板",
 
-            # 材料
-            "混凝土": "Concrete",
-            "钢筋": "Rebar",
-            "砖": "Brick",
-            "玻璃": "Glass",
-            "木材": "Wood",
-            "石材": "Stone",
+            # 材料（Materials）
+            "Concrete": "混凝土",
+            "Rebar": "钢筋",
+            "Brick": "砖",
+            "Glass": "玻璃",
+            "Wood": "木材",
+            "Stone": "石材",
+            "Steel": "钢",
+            "Aluminum": "铝",
 
-            # 单位转换（可选）
-            "毫米": "mm",
-            "厘米": "cm",
-            "米": "m",
-            "平方米": "m²",
+            # 单位（Units）
+            "mm": "毫米",
+            "cm": "厘米",
+            "m": "米",
+            "m²": "平方米",
+            "m³": "立方米",
         }
 
         # 用户自定义术语（优先级更高）
@@ -249,8 +260,8 @@ class SmartTranslator:
         self.mixed_parser = MixedTextParser()
 
         # 翻译配置
-        self.source_lang = self.config.get('translation.source_language', 'Chinese')
-        self.target_lang = self.config.get('translation.target_language', 'English')
+        self.source_lang = self.config.get('translation.default_source_lang', 'en')
+        self.target_lang = self.config.get('translation.default_target_lang', 'zh-CN')
 
         logger.info(
             f"智能翻译器初始化完成: {self.source_lang} → {self.target_lang}"

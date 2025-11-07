@@ -31,8 +31,8 @@ concurrent = 3
 context_window = 3
 use_terminology = true
 post_process = true
-default_source_lang = "zh-CN"
-default_target_lang = "en"
+default_source_lang = "en"  # 默认从英文翻译
+default_target_lang = "zh-CN"  # 默认翻译成简体中文
 
 [calculation]
 default_waste_factor = 0.03

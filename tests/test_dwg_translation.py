@@ -140,24 +140,24 @@ class TestTerminologyDatabase(unittest.TestCase):
         self.db = TerminologyDatabase()
 
     def test_01_builtin_terms(self):
-        """测试内置术语"""
-        match = self.db.match("卧室")
+        """测试内置术语（英文→中文）"""
+        match = self.db.match("Bedroom")
         self.assertIsNotNone(match)
-        self.assertEqual(match[1], "Bedroom")
+        self.assertEqual(match[1], "卧室")
 
     def test_02_add_custom_term(self):
-        """测试添加自定义术语"""
-        self.db.add_term("测试", "Test")
-        match = self.db.match("测试")
+        """测试添加自定义术语（英文→中文）"""
+        self.db.add_term("Test", "测试")
+        match = self.db.match("Test")
         self.assertIsNotNone(match)
-        self.assertEqual(match[1], "Test")
+        self.assertEqual(match[1], "测试")
 
     def test_03_custom_priority(self):
-        """测试自定义术语优先级"""
+        """测试自定义术语优先级（英文→中文）"""
         # 覆盖内置术语
-        self.db.add_term("卧室", "BR")  # 使用缩写
-        match = self.db.match("卧室")
-        self.assertEqual(match[1], "BR")  # 应该使用自定义的
+        self.db.add_term("Bedroom", "卧房")  # 使用不同的译法
+        match = self.db.match("Bedroom")
+        self.assertEqual(match[1], "卧房")  # 应该使用自定义的
 
 
 class TestMTextFormatter(unittest.TestCase):
@@ -193,13 +193,13 @@ class TestDWGCreation(unittest.TestCase):
     """测试DWG文件创建和修改"""
 
     def create_test_dwg(self, filepath: str) -> str:
-        """创建测试用的DWG文件"""
+        """创建测试用的DWG文件（英文文本）"""
         doc = ezdxf.new('R2010')
         msp = doc.modelspace()
 
-        # 添加各种文本实体
-        # 1. TEXT - 纯文本
-        msp.add_text("卧室", dxfattribs={'height': 2.5, 'insert': (0, 0)})
+        # 添加各种文本实体（英文原文）
+        # 1. TEXT - 纯文本（英文房间名）
+        msp.add_text("Bedroom", dxfattribs={'height': 2.5, 'insert': (0, 0)})
 
         # 2. TEXT - 纯数字
         msp.add_text("3000", dxfattribs={'height': 2.5, 'insert': (10, 0)})
@@ -207,13 +207,13 @@ class TestDWGCreation(unittest.TestCase):
         # 3. TEXT - 混合
         msp.add_text("3000mm", dxfattribs={'height': 2.5, 'insert': (20, 0)})
 
-        # 4. MTEXT - 多行
-        mtext = msp.add_mtext("第一行\\P第二行", dxfattribs={'insert': (0, 10)})
+        # 4. MTEXT - 多行英文
+        mtext = msp.add_mtext("First Line\\PSecond Line", dxfattribs={'insert': (0, 10)})
         mtext.dxf.char_height = 2.5
 
-        # 5. MTEXT - 带格式
+        # 5. MTEXT - 带格式的英文
         mtext2 = msp.add_mtext(
-            "\\fSimSun;客厅",
+            "\\fArial;Living Room",
             dxfattribs={'insert': (10, 10)}
         )
         mtext2.dxf.char_height = 2.5
@@ -296,15 +296,15 @@ class TestDWGCreation(unittest.TestCase):
             extractor = TextExtractor()
             texts = extractor.extract_from_file(input_path)
 
-            # 模拟翻译（简单替换）
+            # 模拟翻译（英文→中文）
             for text in texts:
-                if text.original_text == "卧室":
-                    text.translated_text = "Bedroom"
-                elif "客厅" in text.original_text:  # MTEXT可能包含格式标记
+                if text.original_text == "Bedroom":
+                    text.translated_text = "卧室"
+                elif "Living Room" in text.original_text:  # MTEXT可能包含格式标记
                     # 保持MTEXT格式，只替换文字
-                    text.translated_text = text.original_text.replace("客厅", "Living Room")
-                elif "第一行" in text.original_text:
-                    text.translated_text = text.original_text.replace("第一行", "First Line").replace("第二行", "Second Line")
+                    text.translated_text = text.original_text.replace("Living Room", "客厅")
+                elif "First Line" in text.original_text:
+                    text.translated_text = text.original_text.replace("First Line", "第一行").replace("Second Line", "第二行")
                 # 数字保持不变
                 elif text.text_category == TextCategory.PURE_NUMBER:
                     text.translated_text = text.original_text
@@ -339,12 +339,12 @@ class TestDWGCreation(unittest.TestCase):
                 "修改后实体数量应该完全一致"
             )
 
-            # 验证文本已修改
+            # 验证文本已修改（英文→中文）
             modified_texts = [
                 e.dxf.text for e in modified_msp.query('TEXT')
                 if hasattr(e.dxf, 'text')
             ]
-            self.assertIn("Bedroom", modified_texts, "应该包含翻译后的文本")
+            self.assertIn("卧室", modified_texts, "应该包含翻译后的中文文本")
 
             # 验证数字未修改
             self.assertIn("3000", modified_texts, "数字应该保持不变")
@@ -358,11 +358,11 @@ class TestIntegration(unittest.TestCase):
     """集成测试"""
 
     def create_test_dwg(self, filepath: str) -> str:
-        """创建测试DWG"""
+        """创建测试DWG（英文文本）"""
         doc = ezdxf.new('R2010')
         msp = doc.modelspace()
 
-        msp.add_text("卧室", dxfattribs={'height': 2.5, 'insert': (0, 0)})
+        msp.add_text("Bedroom", dxfattribs={'height': 2.5, 'insert': (0, 0)})
         msp.add_text("3000", dxfattribs={'height': 2.5, 'insert': (10, 0)})
         msp.add_line((0, -10), (30, -10))
 
@@ -388,8 +388,8 @@ class TestIntegration(unittest.TestCase):
             # 创建管道
             pipeline = TranslationPipeline(config)
 
-            # 添加术语（这样即使没有API也能翻译）
-            pipeline.translator.terminology_db.add_term("卧室", "Bedroom")
+            # 添加术语（英文→中文，这样即使没有API也能翻译）
+            pipeline.translator.terminology_db.add_term("Bedroom", "卧室")
 
             # 处理文件
             result = pipeline.process_file(input_path, output_path)
