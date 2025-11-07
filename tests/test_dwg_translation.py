@@ -403,6 +403,89 @@ class TestIntegration(unittest.TestCase):
             print(f"  翻译: {result.translated_texts} 个")
             print(f"  耗时: {result.total_time:.2f}秒")
 
+    def test_02_multi_language_detection(self):
+        """测试多语言自动检测（英文、日文、韩文→中文）"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_path = os.path.join(tmpdir, "test_multi.dwg")
+            output_path = os.path.join(tmpdir, "test_multi_translated.dwg")
+
+            # 创建包含多种语言的测试DWG
+            doc = ezdxf.new('R2010')
+            msp = doc.modelspace()
+
+            # 英文文本
+            msp.add_text("Bedroom", dxfattribs={'height': 2.5, 'insert': (0, 0)})
+            msp.add_text("Living Room", dxfattribs={'height': 2.5, 'insert': (0, 5)})
+
+            # 日文文本
+            msp.add_text("リビング", dxfattribs={'height': 2.5, 'insert': (0, 10)})
+            msp.add_text("寝室", dxfattribs={'height': 2.5, 'insert': (0, 15)})
+
+            # 韩文文本
+            msp.add_text("거실", dxfattribs={'height': 2.5, 'insert': (0, 20)})
+            msp.add_text("침실", dxfattribs={'height': 2.5, 'insert': (0, 25)})
+
+            # 数字（应该保持不变）
+            msp.add_text("3000", dxfattribs={'height': 2.5, 'insert': (0, 30)})
+
+            doc.saveas(input_path)
+
+            # 创建配置（不使用API，使用术语库模拟）
+            config = PipelineConfig(
+                api_key="",  # 空API key
+                source_language="auto",  # 自动检测源语言
+                target_language="Chinese",  # 目标语言中文
+                use_terminology=True,
+                use_memory=True,
+                create_backup=False
+            )
+
+            # 创建管道
+            pipeline = TranslationPipeline(config)
+
+            # 添加多语言术语（模拟自动检测）
+            # 英文→中文
+            pipeline.translator.terminology_db.add_term("Bedroom", "卧室")
+            pipeline.translator.terminology_db.add_term("Living Room", "客厅")
+
+            # 日文→中文
+            pipeline.translator.terminology_db.add_term("リビング", "客厅")
+            pipeline.translator.terminology_db.add_term("寝室", "卧室")
+
+            # 韩文→中文
+            pipeline.translator.terminology_db.add_term("거실", "客厅")
+            pipeline.translator.terminology_db.add_term("침실", "卧室")
+
+            # 处理文件
+            result = pipeline.process_file(input_path, output_path)
+
+            # 检查结果
+            self.assertIsNotNone(result, "应该返回结果")
+            self.assertGreater(result.total_texts, 0, "应该提取到文本")
+            self.assertGreater(result.translated_texts, 0, "应该翻译了一些文本")
+
+            # 验证输出文件
+            self.assertTrue(os.path.exists(output_path), "输出文件应该存在")
+
+            # 读取翻译后的文件，验证多语言都被正确处理
+            translated_doc = ezdxf.readfile(output_path)
+            translated_msp = translated_doc.modelspace()
+            translated_texts = [
+                e.dxf.text for e in translated_msp.query('TEXT')
+                if hasattr(e.dxf, 'text')
+            ]
+
+            # 验证英文、日文、韩文都被翻译成中文
+            self.assertIn("卧室", translated_texts, "应该包含'卧室'（从英文/日文/韩文翻译）")
+            self.assertIn("客厅", translated_texts, "应该包含'客厅'（从英文/日文/韩文翻译）")
+            self.assertIn("3000", translated_texts, "数字应该保持不变")
+
+            print(f"✓ 多语言自动检测测试通过")
+            print(f"  提取: {result.total_texts} 个文本")
+            print(f"  翻译: {result.translated_texts} 个")
+            print(f"  支持语言: 英文、日文、韩文 → 简体中文")
+            print(f"  耗时: {result.total_time:.2f}秒")
+
 
 def run_tests():
     """运行所有测试"""

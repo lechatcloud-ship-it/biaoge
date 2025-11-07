@@ -22,7 +22,7 @@ class PipelineConfig:
     api_key: str = ""
 
     # 翻译配置
-    source_language: str = "English"    # 源语言（默认英文）
+    source_language: str = "auto"       # 源语言（自动检测）
     target_language: str = "Chinese"    # 目标语言（默认简体中文）
     use_terminology: bool = True
     use_memory: bool = True
@@ -119,7 +119,7 @@ class TranslationPipeline:
         """从ConfigManager加载配置"""
         return PipelineConfig(
             api_key=self.app_config.get('api.api_key', ''),
-            source_language=self.app_config.get('translation.default_source_lang', 'en'),
+            source_language=self.app_config.get('translation.default_source_lang', 'auto'),
             target_language=self.app_config.get('translation.default_target_lang', 'zh-CN'),
             use_terminology=self.app_config.get('translation.use_terminology', True),
             use_memory=self.app_config.get('translation.cache_enabled', True),

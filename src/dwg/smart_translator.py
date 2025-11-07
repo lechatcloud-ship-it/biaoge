@@ -260,7 +260,7 @@ class SmartTranslator:
         self.mixed_parser = MixedTextParser()
 
         # 翻译配置
-        self.source_lang = self.config.get('translation.default_source_lang', 'en')
+        self.source_lang = self.config.get('translation.default_source_lang', 'auto')
         self.target_lang = self.config.get('translation.default_target_lang', 'zh-CN')
 
         logger.info(
@@ -612,11 +612,11 @@ class SmartTranslator:
         """构建翻译prompt"""
         if is_fragment:
             # 片段翻译，简洁prompt
-            return f"翻译以下CAD图纸文本片段，保持简洁：{text}"
+            return f"自动识别以下CAD图纸文本的语言，翻译成简体中文，保持简洁：{text}"
         else:
             # 完整文本翻译，提供上下文
             prompt = f"""
-你是专业的CAD图纸翻译专家。请翻译以下文本：
+你是专业的CAD图纸翻译专家。请将以下文本翻译成简体中文：
 
 原文：{text}
 
@@ -626,12 +626,13 @@ class SmartTranslator:
 - 文本分类：{context.get('text_category', 'pure_text')}
 
 翻译要求：
-1. 使用专业建筑/工程术语
-2. 保持简洁（建议不超过原文长度的2倍）
-3. 保留所有数字、符号和单位
-4. 如果是标准缩写，使用标准英文缩写
+1. 自动识别源语言（可能是英文、日文、韩文或其他语言）
+2. 翻译成简体中文
+3. 使用专业建筑/工程术语
+4. 保持简洁（建议不超过原文长度的2倍）
+5. 保留所有数字、符号和单位
 
-只返回翻译结果，不要解释。
+只返回简体中文翻译结果，不要解释。
 """
             return prompt.strip()
 

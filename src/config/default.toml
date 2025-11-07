@@ -31,7 +31,7 @@ concurrent = 3
 context_window = 3
 use_terminology = true
 post_process = true
-default_source_lang = "en"  # 默认从英文翻译
+default_source_lang = "auto"  # 自动检测源语言
 default_target_lang = "zh-CN"  # 默认翻译成简体中文
 
 [calculation]
