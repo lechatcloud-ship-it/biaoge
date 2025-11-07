@@ -12,9 +12,20 @@ endpoint = "https://dashscope.aliyuncs.com"
 api_key = ""
 
 # 模型配置（根据任务类型选择不同模型）
+#
+# 【推荐】CAD图纸文本翻译使用专门的MT（机器翻译）模型：
+# - qwen-mt-plus (推荐): 高质量翻译，性价比高
+# - qwen-mt-turbo: 快速翻译，成本更低
+#
+# MT模型优势：
+# ✓ 专门优化翻译任务，翻译质量高
+# ✓ 速度快，响应时间短
+# ✓ 成本低，适合大批量翻译
+# ✓ 支持自动语言检测
+#
 multimodal_model = "qwen-vl-plus"  # 多模态模型：qwen-vl-max, qwen-vl-plus, qwen-max
 image_model = "qwen-vl-plus"       # 图片翻译模型：qwen-vl-max, qwen-vl-plus, qwen-mt-image
-text_model = "qwen-mt-plus"        # 文本翻译模型：qwen-mt-plus, qwen-mt-turbo, qwen-plus, qwen-turbo, qwen-max
+text_model = "qwen-mt-plus"        # 【推荐用于CAD翻译】文本翻译模型：qwen-mt-plus, qwen-mt-turbo, qwen-plus, qwen-turbo, qwen-max
 
 # 自定义模型（优先级最高）
 use_custom_model = false
