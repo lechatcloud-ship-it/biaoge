@@ -210,31 +210,102 @@ class BailianClient:
                     }
                 
                 elif response.status_code == 401:
-                    raise BailianAPIError("API密钥无效，请检查DASHSCOPE_API_KEY")
-                
+                    raise BailianAPIError(
+                        "API密钥验证失败\n\n"
+                        "可能的原因：\n"
+                        "1. API密钥未设置或已过期\n"
+                        "2. 环境变量DASHSCOPE_API_KEY配置错误\n\n"
+                        "解决方法：\n"
+                        "请前往阿里云控制台获取有效的API密钥，并正确配置环境变量"
+                    )
+
                 elif response.status_code == 429:
                     # 速率限制，等待后重试
                     wait_time = 2 ** attempt
-                    logger.warning(f"速率限制，等待{wait_time}秒后重试...")
+                    logger.warning(f"请求过于频繁，{wait_time}秒后自动重试...")
                     time.sleep(wait_time)
                     continue
-                
+
+                elif response.status_code == 400:
+                    raise BailianAPIError(
+                        "请求参数错误\n\n"
+                        "可能的原因：\n"
+                        "1. 文本内容格式不正确\n"
+                        "2. 模型参数配置有误\n\n"
+                        "建议：请检查输入内容是否符合要求"
+                    )
+
+                elif response.status_code == 500:
+                    error_msg = response.text
+                    logger.error(f"服务器错误: {error_msg}")
+                    last_error = BailianAPIError(
+                        "阿里云服务暂时不可用\n\n"
+                        "这通常是临时性问题，请稍后重试\n"
+                        "如果问题持续存在，请联系阿里云技术支持"
+                    )
+
                 else:
                     error_msg = response.text
                     logger.error(f"API调用失败 (HTTP {response.status_code}): {error_msg}")
-                    last_error = BailianAPIError(f"HTTP {response.status_code}: {error_msg}")
+                    last_error = BailianAPIError(
+                        f"翻译服务请求失败 (错误码: {response.status_code})\n\n"
+                        f"详细信息：{error_msg[:200]}\n\n"
+                        "建议：请检查网络连接或稍后重试"
+                    )
             
-            except requests.RequestException as e:
-                logger.error(f"网络请求失败: {e}")
-                last_error = BailianAPIError(f"网络错误: {e}")
-                
+            except requests.Timeout as e:
+                logger.error(f"请求超时: {e}")
+                last_error = BailianAPIError(
+                    "网络请求超时\n\n"
+                    "可能的原因：\n"
+                    "1. 网络连接不稳定\n"
+                    "2. 翻译内容过多，处理时间较长\n\n"
+                    "建议：请检查网络连接后重试"
+                )
+
                 if attempt < self.max_retries - 1:
                     wait_time = 2 ** attempt
-                    logger.info(f"等待{wait_time}秒后重试...")
+                    logger.info(f"{wait_time}秒后自动重试...")
+                    time.sleep(wait_time)
+
+            except requests.ConnectionError as e:
+                logger.error(f"连接失败: {e}")
+                last_error = BailianAPIError(
+                    "无法连接到翻译服务\n\n"
+                    "可能的原因：\n"
+                    "1. 网络连接断开\n"
+                    "2. 防火墙阻止了连接\n"
+                    "3. 代理设置不正确\n\n"
+                    "建议：请检查网络设置后重试"
+                )
+
+                if attempt < self.max_retries - 1:
+                    wait_time = 2 ** attempt
+                    logger.info(f"{wait_time}秒后自动重试...")
+                    time.sleep(wait_time)
+
+            except requests.RequestException as e:
+                logger.error(f"网络请求失败: {e}")
+                last_error = BailianAPIError(
+                    f"网络请求异常\n\n"
+                    f"错误信息：{str(e)[:200]}\n\n"
+                    "建议：请检查网络连接或稍后重试"
+                )
+
+                if attempt < self.max_retries - 1:
+                    wait_time = 2 ** attempt
+                    logger.info(f"{wait_time}秒后自动重试...")
                     time.sleep(wait_time)
         
         # 所有重试都失败
-        raise last_error or BailianAPIError("API调用失败")
+        raise last_error or BailianAPIError(
+            "翻译请求失败\n\n"
+            f"已尝试{self.max_retries}次重试，但仍然失败\n"
+            "建议：\n"
+            "1. 检查网络连接是否正常\n"
+            "2. 确认API密钥配置正确\n"
+            "3. 稍后再试或联系技术支持"
+        )
     
     def _build_translation_prompt(
         self,
@@ -242,17 +313,37 @@ class BailianClient:
         to_lang: str,
         context: Optional[str] = None
     ) -> str:
-        """构建翻译prompt"""
-        base_prompt = f"""你是一个专业的CAD图纸翻译专家。
-请将以下{from_lang}文本翻译成{to_lang}，要求：
-1. 保持专业术语的准确性（建筑、工程、机械领域）
-2. 保留数字、单位、符号不变
-3. 简洁准确，不添加额外解释
-4. 只输出翻译结果，不输出其他内容"""
-        
+        """构建翻译prompt - 人工级别翻译质量"""
+        base_prompt = f"""你是一位精通建筑工程CAD图纸的资深翻译专家，拥有15年以上的专业经验。
+
+【翻译任务】将以下{from_lang}文本翻译成{to_lang}
+
+【专业要求】
+1. **术语准确性**：严格使用建筑、结构、机械、电气等领域的标准术语
+   - 建筑构件：梁(beam)、柱(column)、墙(wall)、板(slab)等
+   - 材料规格：混凝土标号(C20/C30)、钢筋型号(HRB400)等
+   - 尺寸单位：保持mm、m、×、Φ等符号不变
+
+2. **数字和符号**：
+   - 绝对保留所有数字、尺寸、编号
+   - 保持单位符号、特殊字符不变
+   - 维持原文格式（如：300×600不可改为300*600）
+
+3. **专业规范**：
+   - 遵循国家建筑制图标准(GB/T 50001)
+   - 使用行业通用缩写：KL(框架梁)、KZ(框架柱)等
+   - 保持专业命名规范性
+
+4. **翻译风格**：
+   - 简洁专业，符合图纸标注习惯
+   - 避免口语化表达
+   - 不添加解释性文字
+
+5. **输出格式**：只输出翻译结果，不包含任何其他内容"""
+
         if context:
-            base_prompt += f"\n5. 参考上下文：{context}"
-        
+            base_prompt += f"\n\n【上下文参考】{context}"
+
         return base_prompt
     
     def _build_batch_translation_prompt(
@@ -261,18 +352,36 @@ class BailianClient:
         to_lang: str,
         context: Optional[str] = None
     ) -> str:
-        """构建批量翻译prompt"""
-        base_prompt = f"""你是一个专业的CAD图纸翻译专家。
-我将给你一批{from_lang}文本（带编号），请翻译成{to_lang}。要求：
-1. 保持专业术语的准确性（建筑、工程、机械领域）
-2. 保留数字、单位、符号不变
-3. 每条翻译独立成行，格式为："编号. 翻译结果"
-4. 严格按照原编号顺序输出
-5. 只输出翻译结果，不添加额外内容"""
-        
+        """构建批量翻译prompt - 人工级别翻译质量"""
+        base_prompt = f"""你是一位精通建筑工程CAD图纸的资深翻译专家，拥有15年以上的专业经验。
+
+【批量翻译任务】我将提供一批{from_lang}文本（带编号），请翻译成{to_lang}
+
+【专业要求】
+1. **术语准确性**：严格使用建筑、结构、机械、电气等领域的标准术语
+   - 建筑构件：梁(beam)、柱(column)、墙(wall)、板(slab)、门(door)、窗(window)
+   - 材料规格：C20/C30混凝土、Q235/Q345钢材、HRB400钢筋
+   - 保持专业缩写：KL(框架梁)、KZ(框架柱)、NQ(内墙)、WQ(外墙)
+
+2. **数字和符号**：
+   - 绝对保留所有数字、尺寸、编号
+   - 保持单位符号不变：mm、m、×、Φ、@等
+   - 维持原文格式（如：300×600×200）
+
+3. **输出格式**：
+   - 每条翻译独立成行
+   - 格式："编号. 翻译结果"
+   - 严格按原编号顺序
+   - 不添加任何额外说明
+
+4. **专业规范**：
+   - 遵循国家建筑制图标准
+   - 保持图纸标注的简洁性
+   - 使用行业通用表达方式"""
+
         if context:
-            base_prompt += f"\n6. 参考上下文：{context}"
-        
+            base_prompt += f"\n\n【上下文参考】{context}"
+
         return base_prompt
     
     def _parse_batch_response(self, response: str, expected_count: int) -> List[str]:

@@ -37,17 +37,69 @@ class DWGParser:
         filepath = Path(filepath)
 
         if not filepath.exists():
-            raise DWGParseError(f"文件不存在: {filepath}")
+            raise DWGParseError(
+                f"文件不存在\n\n"
+                f"文件路径：{filepath}\n\n"
+                "可能的原因：\n"
+                "1. 文件已被移动或删除\n"
+                "2. 文件路径输入错误\n"
+                "3. 没有访问权限\n\n"
+                "建议：请确认文件路径是否正确"
+            )
 
         try:
             logger.info(f"开始解析DWG文件: {filepath}")
             doc = ezdxf.readfile(str(filepath))
         except IOError as e:
-            raise DWGParseError(f"无法读取文件: {e}")
+            raise DWGParseError(
+                f"文件读取失败\n\n"
+                f"文件：{filepath.name}\n"
+                f"错误：{str(e)}\n\n"
+                "可能的原因：\n"
+                "1. 文件正被其他程序占用\n"
+                "2. 文件权限不足\n"
+                "3. 磁盘读取错误\n\n"
+                "建议：\n"
+                "• 关闭其他可能打开该文件的程序\n"
+                "• 检查文件访问权限\n"
+                "• 尝试复制文件到其他位置后重试"
+            )
         except ezdxf.DXFStructureError as e:
-            raise DWGParseError(f"DWG文件格式错误: {e}")
+            raise DWGParseError(
+                f"DWG文件格式错误\n\n"
+                f"文件：{filepath.name}\n"
+                f"错误：{str(e)}\n\n"
+                "可能的原因：\n"
+                "1. 文件已损坏\n"
+                "2. 文件版本不受支持\n"
+                "3. 文件不是有效的DWG/DXF格式\n\n"
+                "建议：\n"
+                "• 使用CAD软件打开并另存为DXF格式\n"
+                "• 确认文件扩展名正确（.dwg或.dxf）\n"
+                "• 尝试使用CAD软件修复文件"
+            )
+        except ezdxf.DXFVersionError as e:
+            raise DWGParseError(
+                f"DWG文件版本不支持\n\n"
+                f"文件：{filepath.name}\n"
+                f"错误：{str(e)}\n\n"
+                "当前支持的版本：\n"
+                "• R12 - R2024\n\n"
+                "建议：\n"
+                "• 使用AutoCAD等软件将文件另存为R2018或更早版本\n"
+                "• 确认文件是否为有效的DWG格式"
+            )
         except Exception as e:
-            raise DWGParseError(f"解析失败: {e}")
+            raise DWGParseError(
+                f"解析DWG文件时发生未知错误\n\n"
+                f"文件：{filepath.name}\n"
+                f"错误类型：{type(e).__name__}\n"
+                f"错误信息：{str(e)[:200]}\n\n"
+                "建议：\n"
+                "• 检查文件是否完整\n"
+                "• 尝试用CAD软件打开文件验证其有效性\n"
+                "• 如问题持续，请联系技术支持并提供错误信息"
+            )
 
         # 创建文档模型
         dwg_document = DWGDocument()
