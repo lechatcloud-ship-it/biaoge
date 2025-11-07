@@ -25,15 +25,21 @@ class SpatialIndex:
         self.entity_map = {}
         logger.info(f"空间索引初始化 (R-tree: {self.use_rtree})")
     
+    def build(self, entities: List[Entity]):
+        """批量构建索引"""
+        for entity in entities:
+            self.insert(entity)
+        logger.debug(f"空间索引构建完成: {len(entities)}个实体")
+
     def insert(self, entity: Entity):
         """插入实体"""
         bbox = self._get_bbox(entity)
         if not bbox:
             return
-        
+
         entity_id = id(entity)
         self.entity_map[entity_id] = entity
-        
+
         if self.use_rtree:
             self.idx.insert(entity_id, bbox)
         else:
