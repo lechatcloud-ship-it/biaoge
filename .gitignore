@@ -16,36 +16,48 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
-share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
-
-# PyInstaller
-*.manifest
-*.spec
 
 # Virtual environments
 venv/
 ENV/
 env/
 
-# IDEs
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS
-.DS_Store
-Thumbs.db
-
 # Logs
 logs/
 *.log
 
-# User config
-.biaoge/
+# Config and cache
+config.toml
+*.db
+*.sqlite
+.cache/
+__pycache__/
+
+# User data
+~/.biaoge/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PyInstaller
+*.spec
+build/
+dist/
+
+# Temporary
+*.tmp
+*.bak
+*.old
+*_old.py
+*_backup.py

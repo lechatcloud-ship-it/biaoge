@@ -1,43 +1,22 @@
-# DWG智能翻译算量系统 - Python依赖清单
-# Python 3.11+
-
-# GUI框架
+# 核心依赖
 PyQt6>=6.6.0
-PyQt6-Qt6>=6.6.0
-PyQt-Fluent-Widgets>=1.5.0
-
-# DWG/DXF解析
 ezdxf>=1.1.0
-
-# 数值计算和加速
-numpy>=1.26.0
-numba>=0.58.0
-
-# HTTP客户端
+dashscope>=1.23.0
 requests>=2.31.0
 
-# 阿里云百炼大模型SDK
-dashscope>=1.23.0
+# 数据处理
+numpy>=1.24.0
+pandas>=2.0.0
 
-# Excel导出
-openpyxl>=3.1.0
+# 性能优化
+numba>=0.58.0
+psutil>=5.9.0
 
-# PDF生成
-reportlab>=4.0.0
+# 可选依赖
+# pyqt-fluent-widgets>=1.5.0  # 更好的UI
+# rtree>=1.0.0  # 更好的空间索引性能
 
-# 高性能绘图
-pyqtgraph>=0.13.0
-
-# 系统密钥管理
-keyring>=24.0.0
-
-# 配置文件
-toml>=0.10.2
-
-# 几何计算（可选）
-shapely>=2.0.0
-
-# 开发工具
-pytest>=7.4.0
-pytest-qt>=4.2.0
-black>=23.0.0
+# 开发和打包
+# pyinstaller>=6.0.0  # 打包为exe
+# black>=23.0.0  # 代码格式化
+# mypy>=1.0.0  # 类型检查
