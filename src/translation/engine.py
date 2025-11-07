@@ -50,20 +50,31 @@ class TranslationEngine:
     ):
         """
         初始化翻译引擎
-        
+
         Args:
             client: 百炼API客户端，如果为None则自动创建
             cache: 翻译缓存，如果为None则自动创建
         """
         config = ConfigManager()
-        
+
         self.client = client or BailianClient()
         self.cache = cache or TranslationCache()
-        
+
+        # 从配置读取翻译设置（确保设置生效）
         self.batch_size = config.get('translation.batch_size', 50)
         self.cache_enabled = config.get('translation.cache_enabled', True)
-        
-        logger.info("翻译引擎初始化完成")
+        self.context_window = config.get('translation.context_window', 3)
+        self.use_terminology = config.get('translation.use_terminology', True)
+        self.post_process = config.get('translation.post_process', True)
+
+        logger.info(
+            f"翻译引擎初始化完成 - "
+            f"批量大小: {self.batch_size}, "
+            f"缓存: {self.cache_enabled}, "
+            f"上下文窗口: {self.context_window}, "
+            f"术语库: {self.use_terminology}, "
+            f"后处理: {self.post_process}"
+        )
     
     def translate_document(
         self,
@@ -226,7 +237,13 @@ class TranslationEngine:
             logger.info(f"翻译批次 {batch_num}/{total_batches} ({len(batch)}条)")
             
             try:
-                results = self.client.translate_batch(batch, from_lang, to_lang)
+                # 使用配置的文本翻译模型
+                results = self.client.translate_batch(
+                    batch,
+                    from_lang,
+                    to_lang,
+                    task_type='text'  # 使用文本翻译模型
+                )
                 all_results.extend(results)
                 
                 if progress_callback:
@@ -239,7 +256,12 @@ class TranslationEngine:
                 # 失败时逐个翻译
                 for text in batch:
                     try:
-                        result = self.client.translate_text(text, from_lang, to_lang)
+                        result = self.client.translate_text(
+                            text,
+                            from_lang,
+                            to_lang,
+                            task_type='text'  # 使用文本翻译模型
+                        )
                         all_results.append(result)
                     except Exception as e2:
                         logger.error(f"单文本翻译失败: {text}, {e2}")

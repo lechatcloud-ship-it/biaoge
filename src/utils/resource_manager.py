@@ -4,13 +4,22 @@ import psutil
 import os
 from typing import Dict
 from ..utils.logger import logger
+from .config_manager import ConfigManager
 
 class ResourceManager:
     """资源管理器"""
-    
+
     def __init__(self):
         self.process = psutil.Process(os.getpid())
-        logger.info("资源管理器初始化")
+        self.config = ConfigManager()
+        # 从配置读取内存阈值（确保设置生效）
+        self.memory_threshold_mb = self.config.get('performance.memory_threshold_mb', 500)
+        self.auto_optimize = self.config.get('performance.auto_optimize', True)
+        logger.info(
+            f"资源管理器初始化 - "
+            f"内存阈值: {self.memory_threshold_mb}MB, "
+            f"自动优化: {self.auto_optimize}"
+        )
     
     def get_memory_usage(self) -> Dict:
         """获取内存使用情况"""
@@ -34,12 +43,20 @@ class ResourceManager:
         logger.info(f"内存优化完成: 释放 {freed:.2f} MB")
         return freed
     
-    def check_memory_threshold(self, threshold_mb=500):
-        """检查内存阈值"""
+    def check_memory_threshold(self, threshold_mb=None):
+        """检查内存阈值（使用配置的阈值）"""
+        if threshold_mb is None:
+            threshold_mb = self.memory_threshold_mb
+
         usage = self.get_memory_usage()
         if usage['rss_mb'] > threshold_mb:
-            logger.warning(f"内存使用过高: {usage['rss_mb']:.2f} MB")
-            self.optimize_memory()
+            logger.warning(
+                f"内存使用过高: {usage['rss_mb']:.2f} MB "
+                f"(阈值: {threshold_mb} MB)"
+            )
+            if self.auto_optimize:
+                self.optimize_memory()
+                logger.info("已自动优化内存（配置启用）")
             return False
         return True
     

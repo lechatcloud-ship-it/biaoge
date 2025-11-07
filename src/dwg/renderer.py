@@ -15,6 +15,7 @@ from .spatial_index import SpatialIndex
 from ..utils.logger import logger
 from ..utils.performance import perf_monitor
 from ..utils.resource_manager import resource_manager
+from ..utils.config_manager import ConfigManager
 
 
 class DWGCanvas(QWidget):
@@ -26,6 +27,9 @@ class DWGCanvas(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+
+        # 读取配置（确保性能设置生效）
+        config = ConfigManager()
 
         # 文档数据
         self.document: Optional[DWGDocument] = None
@@ -39,10 +43,10 @@ class DWGCanvas(QWidget):
         # 背景色
         self.background_color = QColor(33, 33, 33)  # 深色背景
 
-        # 渲染选项
+        # 渲染选项（从配置读取）
         self.show_axes = True
         self.show_grid = False
-        self.antialiasing = True
+        self.antialiasing = config.get('performance.antialiasing', True)
 
         # 图层可见性
         self.visible_layers = set()
@@ -52,9 +56,10 @@ class DWGCanvas(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent)
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
 
-        # 空间索引（商业级优化）
+        # 空间索引（商业级优化，从配置读取）
         self.spatial_index: Optional[SpatialIndex] = None
-        self.use_spatial_index = True  # 默认启用
+        self.use_spatial_index = config.get('performance.spatial_index', True)
+        self.entity_threshold = config.get('performance.entity_threshold', 100)
 
         # 渲染缓存
         self._viewport_bbox = None
@@ -75,15 +80,20 @@ class DWGCanvas(QWidget):
         # 初始化所有图层为可见
         self.visible_layers = {layer.name for layer in document.layers}
 
-        # 构建空间索引（商业级优化）
-        if self.use_spatial_index and len(document.entities) > 100:
+        # 构建空间索引（商业级优化，使用配置的阈值）
+        if self.use_spatial_index and len(document.entities) > self.entity_threshold:
             index_start = perf_monitor.start_timer('spatial_index_build')
             self.spatial_index = SpatialIndex()
             self.spatial_index.build(document.entities)
             perf_monitor.end_timer('spatial_index_build', index_start)
-            logger.info(f"空间索引构建完成: {len(document.entities)}个实体")
+            logger.info(
+                f"空间索引构建完成: {len(document.entities)}个实体 "
+                f"(阈值: {self.entity_threshold})"
+            )
         else:
             self.spatial_index = None
+            if len(document.entities) > self.entity_threshold:
+                logger.info(f"空间索引已禁用（配置）")
 
         # 更新可见实体
         self._updateVisibleEntities()

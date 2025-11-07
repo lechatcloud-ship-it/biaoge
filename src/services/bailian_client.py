@@ -28,73 +28,127 @@ class BailianAPIError(Exception):
 
 
 class BailianClient:
-    """阿里云百炼API客户端"""
-    
+    """阿里云百炼API客户端 - 支持多模型配置"""
+
     # 模型定价（元/1000 tokens）
     PRICING = {
+        # 通用模型
         'qwen-plus': {'input': 0.004, 'output': 0.004},
         'qwen-max': {'input': 0.040, 'output': 0.040},
         'qwen-turbo': {'input': 0.002, 'output': 0.002},
+        # 多模态模型
+        'qwen-vl-max': {'input': 0.020, 'output': 0.020},
+        'qwen-vl-plus': {'input': 0.008, 'output': 0.008},
+        # 翻译专用模型
+        'qwen-mt-plus': {'input': 0.006, 'output': 0.006},
+        'qwen-mt-turbo': {'input': 0.003, 'output': 0.003},
+        'qwen-mt-image': {'input': 0.012, 'output': 0.012},
     }
-    
-    def __init__(self, api_key: Optional[str] = None, model: str = 'qwen-plus'):
+
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
         """
         初始化百炼客户端
-        
+
         Args:
             api_key: API密钥，如果为None则从环境变量DASHSCOPE_API_KEY读取
-            model: 模型名称，默认qwen-plus
+            model: 模型名称，如果为None则从配置文件读取
         """
         self.api_key = api_key or os.getenv('DASHSCOPE_API_KEY')
         if not self.api_key:
             raise BailianAPIError(
                 "未找到API密钥，请设置环境变量DASHSCOPE_API_KEY或传入api_key参数"
             )
-        
+
         config = ConfigManager()
-        self.model = model
+
+        # 从配置读取模型设置
+        self.use_custom_model = config.get('api.use_custom_model', False)
+        self.custom_model = config.get('api.custom_model', '')
+
+        # 读取不同任务的模型配置
+        self.multimodal_model = config.get('api.multimodal_model', 'qwen-vl-plus')
+        self.image_model = config.get('api.image_model', 'qwen-vl-plus')
+        self.text_model = config.get('api.text_model', 'qwen-mt-plus')
+
+        # 如果传入了model参数，使用传入的值
+        if model:
+            self.text_model = model
+
         self.endpoint = config.get('api.endpoint', 'https://dashscope.aliyuncs.com')
         self.base_url = f"{self.endpoint}/compatible-mode/v1"
         self.timeout = config.get('api.timeout', 60)
         self.max_retries = config.get('api.max_retries', 3)
-        
-        logger.info(f"百炼客户端初始化: model={self.model}, endpoint={self.endpoint}")
+
+        logger.info(
+            f"百炼客户端初始化 - "
+            f"文本模型: {self.text_model}, "
+            f"图片模型: {self.image_model}, "
+            f"多模态: {self.multimodal_model}, "
+            f"自定义模型: {self.use_custom_model}"
+        )
+
+    def get_model_for_task(self, task_type: str = 'text') -> str:
+        """
+        根据任务类型获取合适的模型
+
+        Args:
+            task_type: 任务类型 - 'text'(文本翻译), 'image'(图片翻译), 'multimodal'(多模态)
+
+        Returns:
+            str: 模型名称
+        """
+        # 如果启用了自定义模型，优先使用
+        if self.use_custom_model and self.custom_model:
+            return self.custom_model
+
+        # 根据任务类型选择模型
+        if task_type == 'image':
+            return self.image_model
+        elif task_type == 'multimodal':
+            return self.multimodal_model
+        else:
+            return self.text_model
     
     def translate_text(
         self,
         text: str,
         from_lang: str,
         to_lang: str,
-        context: Optional[str] = None
+        context: Optional[str] = None,
+        task_type: str = 'text'
     ) -> TranslationResult:
         """
         翻译单个文本
-        
+
         Args:
             text: 要翻译的文本
             from_lang: 源语言（如：中文、英文、日文、韩文）
             to_lang: 目标语言
             context: 上下文提示（可选）
-        
+            task_type: 任务类型 - 'text'(文本翻译), 'image'(图片翻译), 'multimodal'(多模态)
+
         Returns:
             TranslationResult: 翻译结果
         """
+        # 选择合适的模型
+        model = self.get_model_for_task(task_type)
+
         # 构建prompt
         system_prompt = self._build_translation_prompt(from_lang, to_lang, context)
-        
+
         # 调用API
         messages = [
             {'role': 'system', 'content': system_prompt},
             {'role': 'user', 'content': text}
         ]
-        
-        response = self._call_api(messages)
-        
+
+        response = self._call_api(messages, model)
+
         return TranslationResult(
             original_text=text,
             translated_text=response['translated_text'],
             tokens_used=response['tokens_used'],
-            model=self.model,
+            model=model,
             cost_estimate=response['cost_estimate']
         )
     
@@ -103,62 +157,68 @@ class BailianClient:
         texts: List[str],
         from_lang: str,
         to_lang: str,
-        context: Optional[str] = None
+        context: Optional[str] = None,
+        task_type: str = 'text'
     ) -> List[TranslationResult]:
         """
         批量翻译文本（一次API调用）
-        
+
         Args:
             texts: 要翻译的文本列表
             from_lang: 源语言
             to_lang: 目标语言
             context: 上下文提示
-        
+            task_type: 任务类型 - 'text'(文本翻译), 'image'(图片翻译), 'multimodal'(多模态)
+
         Returns:
             List[TranslationResult]: 翻译结果列表
         """
         if not texts:
             return []
-        
+
+        # 选择合适的模型
+        model = self.get_model_for_task(task_type)
+
         # 构建批量翻译prompt
         system_prompt = self._build_batch_translation_prompt(from_lang, to_lang, context)
-        
+
         # 构建批量文本（带编号）
         numbered_texts = '\n'.join([f"{i+1}. {text}" for i, text in enumerate(texts)])
-        
+
         messages = [
             {'role': 'system', 'content': system_prompt},
             {'role': 'user', 'content': numbered_texts}
         ]
-        
-        response = self._call_api(messages)
-        
+
+        response = self._call_api(messages, model)
+
         # 解析批量翻译结果
         translated_texts = self._parse_batch_response(response['translated_text'], len(texts))
-        
+
         # 计算单个文本的token消耗（平均分配）
         tokens_per_text = response['tokens_used'] // len(texts)
         cost_per_text = response['cost_estimate'] / len(texts)
-        
+
         results = []
         for original, translated in zip(texts, translated_texts):
             results.append(TranslationResult(
                 original_text=original,
                 translated_text=translated,
                 tokens_used=tokens_per_text,
-                model=self.model,
+                model=model,
                 cost_estimate=cost_per_text
             ))
-        
+
         return results
     
-    def _call_api(self, messages: List[Dict[str, str]]) -> Dict:
+    def _call_api(self, messages: List[Dict[str, str]], model: str) -> Dict:
         """
         调用API（带重试）
-        
+
         Args:
             messages: 消息列表
-        
+            model: 要使用的模型名称
+
         Returns:
             Dict: 包含translated_text, tokens_used, cost_estimate的字典
         """
@@ -166,9 +226,9 @@ class BailianClient:
             'Authorization': f'Bearer {self.api_key}',
             'Content-Type': 'application/json'
         }
-        
+
         payload = {
-            'model': self.model,
+            'model': model,
             'messages': messages
         }
         
@@ -193,7 +253,7 @@ class BailianClient:
                     # 计算成本
                     input_tokens = data['usage']['prompt_tokens']
                     output_tokens = data['usage']['completion_tokens']
-                    pricing = self.PRICING.get(self.model, self.PRICING['qwen-plus'])
+                    pricing = self.PRICING.get(model, self.PRICING['qwen-plus'])
                     cost_estimate = (
                         input_tokens * pricing['input'] / 1000 +
                         output_tokens * pricing['output'] / 1000
@@ -422,13 +482,13 @@ class BailianClient:
     def test_connection(self) -> bool:
         """
         测试API连接
-        
+
         Returns:
             bool: 连接是否成功
         """
         try:
-            result = self.translate_text("测试", "中文", "英文")
-            logger.info(f"API连接测试成功: {result.original_text} -> {result.translated_text}")
+            result = self.translate_text("测试", "中文", "英文", task_type='text')
+            logger.info(f"API连接测试成功: {result.original_text} -> {result.translated_text} (模型: {result.model})")
             return True
         except Exception as e:
             logger.error(f"API连接测试失败: {e}")

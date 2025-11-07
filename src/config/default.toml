@@ -7,8 +7,19 @@ author = "BiaoGe Team"
 
 [api]
 provider = "aliyun-bailian"
-endpoint = "https://dashscope.aliyuncs.com/api/v1"
-model = "qwen-plus"
+endpoint = "https://dashscope.aliyuncs.com"
+# API密钥通过环境变量DASHSCOPE_API_KEY或设置界面配置
+api_key = ""
+
+# 模型配置（根据任务类型选择不同模型）
+multimodal_model = "qwen-vl-plus"  # 多模态模型：qwen-vl-max, qwen-vl-plus, qwen-max
+image_model = "qwen-vl-plus"       # 图片翻译模型：qwen-vl-max, qwen-vl-plus, qwen-mt-image
+text_model = "qwen-mt-plus"        # 文本翻译模型：qwen-mt-plus, qwen-mt-turbo, qwen-plus, qwen-turbo, qwen-max
+
+# 自定义模型（优先级最高）
+use_custom_model = false
+custom_model = ""
+
 timeout = 60
 max_retries = 3
 

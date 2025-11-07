@@ -56,10 +56,21 @@ python main.py
   - 空间索引优化
 
 #### 2. AI翻译 ✅
-- **模型选择**:
-  - qwen-plus（推荐，¥0.004/1K tokens）
-  - qwen-turbo（快速，¥0.002/1K tokens）
-  - qwen-max（最强，¥0.040/1K tokens）
+- **多模态模型**:
+  - qwen-vl-max（多模态-最强，¥0.020/1K tokens）
+  - qwen-vl-plus（多模态-推荐，¥0.008/1K tokens）
+  - qwen-max（通用最强，¥0.040/1K tokens）
+- **图片翻译模型**:
+  - qwen-vl-max（图片识别-最强，¥0.020/1K tokens）
+  - qwen-vl-plus（图片识别-推荐，¥0.008/1K tokens）
+  - qwen-mt-image（专用图片翻译，¥0.012/1K tokens）
+- **文本翻译模型**:
+  - qwen-mt-plus（翻译专用-推荐，¥0.006/1K tokens）
+  - qwen-mt-turbo（翻译专用-快速，¥0.003/1K tokens）
+  - qwen-plus（通用-推荐，¥0.004/1K tokens）
+  - qwen-turbo（通用-快速，¥0.002/1K tokens）
+  - qwen-max（通用-最强，¥0.040/1K tokens）
+- **自定义模型**: 支持用户自定义DashScope兼容的任何模型名称
 - **语言支持**:
   - 中文/英文/日文/韩文
   - 法文/德文/西文/俄文
@@ -99,27 +110,41 @@ python main.py
 
 ### 系统功能
 
-#### 5. 设置管理 ✅
-- **阿里云百炼**:
+#### 5. 设置管理 ✅（6个选项卡）
+- **🤖 阿里云百炼**:
   - API密钥配置
-  - 模型选择
+  - 多模态模型选择（qwen-vl-max/plus, qwen-max）
+  - 图片翻译模型选择（qwen-vl-max/plus, qwen-mt-image）
+  - 文本翻译模型选择（qwen-mt-plus/turbo, qwen-plus/turbo/max）
+  - 自定义模型支持（兼容所有DashScope模型）
   - 端点设置
   - 超时和重试配置
   - 连接测试
-- **性能优化**:
-  - 空间索引开关
-  - 抗锯齿设置
-  - 内存阈值配置
-  - 性能监控开关
-- **界面设置**:
-  - 主题选择（亮/暗/自动）
-  - 字体大小
-  - 窗口行为
-  - 最近文件数
-- **高级设置**:
-  - 日志级别
-  - 缓存管理
-  - 配置重置
+- **🌐 翻译设置**:
+  - 翻译引擎配置（批量大小、并发线程）
+  - 智能缓存（启用、TTL、自动清理）
+  - 翻译质量（上下文窗口、专业术语库、后处理优化）
+  - 默认语言对配置
+- **⚡ 性能优化**:
+  - 渲染设置（空间索引、抗锯齿、实体阈值）
+  - 性能限制（FPS限制、内存阈值、自动优化）
+  - 缓存管理（缓存大小）
+  - 性能监控（启用监控、历史记录、生成报告）
+- **🎨 界面设置**:
+  - 外观主题（亮色/暗色/系统/蓝色/绿色）
+  - 字体设置（字体族、大小、UI缩放）
+  - 窗口行为（启动最大化、记住位置、显示状态栏/工具栏）
+  - 布局设置（选项卡位置、确认退出、拖放支持）
+  - 文件设置（最近文件数、双击行为）
+- **💾 数据管理**:
+  - 自动保存（启用、保存间隔）
+  - 数据备份（启用、备份目录、保留数量、手动备份/恢复）
+  - 数据清理（清除缓存、清除日志、清除临时文件）
+- **🔧 高级设置**:
+  - 日志配置（日志级别、日志文件、最大大小）
+  - 更新设置（自动检查更新、更新频率、更新通道）
+  - 统计设置（启用使用统计、匿名统计）
+  - 重置选项（恢复默认设置）
 
 #### 6. 日志查看器 ✅
 - 实时日志显示
@@ -148,9 +173,20 @@ python main.py
 
 ```toml
 [api]
-api_key = "sk-xxx..."  # API密钥
-model = "qwen-plus"    # 模型名称
+provider = "aliyun-bailian"
 endpoint = "https://dashscope.aliyuncs.com"
+# API密钥通过环境变量DASHSCOPE_API_KEY或设置界面配置
+api_key = ""
+
+# 模型配置（根据任务类型选择不同模型）
+multimodal_model = "qwen-vl-plus"  # 多模态模型：qwen-vl-max, qwen-vl-plus, qwen-max
+image_model = "qwen-vl-plus"       # 图片翻译模型：qwen-vl-max, qwen-vl-plus, qwen-mt-image
+text_model = "qwen-mt-plus"        # 文本翻译模型：qwen-mt-plus, qwen-mt-turbo, qwen-plus, qwen-turbo, qwen-max
+
+# 自定义模型（优先级最高）
+use_custom_model = false
+custom_model = ""
+
 timeout = 60           # 超时（秒）
 max_retries = 3        # 重试次数
 
