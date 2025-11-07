@@ -3,7 +3,7 @@
 保证非破坏性修改，只改文本内容，其他属性完全不变
 """
 from dataclasses import dataclass
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 import ezdxf
 from ezdxf.document import Drawing
@@ -141,6 +141,18 @@ class PrecisionDWGModifier:
                 continue
 
             try:
+                # ⚠️ 关键修复：根据entity_id重新查找实体
+                # entity_ref可能指向旧文档，需要从当前doc中重新查找
+                try:
+                    entity = doc.entitydb[trans.entity_id]
+                except KeyError:
+                    logger.error(f"找不到实体: {trans.entity_id}")
+                    self.stats.error_count += 1
+                    continue
+
+                # 更新entity_ref为当前文档中的实体
+                trans.entity_ref = entity
+
                 # 根据实体类型调用不同的修改方法
                 if trans.entity_type == TextEntityType.TEXT:
                     self._modify_text(trans)
