@@ -64,6 +64,7 @@ class MainWindow(FluentWindow if FLUENT_WIDGETS_AVAILABLE else object):
         """初始化导航（Fluent Widgets）"""
         from .dwg_viewer import DWGViewerInterface
         from .welcome import WelcomeInterface
+        from .translation import TranslationInterface
 
         # 欢迎界面
         self.welcomeInterface = WelcomeInterface(self)
@@ -81,9 +82,13 @@ class MainWindow(FluentWindow if FLUENT_WIDGETS_AVAILABLE else object):
             '图纸查看'
         )
 
-        # TODO: 添加其他界面
-        # self.translationInterface = TranslationInterface(self)
-        # self.addSubInterface(...)
+        # 翻译界面
+        self.translationInterface = TranslationInterface(self)
+        self.addSubInterface(
+            self.translationInterface,
+            FluentIcon.LANGUAGE,
+            '智能翻译'
+        )
 
         # 设置界面（底部）
         # self.settingsInterface = SettingsInterface(self)
@@ -106,3 +111,17 @@ class MainWindow(FluentWindow if FLUENT_WIDGETS_AVAILABLE else object):
         layout.addWidget(label)
 
         self.setCentralWidget(central_widget)
+
+    def refreshCanvas(self):
+        """刷新画布（翻译完成后调用）"""
+        if hasattr(self, 'dwgViewerInterface') and self.dwgViewerInterface.canvas:
+            self.dwgViewerInterface.canvas.update()
+            logger.info("画布已刷新显示翻译结果")
+
+    def onDocumentLoaded(self, document):
+        """文档加载完成的回调"""
+        # 通知翻译界面
+        if hasattr(self, 'translationInterface'):
+            self.translationInterface.setDocument(document)
+
+        logger.info("文档已同步到所有界面")

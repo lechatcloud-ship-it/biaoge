@@ -160,6 +160,11 @@ class DWGViewerInterface(QWidget):
                     f"已加载 {self.document.entity_count} 个实体"
                 )
 
+            # 通知主窗口文档已加载
+            parent = self.parent()
+            if parent and hasattr(parent, 'onDocumentLoaded'):
+                parent.onDocumentLoaded(self.document)
+
             logger.info("图纸加载成功")
 
         except DWGParseError as e:

@@ -16,6 +16,9 @@ numba>=0.58.0
 # HTTP客户端
 requests>=2.31.0
 
+# 阿里云百炼大模型SDK
+dashscope>=1.23.0
+
 # Excel导出
 openpyxl>=3.1.0
 
