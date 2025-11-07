@@ -12,9 +12,11 @@ except:
     FLUENT = False
 
 from ..export.dwg_exporter import DWGExporter
+from ..export.advanced_dwg_exporter import AdvancedDWGExporter
 from ..export.pdf_exporter import PDFExporter
 from ..export.excel_exporter import ExcelExporter
 from ..utils.logger import logger
+from ..utils.performance import perf_monitor
 
 class ExportInterface(QWidget):
     def __init__(self, parent=None):
@@ -56,8 +58,20 @@ class ExportInterface(QWidget):
             return
         path, _ = QFileDialog.getSaveFileName(self, "保存DWG", "", "DWG Files (*.dwg);;DXF Files (*.dxf)")
         if path:
-            DWGExporter().export(self.document, path)
-            QMessageBox.information(self, "成功", "导出成功！")
+            try:
+                start = perf_monitor.start_timer('dwg_export')
+                exporter = AdvancedDWGExporter()
+                success = exporter.export(self.document, path, version='R2018')
+                perf_monitor.end_timer('dwg_export', start)
+
+                if success:
+                    QMessageBox.information(self, "成功", f"导出成功！\n文件: {path}")
+                    logger.info(f"DWG导出成功: {path}")
+                else:
+                    QMessageBox.warning(self, "警告", "导出完成，但部分实体可能失败")
+            except Exception as e:
+                logger.error(f"导出失败: {e}")
+                QMessageBox.critical(self, "错误", f"导出失败: {e}")
     
     def onExportPDF(self):
         if not self.document:

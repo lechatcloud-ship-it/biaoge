@@ -11,7 +11,10 @@ from .entities import (
     DWGDocument, Entity, LineEntity, CircleEntity,
     TextEntity, PolylineEntity, EntityType
 )
+from .spatial_index import SpatialIndex
 from ..utils.logger import logger
+from ..utils.performance import perf_monitor
+from ..utils.resource_manager import resource_manager
 
 
 class DWGCanvas(QWidget):
@@ -44,22 +47,43 @@ class DWGCanvas(QWidget):
         # 图层可见性
         self.visible_layers = set()
 
-        # 性能优化
+        # 性能优化 - 商业级
         self.setMouseTracking(True)
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent)
         self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground)
 
+        # 空间索引（商业级优化）
+        self.spatial_index: Optional[SpatialIndex] = None
+        self.use_spatial_index = True  # 默认启用
+
+        # 渲染缓存
+        self._viewport_bbox = None
+        self._last_zoom = 1.0
+        self._last_pan = QPointF(0, 0)
+
         # 设置最小尺寸
         self.setMinimumSize(400, 300)
 
-        logger.info("DWG画布初始化完成")
+        logger.info("DWG画布初始化完成（商业级）")
 
     def setDocument(self, document: DWGDocument):
         """设置DWG文档"""
+        start = perf_monitor.start_timer('set_document')
+
         self.document = document
 
         # 初始化所有图层为可见
         self.visible_layers = {layer.name for layer in document.layers}
+
+        # 构建空间索引（商业级优化）
+        if self.use_spatial_index and len(document.entities) > 100:
+            index_start = perf_monitor.start_timer('spatial_index_build')
+            self.spatial_index = SpatialIndex()
+            self.spatial_index.build(document.entities)
+            perf_monitor.end_timer('spatial_index_build', index_start)
+            logger.info(f"空间索引构建完成: {len(document.entities)}个实体")
+        else:
+            self.spatial_index = None
 
         # 更新可见实体
         self._updateVisibleEntities()
@@ -67,23 +91,48 @@ class DWGCanvas(QWidget):
         # 自适应视图
         self.fitToView()
 
+        # 检查内存
+        resource_manager.check_memory_threshold()
+
+        perf_monitor.end_timer('set_document', start)
         logger.info(f"设置文档: {len(document.entities)}个实体, {len(document.layers)}个图层")
         self.update()
 
     def _updateVisibleEntities(self):
-        """更新可见实体列表（视锥剔除 + 图层过滤）"""
+        """更新可见实体列表（视锥剔除 + 图层过滤）- 商业级优化"""
         if not self.document:
             self.visible_entities = []
             return
 
-        # 简单实现：先显示所有实体（后续可加视锥剔除）
-        self.visible_entities = [
-            entity for entity in self.document.entities
-            if entity.layer in self.visible_layers
-        ]
+        start = perf_monitor.start_timer('update_visible_entities')
+
+        # 计算视口边界框
+        viewport_bbox = self._calculateViewportBBox()
+
+        # 使用空间索引查询（商业级优化）
+        if self.spatial_index and viewport_bbox:
+            # 空间索引查询
+            entities_in_view = self.spatial_index.query(viewport_bbox)
+
+            # 图层过滤
+            self.visible_entities = [
+                entity for entity in entities_in_view
+                if entity.layer in self.visible_layers
+            ]
+        else:
+            # 回退到简单过滤
+            self.visible_entities = [
+                entity for entity in self.document.entities
+                if entity.layer in self.visible_layers
+            ]
+
+        perf_monitor.end_timer('update_visible_entities', start)
+        logger.debug(f"可见实体: {len(self.visible_entities)}/{len(self.document.entities)}")
 
     def paintEvent(self, event):
-        """绘制事件"""
+        """绘制事件 - 商业级性能监控"""
+        start = perf_monitor.start_timer('paint_event')
+
         painter = QPainter(self)
 
         # 抗锯齿
@@ -97,7 +146,14 @@ class DWGCanvas(QWidget):
 
         if not self.document:
             self._drawEmptyState(painter)
+            perf_monitor.end_timer('paint_event', start)
             return
+
+        # 检查视口是否变化，触发可见实体更新
+        if self._viewportChanged():
+            self._updateVisibleEntities()
+            self._last_zoom = self.zoom_level
+            self._last_pan = QPointF(self.pan_offset)
 
         # 应用视口变换
         painter.save()
@@ -109,14 +165,19 @@ class DWGCanvas(QWidget):
         if self.show_axes:
             self._drawAxes(painter)
 
-        # 绘制实体
+        # 绘制实体（商业级优化）
+        entity_start = perf_monitor.start_timer('draw_entities')
         for entity in self.visible_entities:
             self._drawEntity(painter, entity)
+        perf_monitor.end_timer('draw_entities', entity_start)
 
         painter.restore()
 
         # 绘制UI叠加层
         self._drawOverlay(painter)
+
+        perf_monitor.end_timer('paint_event', start)
+        perf_monitor.increment('frame_count')
 
     def _drawEmptyState(self, painter: QPainter):
         """绘制空状态提示"""
@@ -371,6 +432,33 @@ class DWGCanvas(QWidget):
             return None
 
         return (min_x, min_y, max_x, max_y)
+
+    def _calculateViewportBBox(self):
+        """计算视口边界框（世界坐标）- 商业级优化"""
+        if not self.document:
+            return None
+
+        # 视口中心在世界坐标
+        center_x = -self.pan_offset.x() / self.zoom_level
+        center_y = self.pan_offset.y() / self.zoom_level
+
+        # 视口半宽高（世界坐标）
+        half_width = (self.width() / 2) / self.zoom_level
+        half_height = (self.height() / 2) / self.zoom_level
+
+        # 返回边界框 (min_x, min_y, max_x, max_y)
+        return (
+            center_x - half_width,
+            center_y - half_height,
+            center_x + half_width,
+            center_y + half_height
+        )
+
+    def _viewportChanged(self) -> bool:
+        """检查视口是否变化"""
+        zoom_changed = abs(self.zoom_level - self._last_zoom) > 0.01
+        pan_changed = (self.pan_offset - self._last_pan).manhattanLength() > 1.0
+        return zoom_changed or pan_changed
 
     def resetView(self):
         """重置视图"""
