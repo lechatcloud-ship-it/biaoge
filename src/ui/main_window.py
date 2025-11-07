@@ -65,6 +65,9 @@ class MainWindow(FluentWindow if FLUENT_WIDGETS_AVAILABLE else object):
         from .dwg_viewer import DWGViewerInterface
         from .welcome import WelcomeInterface
         from .translation import TranslationInterface
+        from .calculation import CalculationInterface
+        from .export import ExportInterface
+        from .settings import SettingsInterface
 
         # 欢迎界面
         self.welcomeInterface = WelcomeInterface(self)
@@ -90,14 +93,30 @@ class MainWindow(FluentWindow if FLUENT_WIDGETS_AVAILABLE else object):
             '智能翻译'
         )
 
+        # 算量界面
+        self.calculationInterface = CalculationInterface(self)
+        self.addSubInterface(
+            self.calculationInterface,
+            FluentIcon.CALCULATOR,
+            '工程算量'
+        )
+
+        # 导出界面
+        self.exportInterface = ExportInterface(self)
+        self.addSubInterface(
+            self.exportInterface,
+            FluentIcon.SHARE,
+            '导出'
+        )
+
         # 设置界面（底部）
-        # self.settingsInterface = SettingsInterface(self)
-        # self.addSubInterface(
-        #     self.settingsInterface,
-        #     FluentIcon.SETTING,
-        #     '设置',
-        #     NavigationItemPosition.BOTTOM
-        # )
+        self.settingsInterface = SettingsInterface(self)
+        self.addSubInterface(
+            self.settingsInterface,
+            FluentIcon.SETTING,
+            '设置',
+            NavigationItemPosition.BOTTOM
+        )
 
     def initBasicUI(self):
         """初始化基础UI（无Fluent Widgets时的后备方案）"""
@@ -120,8 +139,12 @@ class MainWindow(FluentWindow if FLUENT_WIDGETS_AVAILABLE else object):
 
     def onDocumentLoaded(self, document):
         """文档加载完成的回调"""
-        # 通知翻译界面
+        # 通知所有界面
         if hasattr(self, 'translationInterface'):
             self.translationInterface.setDocument(document)
+        if hasattr(self, 'calculationInterface'):
+            self.calculationInterface.setDocument(document)
+        if hasattr(self, 'exportInterface'):
+            self.exportInterface.setDocument(document)
 
         logger.info("文档已同步到所有界面")
