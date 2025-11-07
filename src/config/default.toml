@@ -27,6 +27,10 @@ max_retries = 3
 cache_enabled = true
 cache_ttl_days = 7
 batch_size = 50
+concurrent = 3
+context_window = 3
+use_terminology = true
+post_process = true
 default_source_lang = "zh-CN"
 default_target_lang = "en"
 
@@ -35,12 +39,53 @@ default_waste_factor = 0.03
 auto_deduction = true
 use_numba_acceleration = true
 
+[performance]
+spatial_index = true
+antialiasing = true
+entity_threshold = 100
+fps_limit = 60
+memory_threshold_mb = 500
+auto_optimize = true
+cache_size_mb = 100
+monitor_enabled = false
+monitor_history = 100
+generate_report = false
+
 [ui]
-theme = "auto"  # auto | light | dark
-language = "zh-CN"
-font_size = "medium"
-window_width = 1400
-window_height = 900
+theme = 0  # 0=亮色, 1=暗色, 2=系统, 3=蓝色, 4=绿色
+font_family = "微软雅黑"
+font_size = 9
+scale = 100
+start_maximized = false
+remember_position = true
+show_statusbar = true
+show_toolbar = true
+tab_position = 0
+confirm_exit = true
+drag_drop = true
+recent_files_count = 10
+double_click_action = 0
+
+[data]
+autosave_enabled = true
+autosave_interval = 5
+backup_enabled = false
+backup_path = "~/biaoge_backup"
+backup_count = 5
+
+[logging]
+level = "INFO"
+file = "logs/app.log"
+max_size_mb = 10
+
+[update]
+auto_check = true
+check_interval = 7
+channel = "stable"
+
+[stats]
+enabled = true
+anonymous = true
 
 [paths]
 data_dir = "~/.biaoge"
