@@ -18,6 +18,7 @@ from .translation import TranslationWidget
 from .calculation import CalculationWidget
 from .export import ExportWidget
 from .batch_widget import BatchWidget
+from .ai_chat_widget import AIChatWidget
 from .settings_dialog import SettingsDialog
 from .about import AboutDialog
 from .log_viewer import LogViewerDialog
@@ -87,6 +88,9 @@ class MainWindow(QMainWindow):
 
         self.performance_panel = PerformancePanel()
         self.tab_widget.addTab(self.performance_panel, "⚡ 性能")
+
+        self.ai_chat_widget = AIChatWidget()
+        self.tab_widget.addTab(self.ai_chat_widget, "💬 AI助手")
 
         splitter.addWidget(self.tab_widget)
         splitter.setStretchFactor(0, 7)
@@ -175,6 +179,7 @@ class MainWindow(QMainWindow):
         self.documentLoaded.connect(self.translation_widget.setDocument)
         self.documentLoaded.connect(self.calculation_widget.setDocument)
         self.documentLoaded.connect(self.export_widget.setDocument)
+        self.documentLoaded.connect(self.ai_chat_widget.set_document)
 
         self.calculation_widget.parent_window = self
         self.export_widget.parent_window = self
