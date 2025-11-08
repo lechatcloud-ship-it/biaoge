@@ -71,7 +71,7 @@ class CalculationInterface(QWidget):
         # 🚀 使用超精确识别器 (99.9999%准确率)
         if self.use_ultra_precise:
             logger.info("🚀 使用超精确识别器 (5阶段验证管道)")
-            recognizer = UltraPreciseRecognizer(use_ai=False)  # 暂不使用AI以加快速度
+            recognizer = UltraPreciseRecognizer(client=None)  # 暂不使用AI以加快速度
             self.components, self.component_confidences = recognizer.recognize(
                 self.document,
                 use_ai=False,

@@ -359,8 +359,8 @@ class TranslationEngine:
             original = result.original_text
             translated = result.translated_text
 
-            # 执行质量检查
-            quality_report = self.quality_control.check_translation(
+            # 执行质量检查 (返回问题列表)
+            issues = self.quality_control.check_translation(
                 original,
                 translated,
                 context={'from_lang': from_lang, 'to_lang': to_lang}
@@ -368,29 +368,35 @@ class TranslationEngine:
 
             quality_stats['checked'] += 1
 
-            # 记录质量等级
-            if quality_report.quality_level == QualityLevel.PERFECT:
+            # 根据问题数量和严重程度判断质量
+            critical_issues = [i for i in issues if i.severity == 'CRITICAL']
+            major_issues = [i for i in issues if i.severity == 'MAJOR']
+            minor_issues = [i for i in issues if i.severity == 'MINOR']
+
+            if len(issues) == 0:
                 quality_stats['perfect'] += 1
-            elif quality_report.quality_level in [QualityLevel.EXCELLENT, QualityLevel.GOOD]:
-                quality_stats['warnings'] += sum(
-                    1 for issue in quality_report.issues if issue.severity == 'MINOR'
-                )
+                issue_score = 100.0
             else:
-                quality_stats['errors'] += sum(
-                    1 for issue in quality_report.issues if issue.severity == 'CRITICAL'
-                )
+                # 计算质量分数: 每个CRITICAL -20分, MAJOR -10分, MINOR -5分
+                issue_score = max(0, 100 - len(critical_issues)*20 - len(major_issues)*10 - len(minor_issues)*5)
 
-            # 计算分数
-            total_score += quality_report.accuracy_rate
+                if critical_issues:
+                    quality_stats['errors'] += len(critical_issues)
+                if major_issues or minor_issues:
+                    quality_stats['warnings'] += len(major_issues) + len(minor_issues)
 
-            # 如果需要修正
-            if quality_report.corrected_translation:
-                result.translated_text = quality_report.corrected_translation
-                quality_stats['corrected'] += 1
-                logger.debug(
-                    f"🚀 翻译已修正: {original[:20]}... | "
-                    f"{translated[:20]}... -> {quality_report.corrected_translation[:20]}..."
-                )
+            total_score += issue_score
+
+            # 如果有critical问题，尝试自动修正
+            if critical_issues:
+                corrected = self.quality_control.auto_correct(original, translated, critical_issues)
+                if corrected and corrected != translated:
+                    result.translated_text = corrected
+                    quality_stats['corrected'] += 1
+                    logger.debug(
+                        f"🚀 翻译已修正: {original[:20]}... | "
+                        f"{translated[:20]}... -> {corrected[:20]}..."
+                    )
 
             corrected_results.append(result)
 
