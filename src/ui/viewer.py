@@ -29,12 +29,14 @@ class ViewerWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
+        # 画布 - 必须先创建，因为工具栏需要引用它
+        self.canvas = DWGCanvas()
+
         # 工具栏
         toolbar = self._create_toolbar()
         layout.addWidget(toolbar)
 
         # 画布
-        self.canvas = DWGCanvas()
         layout.addWidget(self.canvas)
 
         # 状态栏
