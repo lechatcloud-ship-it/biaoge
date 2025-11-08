@@ -231,7 +231,9 @@ class ComponentRecognizer:
             messages = [
                 {'role': 'user', 'content': prompt}
             ]
-            response = self.client._call_api(messages)
+            # 🆕 使用calculation任务类型，调用qwen-max模型（强推理能力）
+            model = self.client.get_model_for_task('calculation')
+            response = self.client._call_api(messages, model)
             
             # 解析AI返回的JSON
             import json

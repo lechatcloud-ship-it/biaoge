@@ -69,6 +69,7 @@ class BailianClient:
         self.multimodal_model = config.get('api.multimodal_model', 'qwen-vl-plus')
         self.image_model = config.get('api.image_model', 'qwen-vl-plus')
         self.text_model = config.get('api.text_model', 'qwen-mt-plus')
+        self.calculation_model = config.get('api.calculation_model', 'qwen-max')  # 🆕 算量专用模型
 
         # 如果传入了model参数，使用传入的值
         if model:
@@ -84,6 +85,7 @@ class BailianClient:
             f"文本模型: {self.text_model}, "
             f"图片模型: {self.image_model}, "
             f"多模态: {self.multimodal_model}, "
+            f"算量模型: {self.calculation_model}, "  # 🆕
             f"自定义模型: {self.use_custom_model}"
         )
 
@@ -92,7 +94,7 @@ class BailianClient:
         根据任务类型获取合适的模型
 
         Args:
-            task_type: 任务类型 - 'text'(文本翻译), 'image'(图片翻译), 'multimodal'(多模态)
+            task_type: 任务类型 - 'text'(文本翻译), 'image'(图片翻译), 'multimodal'(多模态), 'calculation'(工程量计算)
 
         Returns:
             str: 模型名称
@@ -106,6 +108,8 @@ class BailianClient:
             return self.image_model
         elif task_type == 'multimodal':
             return self.multimodal_model
+        elif task_type == 'calculation':  # 🆕 工程量计算任务
+            return self.calculation_model
         else:
             return self.text_model
     

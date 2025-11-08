@@ -23,9 +23,21 @@ api_key = ""
 # ✓ 成本低，适合大批量翻译
 # ✓ 支持自动语言检测
 #
+# 【新增】工程量计算使用专门的推理模型：
+# - qwen-max (推荐): 最强推理能力，适合复杂结构识别和尺寸推断
+# - qwen-plus: 平衡性能和成本，适合常规算量任务
+#
+# 参考：广联达AecGPT、同济CivilGPT均使用垂直领域优化模型
+# 算量模型需要：
+# ✓ 强大的空间推理能力（识别几何关系）
+# ✓ 上下文理解能力（关联文本标注和图形）
+# ✓ 数值计算准确性（尺寸提取和验证）
+# ✓ 专业知识（建筑规范、标准做法）
+#
 multimodal_model = "qwen-vl-plus"  # 多模态模型：qwen-vl-max, qwen-vl-plus, qwen-max
 image_model = "qwen-vl-plus"       # 图片翻译模型：qwen-vl-max, qwen-vl-plus, qwen-mt-image
 text_model = "qwen-mt-plus"        # 【推荐用于CAD翻译】文本翻译模型：qwen-mt-plus, qwen-mt-turbo, qwen-plus, qwen-turbo, qwen-max
+calculation_model = "qwen-max"     # 【新增-推荐用于工程量计算】算量模型：qwen-max, qwen-plus（需要强推理能力）
 
 # 自定义模型（优先级最高）
 use_custom_model = false
