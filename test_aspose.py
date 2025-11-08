@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 测试 Aspose.CAD 读取DWG文件
 """

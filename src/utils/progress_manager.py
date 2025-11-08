@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """进度管理器 - 商业级"""
 import json
 from pathlib import Path

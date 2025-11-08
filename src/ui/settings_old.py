@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """设置界面"""
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QPushButton, QLineEdit, QLabel, QComboBox, QFormLayout, QMessageBox
 from PyQt6.QtCore import Qt

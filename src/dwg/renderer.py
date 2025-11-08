@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 DWG渲染器（基于QPainter）
 """

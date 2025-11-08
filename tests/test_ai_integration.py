@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """AI助手集成测试 - 验证DWG→翻译→算量→AI对话完整流程"""
 import sys
 import os

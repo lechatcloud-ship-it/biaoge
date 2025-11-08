@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Batch processing module"""
 from .processor import BatchProcessor, BatchTask, TaskStatus
 

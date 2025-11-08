@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 DWG解析器 - 基于Aspose.CAD商业库
 完美支持DWG R12-R2021所有版本

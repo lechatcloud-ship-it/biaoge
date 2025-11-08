@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """DWG/DXF导出器"""
 import ezdxf
 from ..dwg.entities import DWGDocument, LineEntity, CircleEntity, TextEntity

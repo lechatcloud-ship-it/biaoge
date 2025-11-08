@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Utils module"""
 from .config_manager import ConfigManager, config
 from .settings_manager import SettingsManager, settings_manager
