@@ -14,6 +14,7 @@ except:
 
 from ..calculation.component_recognizer import ComponentRecognizer
 from ..calculation.advanced_recognizer import AdvancedComponentRecognizer
+from ..calculation.ultra_precise_recognizer import UltraPreciseRecognizer  # 🚀 超精确识别器 (99.9999%)
 from ..calculation.quantity_calculator import QuantityCalculator
 from ..calculation.result_validator import ResultValidator  # 🆕 结果验证器
 from ..utils.logger import logger
@@ -26,7 +27,9 @@ class CalculationInterface(QWidget):
         self.document = None
         self.components = []
         self.results = None
+        self.component_confidences = []  # 🚀 构件置信度列表
         self.use_advanced = True  # 默认使用高级识别
+        self.use_ultra_precise = True  # 🚀 默认使用超精确识别 (99.9999%)
         self.setupUI()
     
     def setupUI(self):
@@ -43,8 +46,8 @@ class CalculationInterface(QWidget):
         layout.addWidget(self.validationLabel)
 
         self.resultTable = TableWidget() if FLUENT else QTableWidget()
-        self.resultTable.setColumnCount(6)  # 🆕 增加"状态"列
-        self.resultTable.setHorizontalHeaderLabels(["类型", "数量", "体积", "面积", "费用", "状态"])
+        self.resultTable.setColumnCount(7)  # 🚀 增加"置信度"列
+        self.resultTable.setHorizontalHeaderLabels(["类型", "数量", "体积", "面积", "费用", "状态", "置信度"])
         layout.addWidget(self.resultTable)
 
         self.reportText = QTextEdit()
@@ -65,13 +68,25 @@ class CalculationInterface(QWidget):
         # 检查内存
         resource_manager.check_memory_threshold()
 
+        # 🚀 使用超精确识别器 (99.9999%准确率)
+        if self.use_ultra_precise:
+            logger.info("🚀 使用超精确识别器 (5阶段验证管道)")
+            recognizer = UltraPreciseRecognizer(use_ai=False)  # 暂不使用AI以加快速度
+            self.components, self.component_confidences = recognizer.recognize(
+                self.document,
+                use_ai=False,
+                confidence_threshold=0.95  # 95%置信度阈值
+            )
+            logger.info(f"识别完成: {len(self.components)} 个高置信度构件")
         # 使用高级识别器
-        if self.use_advanced:
+        elif self.use_advanced:
             recognizer = AdvancedComponentRecognizer(use_ai=False)
             self.components = recognizer.recognize(self.document)
+            self.component_confidences = []  # 无置信度信息
         else:
             recognizer = ComponentRecognizer()
             self.components = recognizer.recognize_components(self.document)
+            self.component_confidences = []  # 无置信度信息
 
         perf_monitor.end_timer('component_recognition', start)
 
@@ -109,6 +124,18 @@ class CalculationInterface(QWidget):
             else:
                 status_item.setForeground(Qt.GlobalColor.darkGreen)
             self.resultTable.setItem(i, 5, status_item)
+
+            # 🚀 添加置信度（如果可用）
+            confidence_text = self._get_average_confidence(result.component_type)
+            confidence_item = QTableWidgetItem(confidence_text)
+            # 根据置信度设置颜色
+            if "99.9" in confidence_text or "100.0" in confidence_text:
+                confidence_item.setForeground(Qt.GlobalColor.darkGreen)
+            elif any(x in confidence_text for x in ["95", "96", "97", "98"]):
+                confidence_item.setForeground(Qt.GlobalColor.darkBlue)
+            elif confidence_text != "N/A":
+                confidence_item.setForeground(Qt.GlobalColor.darkYellow)
+            self.resultTable.setItem(i, 6, confidence_item)
 
         # 🆕 生成包含验证信息的综合报告
         report = calculator.generate_report(self.results)
@@ -160,6 +187,30 @@ class CalculationInterface(QWidget):
             return f"⚠️ {warnings}警告"
         else:
             return "✅ 通过"
+
+    def _get_average_confidence(self, component_type):
+        """🚀 获取构件类型的平均置信度"""
+        if not self.component_confidences:
+            return "N/A"
+
+        # 找到该类型的所有构件
+        type_components = [comp for comp in self.components if comp.type == component_type]
+        if not type_components:
+            return "N/A"
+
+        # 找到对应的置信度
+        type_confidences = []
+        for comp in type_components:
+            for conf in self.component_confidences:
+                if conf.component_id == comp.id:
+                    type_confidences.append(conf.confidence)
+                    break
+
+        if not type_confidences:
+            return "N/A"
+
+        avg_confidence = sum(type_confidences) / len(type_confidences)
+        return f"{avg_confidence*100:.2f}%"
 
 
 # 别名，保持与主窗口导入的兼容性

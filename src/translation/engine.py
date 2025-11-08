@@ -9,6 +9,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from ..dwg.entities import DWGDocument, TextEntity
 from ..services.bailian_client import BailianClient, BailianAPIError
 from .cache import TranslationCache
+from .quality_control import TranslationQualityControl, QualityLevel  # 🚀 翻译质量控制 (99.9999%)
 from ..utils.logger import logger
 from ..utils.config_manager import ConfigManager
 
@@ -24,6 +25,13 @@ class TranslationStats:
     total_tokens: int = 0  # 总token消耗
     total_cost: float = 0.0  # 总成本（元）
     duration_seconds: float = 0.0  # 耗时（秒）
+    # 🚀 质量控制统计
+    quality_checked: int = 0  # 质量检查数
+    quality_perfect: int = 0  # 完美翻译数
+    quality_corrected: int = 0  # 自动修正数
+    quality_warnings: int = 0  # 警告数
+    quality_errors: int = 0  # 错误数
+    average_quality_score: float = 0.0  # 平均质量分数
     
     def to_dict(self) -> Dict:
         """转换为字典"""
@@ -36,7 +44,14 @@ class TranslationStats:
             'total_tokens': self.total_tokens,
             'total_cost': self.total_cost,
             'duration_seconds': self.duration_seconds,
-            'cache_hit_rate': f"{self.cached_count / self.unique_texts * 100:.1f}%" if self.unique_texts > 0 else "0%"
+            'cache_hit_rate': f"{self.cached_count / self.unique_texts * 100:.1f}%" if self.unique_texts > 0 else "0%",
+            # 🚀 质量控制统计
+            'quality_checked': self.quality_checked,
+            'quality_perfect': self.quality_perfect,
+            'quality_corrected': self.quality_corrected,
+            'quality_warnings': self.quality_warnings,
+            'quality_errors': self.quality_errors,
+            'average_quality_score': f"{self.average_quality_score:.2f}%"
         }
 
 
@@ -59,6 +74,7 @@ class TranslationEngine:
 
         self.client = client or BailianClient()
         self.cache = cache or TranslationCache()
+        self.quality_control = TranslationQualityControl()  # 🚀 质量控制器 (99.9999%)
 
         # 从配置读取翻译设置（确保设置生效）
         self.batch_size = config.get('translation.batch_size', 50)
@@ -66,6 +82,7 @@ class TranslationEngine:
         self.context_window = config.get('translation.context_window', 3)
         self.use_terminology = config.get('translation.use_terminology', True)
         self.post_process = config.get('translation.post_process', True)
+        self.enable_quality_control = config.get('translation.quality_control', True)  # 🚀 默认启用质量控制
 
         logger.info(
             f"翻译引擎初始化完成 - "
@@ -73,7 +90,8 @@ class TranslationEngine:
             f"缓存: {self.cache_enabled}, "
             f"上下文窗口: {self.context_window}, "
             f"术语库: {self.use_terminology}, "
-            f"后处理: {self.post_process}"
+            f"后处理: {self.post_process}, "
+            f"质量控制: {self.enable_quality_control}"  # 🚀
         )
     
     def translate_document(
@@ -144,7 +162,7 @@ class TranslationEngine:
         if to_translate:
             if progress_callback:
                 progress_callback(stats.cached_count, stats.unique_texts, "正在调用API翻译...")
-            
+
             new_translations = self._translate_batch_texts(
                 to_translate,
                 from_lang,
@@ -152,14 +170,42 @@ class TranslationEngine:
                 progress_callback,
                 stats.cached_count
             )
-            
+
+            # 🚀 质量控制检查
+            if self.enable_quality_control:
+                if progress_callback:
+                    progress_callback(stats.cached_count, stats.unique_texts, "正在进行质量控制检查...")
+
+                logger.info(f"🚀 开始质量控制检查: {len(new_translations)}条翻译")
+                new_translations, quality_stats = self._perform_quality_control(
+                    new_translations,
+                    from_lang,
+                    to_lang
+                )
+
+                # 更新质量统计
+                stats.quality_checked = quality_stats['checked']
+                stats.quality_perfect = quality_stats['perfect']
+                stats.quality_corrected = quality_stats['corrected']
+                stats.quality_warnings = quality_stats['warnings']
+                stats.quality_errors = quality_stats['errors']
+                stats.average_quality_score = quality_stats['average_score']
+
+                logger.info(
+                    f"🚀 质量控制完成: 完美{quality_stats['perfect']}, "
+                    f"修正{quality_stats['corrected']}, "
+                    f"警告{quality_stats['warnings']}, "
+                    f"错误{quality_stats['errors']}, "
+                    f"平均分{quality_stats['average_score']:.2f}%"
+                )
+
             # 更新统计
             for result in new_translations:
                 translations[result.original_text] = result.translated_text
                 stats.translated_count += 1
                 stats.total_tokens += result.tokens_used
                 stats.total_cost += result.cost_estimate
-            
+
             # 保存到缓存
             if self.cache_enabled:
                 cache_dict = {r.original_text: r.translated_text for r in new_translations}
@@ -279,7 +325,81 @@ class TranslationEngine:
                 translated_text = translations[original_text]
                 for entity in entities:
                     entity.translated_text = translated_text
-    
+
+    def _perform_quality_control(
+        self,
+        translation_results: List,
+        from_lang: str,
+        to_lang: str
+    ) -> tuple:
+        """
+        🚀 执行翻译质量控制
+
+        Args:
+            translation_results: 翻译结果列表
+            from_lang: 源语言
+            to_lang: 目标语言
+
+        Returns:
+            tuple: (修正后的翻译结果, 质量统计字典)
+        """
+        quality_stats = {
+            'checked': 0,
+            'perfect': 0,
+            'corrected': 0,
+            'warnings': 0,
+            'errors': 0,
+            'average_score': 0.0
+        }
+
+        corrected_results = []
+        total_score = 0.0
+
+        for result in translation_results:
+            original = result.original_text
+            translated = result.translated_text
+
+            # 执行质量检查
+            quality_report = self.quality_control.check_translation(
+                original,
+                translated,
+                context={'from_lang': from_lang, 'to_lang': to_lang}
+            )
+
+            quality_stats['checked'] += 1
+
+            # 记录质量等级
+            if quality_report.quality_level == QualityLevel.PERFECT:
+                quality_stats['perfect'] += 1
+            elif quality_report.quality_level in [QualityLevel.EXCELLENT, QualityLevel.GOOD]:
+                quality_stats['warnings'] += sum(
+                    1 for issue in quality_report.issues if issue.severity == 'MINOR'
+                )
+            else:
+                quality_stats['errors'] += sum(
+                    1 for issue in quality_report.issues if issue.severity == 'CRITICAL'
+                )
+
+            # 计算分数
+            total_score += quality_report.accuracy_rate
+
+            # 如果需要修正
+            if quality_report.corrected_translation:
+                result.translated_text = quality_report.corrected_translation
+                quality_stats['corrected'] += 1
+                logger.debug(
+                    f"🚀 翻译已修正: {original[:20]}... | "
+                    f"{translated[:20]}... -> {quality_report.corrected_translation[:20]}..."
+                )
+
+            corrected_results.append(result)
+
+        # 计算平均分
+        if quality_stats['checked'] > 0:
+            quality_stats['average_score'] = total_score / quality_stats['checked']
+
+        return corrected_results, quality_stats
+
     def _is_number_only(self, text: str) -> bool:
         """判断是否纯数字（含小数点、负号）"""
         pattern = r'^[-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$'

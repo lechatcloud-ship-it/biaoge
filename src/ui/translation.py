@@ -286,6 +286,25 @@ Token消耗: {stats.total_tokens}
 
 缓存命中率: {stats.cached_count / stats.unique_texts * 100 if stats.unique_texts > 0 else 0:.1f}%
 """
+
+        # 🚀 添加质量控制统计
+        if stats.quality_checked > 0:
+            stats_text += f"""
+{'='*50}
+🚀 质量控制统计 (99.9999%准确率目标)
+{'='*50}
+
+检查数量: {stats.quality_checked}
+✅ 完美翻译: {stats.quality_perfect}
+🔧 自动修正: {stats.quality_corrected}
+⚠️  警告: {stats.quality_warnings}
+❌ 错误: {stats.quality_errors}
+
+平均质量分: {stats.average_quality_score:.2f}%
+完美率: {stats.quality_perfect / stats.quality_checked * 100:.2f}%
+修正率: {stats.quality_corrected / stats.quality_checked * 100:.2f}%
+"""
+
         self.statsText.setPlainText(stats_text)
         
         # 显示成功提示
