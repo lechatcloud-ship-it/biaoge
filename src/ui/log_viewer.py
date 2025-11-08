@@ -1,17 +1,20 @@
+# -*- coding: utf-8 -*-
 """
 日志查看器
 """
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QTextEdit,
-    QPushButton, QComboBox, QLabel, QFileDialog
-)
+from PyQt6.QtWidgets import QVBoxLayout, QHBoxLayout, QFileDialog
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont, QTextCursor
 from pathlib import Path
 import logging
 
+from qfluentwidgets import (
+    Dialog, TextEdit, PushButton, ComboBox,
+    BodyLabel, MessageBox
+)
 
-class LogViewerDialog(QDialog):
+
+class LogViewerDialog(Dialog):
     """日志查看器对话框"""
 
     def __init__(self, parent=None):
@@ -37,9 +40,9 @@ class LogViewerDialog(QDialog):
         toolbar = QHBoxLayout()
 
         # 日志级别过滤
-        toolbar.addWidget(QLabel("级别:"))
+        toolbar.addWidget(BodyLabel("级别:"))
 
-        self.level_combo = QComboBox()
+        self.level_combo = ComboBox()
         self.level_combo.addItems(["全部", "DEBUG", "INFO", "WARNING", "ERROR"])
         self.level_combo.currentTextChanged.connect(self._on_level_changed)
         toolbar.addWidget(self.level_combo)
@@ -47,32 +50,32 @@ class LogViewerDialog(QDialog):
         toolbar.addStretch()
 
         # 自动刷新
-        self.auto_refresh_combo = QComboBox()
+        self.auto_refresh_combo = ComboBox()
         self.auto_refresh_combo.addItems(["不自动刷新", "每1秒", "每3秒", "每5秒"])
         self.auto_refresh_combo.currentIndexChanged.connect(self._on_refresh_interval_changed)
         toolbar.addWidget(self.auto_refresh_combo)
 
         # 刷新按钮
-        refresh_btn = QPushButton("刷新")
+        refresh_btn = PushButton("刷新")
         refresh_btn.clicked.connect(self._load_log)
         toolbar.addWidget(refresh_btn)
 
         # 清空按钮
-        clear_btn = QPushButton("清空日志")
+        clear_btn = PushButton("清空日志")
         clear_btn.clicked.connect(self._clear_log)
         toolbar.addWidget(clear_btn)
 
         # 导出按钮
-        export_btn = QPushButton("导出...")
+        export_btn = PushButton("导出...")
         export_btn.clicked.connect(self._export_log)
         toolbar.addWidget(export_btn)
 
         layout.addLayout(toolbar)
 
         # 日志文本
-        self.log_text = QTextEdit()
+        self.log_text = TextEdit()
         self.log_text.setReadOnly(True)
-        self.log_text.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
+        self.log_text.setLineWrapMode(TextEdit.LineWrapMode.NoWrap)
 
         # 等宽字体
         font = QFont("Consolas" if self._is_windows() else "Monaco")
@@ -84,13 +87,13 @@ class LogViewerDialog(QDialog):
         # 状态栏
         status_layout = QHBoxLayout()
 
-        self.status_label = QLabel()
+        self.status_label = BodyLabel()
         status_layout.addWidget(self.status_label)
 
         status_layout.addStretch()
 
         # 关闭按钮
-        close_btn = QPushButton("关闭")
+        close_btn = PushButton("关闭")
         close_btn.clicked.connect(self.accept)
         status_layout.addWidget(close_btn)
 
@@ -153,23 +156,19 @@ class LogViewerDialog(QDialog):
 
     def _clear_log(self):
         """清空日志"""
-        from PyQt6.QtWidgets import QMessageBox
-
-        reply = QMessageBox.question(
-            self,
+        w = MessageBox(
             "确认",
             "确定要清空日志文件吗？",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            self
         )
-
-        if reply == QMessageBox.StandardButton.Yes:
+        if w.exec():
             try:
                 if self.log_file.exists():
                     self.log_file.write_text("")
                     self._load_log()
-                    QMessageBox.information(self, "成功", "日志已清空")
+                    MessageBox("成功", "日志已清空", self).exec()
             except Exception as e:
-                QMessageBox.critical(self, "错误", f"清空日志失败:\n{e}")
+                MessageBox("错误", f"清空日志失败:\n{e}", self).exec()
 
     def _export_log(self):
         """导出日志"""
@@ -185,12 +184,10 @@ class LogViewerDialog(QDialog):
                 with open(file_path, 'w', encoding='utf-8') as f:
                     f.write(self.log_text.toPlainText())
 
-                from PyQt6.QtWidgets import QMessageBox
-                QMessageBox.information(self, "成功", f"日志已导出到:\n{file_path}")
+                MessageBox("成功", f"日志已导出到:\n{file_path}", self).exec()
 
             except Exception as e:
-                from PyQt6.QtWidgets import QMessageBox
-                QMessageBox.critical(self, "错误", f"导出失败:\n{e}")
+                MessageBox("错误", f"导出失败:\n{e}", self).exec()
 
     def closeEvent(self, event):
         """关闭事件"""

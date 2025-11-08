@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 主窗口（使用PyQt-Fluent-Widgets）
 """

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """错误恢复机制 - 商业级"""
 import traceback
 from typing import Callable, Any

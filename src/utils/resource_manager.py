@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """资源管理器 - 内存和文件资源管理"""
 import gc
 import psutil

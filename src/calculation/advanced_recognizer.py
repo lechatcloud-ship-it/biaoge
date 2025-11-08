@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """高级构件识别 - 商业级算法"""
 import re
 from typing import List, Dict

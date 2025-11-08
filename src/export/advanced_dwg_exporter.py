@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """高级DWG导出器 - 商业级"""
 import ezdxf
 from ezdxf.enums import TextEntityAlignment

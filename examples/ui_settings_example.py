@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 UI设置界面示例代码
 演示如何在设置界面中使用SettingsManager

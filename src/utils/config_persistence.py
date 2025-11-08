@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """配置持久化 - 商业级"""
 import json
 from pathlib import Path

@@ -1,9 +1,10 @@
+# -*- coding: utf-8 -*-
 """
 DWG渲染器（基于QPainter）
 """
-from PyQt6.QtWidgets import QWidget
-from PyQt6.QtGui import QPainter, QPen, QBrush, QColor, QFont, QPainterPath
-from PyQt6.QtCore import Qt, QPointF, QRectF, QSizeF, pyqtSignal
+from PyQt6.QtWidgets import QWidget, QGesture
+from PyQt6.QtGui import QPainter, QPen, QBrush, QColor, QFont, QPainterPath, QPinchGesture
+from PyQt6.QtCore import Qt, QPointF, QRectF, QSizeF, pyqtSignal, QEvent
 from typing import List, Optional
 import math
 
@@ -69,7 +70,11 @@ class DWGCanvas(QWidget):
         # 设置最小尺寸
         self.setMinimumSize(400, 300)
 
-        logger.info("DWG画布初始化完成（商业级）")
+        # 启用触控板手势支持（双指缩放）
+        self.grabGesture(Qt.GestureType.PinchGesture)
+        self.setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents)
+
+        logger.info("DWG画布初始化完成（商业级）+ 触控板支持")
 
     def setDocument(self, document: DWGDocument):
         """设置DWG文档"""
@@ -349,14 +354,14 @@ class DWGCanvas(QWidget):
             self.update()
 
     def mousePressEvent(self, event):
-        """鼠标按下"""
-        if event.button() == Qt.MouseButton.MiddleButton:
+        """鼠标按下 - 左键拖动视图"""
+        if event.button() == Qt.MouseButton.LeftButton:
             self._pan_start = event.position()
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
 
     def mouseMoveEvent(self, event):
-        """鼠标移动"""
-        if event.buttons() & Qt.MouseButton.MiddleButton and self._pan_start:
+        """鼠标移动 - 左键拖动平移"""
+        if event.buttons() & Qt.MouseButton.LeftButton and self._pan_start:
             delta = event.position() - self._pan_start
             self.pan_offset += delta
             self._pan_start = event.position()
@@ -365,9 +370,47 @@ class DWGCanvas(QWidget):
 
     def mouseReleaseEvent(self, event):
         """鼠标释放"""
-        if event.button() == Qt.MouseButton.MiddleButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self._pan_start = None
             self.setCursor(Qt.CursorShape.ArrowCursor)
+
+    def event(self, event):
+        """事件处理 - 支持触控板双指缩放"""
+        if event.type() == QEvent.Type.Gesture:
+            return self.gestureEvent(event)
+        return super().event(event)
+
+    def gestureEvent(self, event):
+        """手势事件处理 - 触控板双指缩放"""
+        gesture = event.gesture(Qt.GestureType.PinchGesture)
+        if gesture:
+            return self.pinchTriggered(gesture)
+        return False
+
+    def pinchTriggered(self, gesture: QPinchGesture):
+        """触控板双指缩放处理"""
+        if gesture.state() == Qt.GestureState.GestureUpdated:
+            # 获取缩放比例
+            scale_factor = gesture.scaleFactor()
+
+            old_zoom = self.zoom_level
+            self.zoom_level *= scale_factor
+            self.zoom_level = max(0.01, min(100.0, self.zoom_level))
+
+            if old_zoom != self.zoom_level:
+                # 以手势中心点为中心缩放
+                center_point = gesture.centerPoint()
+                widget_center = QPointF(self.width() / 2, self.height() / 2)
+                offset_from_center = center_point - widget_center
+
+                # 调整平移偏移以保持缩放中心不变
+                zoom_change = self.zoom_level / old_zoom
+                self.pan_offset = self.pan_offset * zoom_change + offset_from_center * (1 - zoom_change)
+
+                self.viewportChanged.emit(self.zoom_level, self.pan_offset)
+                self.update()
+
+        return True
 
     # ==================== 视图控制 ====================
 

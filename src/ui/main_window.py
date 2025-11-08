@@ -1,24 +1,19 @@
+# -*- coding: utf-8 -*-
 """
 主窗口 - 完整商业版 (Fluent Design)
 """
-from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout,
-    QSplitter, QMessageBox, QFileDialog, QStatusBar
+from qfluentwidgets import (
+    FluentWindow, NavigationItemPosition, FluentIcon,
+    InfoBar, InfoBarPosition, setTheme, Theme,
+    MessageBox, isDarkTheme,
+    SmoothScrollArea, PrimaryPushButton, PushButton,
+    CommandBar, Action
 )
-from PyQt6.QtGui import QAction, QKeySequence, QIcon
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFileDialog
+from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtCore import Qt, pyqtSignal
 from pathlib import Path
 from typing import Optional
-
-try:
-    from qfluentwidgets import (
-        FluentWindow, NavigationItemPosition, FluentIcon,
-        InfoBar, InfoBarPosition, setTheme, Theme
-    )
-    FLUENT_AVAILABLE = True
-except ImportError:
-    from PyQt6.QtWidgets import QMainWindow as FluentWindow
-    FLUENT_AVAILABLE = False
 
 from ..dwg.parser import DWGParser, DWGParseError
 from ..dwg.entities import DWGDocument
@@ -28,7 +23,6 @@ from .calculation import CalculationInterface
 from .export import ExportInterface
 from .batch_widget import BatchWidget
 from .settings_dialog import SettingsDialog
-from .ai_chat_widget import AIChatWidget
 from ..ai.context_manager import ContextManager
 from ..ai.ai_assistant import AIAssistant
 from ..ai.assistant_widget import AIAssistantWidget
@@ -61,28 +55,24 @@ class MainWindow(FluentWindow):
             logger.warning(f"AI助手初始化失败 (可能未配置API密钥): {e}")
             self.ai_assistant = None
 
-        if FLUENT_AVAILABLE:
-            self._init_fluent_ui()
-        else:
-            self._init_classic_ui()
-
+        self._init_ui()
         self._connect_signals()
         self._restore_window_state()
 
         self.setAcceptDrops(True)
 
-        if FLUENT_AVAILABLE:
-            # 设置Fluent主题
-            setTheme(Theme.AUTO)
-            logger.info("主窗口初始化完成 (Fluent Design)")
-        else:
-            logger.info("主窗口初始化完成 (经典模式)")
+        # 设置Fluent主题
+        setTheme(Theme.AUTO)
+        logger.info("主窗口初始化完成 (Fluent Design)")
 
-    def _init_fluent_ui(self):
+    def _init_ui(self):
         """初始化Fluent Design UI"""
         self.setWindowTitle("表哥 - DWG翻译计算软件 v1.0.0")
         self.setMinimumSize(1200, 800)
         self.resize(1400, 900)
+
+        # 添加标题栏按钮 - 设置和关于
+        self._add_title_bar_buttons()
 
         # 配置导航栏
         self.navigationInterface.setExpandWidth(200)
@@ -127,7 +117,7 @@ class MainWindow(FluentWindow):
 
         self.addSubInterface(
             self.calculation_widget,
-            FluentIcon.CALORIES,
+            FluentIcon.CALCULATOR,
             "算量",
             NavigationItemPosition.TOP
         )
@@ -162,7 +152,7 @@ class MainWindow(FluentWindow):
         )
 
     def _create_home_page(self) -> QWidget:
-        """创建主页 - 包含DWG查看器"""
+        """创建主页 - 包含DWG查看器和快捷按钮"""
         home_widget = QWidget()
         home_widget.setObjectName("homePage")
 
@@ -170,149 +160,67 @@ class MainWindow(FluentWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
+        # 创建顶部快捷按钮栏
+        button_bar = self._create_quick_actions_bar()
+        layout.addWidget(button_bar)
+
         # 创建查看器组件
         self.viewer_widget = ViewerWidget()
         layout.addWidget(self.viewer_widget)
 
-        # 创建底部状态栏
-        self.status_bar = QStatusBar()
-        self.status_bar.setStyleSheet("""
-            QStatusBar {
-                background-color: #f5f5f5;
-                border-top: 1px solid #ddd;
-                padding: 5px 10px;
-            }
-        """)
-        self.status_bar.showMessage("就绪 | 请打开DWG文件开始使用")
-        layout.addWidget(self.status_bar)
-
         return home_widget
 
-    def _init_classic_ui(self):
-        """初始化经典UI (Fallback)"""
-        self.setWindowTitle("表哥 - DWG翻译计算软件 v1.0.0")
-        self.setMinimumSize(1200, 800)
+    def _create_quick_actions_bar(self) -> QWidget:
+        """创建快捷操作栏"""
+        bar_widget = QWidget()
+        bar_widget.setObjectName("quickActionsBar")
+        bar_widget.setStyleSheet("""
+            QWidget#quickActionsBar {
+                background-color: transparent;
+                padding: 10px;
+            }
+        """)
 
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
+        layout = QHBoxLayout(bar_widget)
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(10)
 
-        main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
+        # 打开文件按钮
+        open_btn = PrimaryPushButton(FluentIcon.FOLDER, "打开DWG文件")
+        open_btn.clicked.connect(self.onOpenFile)
+        layout.addWidget(open_btn)
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        layout.addSpacing(20)
 
-        self.viewer_widget = ViewerWidget()
-        splitter.addWidget(self.viewer_widget)
+        # 翻译按钮
+        translate_btn = PushButton(FluentIcon.LANGUAGE, "智能翻译")
+        translate_btn.setEnabled(False)  # 默认禁用，打开文件后启用
+        translate_btn.clicked.connect(self.onQuickTranslate)
+        self.quick_translate_btn = translate_btn
+        layout.addWidget(translate_btn)
 
-        from PyQt6.QtWidgets import QTabWidget
-        self.tab_widget = QTabWidget()
-        self.tab_widget.setMinimumWidth(350)
-        self.tab_widget.setMaximumWidth(500)
+        # 算量按钮
+        calc_btn = PushButton(FluentIcon.CALCULATOR, "智能算量")
+        calc_btn.setEnabled(False)  # 默认禁用，打开文件后启用
+        calc_btn.clicked.connect(self.onQuickCalculate)
+        self.quick_calc_btn = calc_btn
+        layout.addWidget(calc_btn)
 
-        self.translation_widget = TranslationInterface()
-        self.tab_widget.addTab(self.translation_widget, "📝 翻译")
+        layout.addStretch()
 
-        self.calculation_widget = CalculationInterface()
-        self.tab_widget.addTab(self.calculation_widget, "📊 算量")
+        return bar_widget
 
-        self.export_widget = ExportInterface()
-        self.tab_widget.addTab(self.export_widget, "💾 导出")
+    def _add_title_bar_buttons(self):
+        """在标题栏添加设置和关于按钮"""
+        # 添加设置按钮到标题栏
+        settings_action = Action(FluentIcon.SETTING, "设置")
+        settings_action.triggered.connect(self.onSettings)
+        self.titleBar.addWidget(settings_action, Qt.AlignmentFlag.AlignRight)
 
-        self.batch_widget = BatchWidget()
-        self.tab_widget.addTab(self.batch_widget, "📦 批量处理")
-
-        self.performance_panel = PerformancePanel()
-        self.tab_widget.addTab(self.performance_panel, "⚡ 性能")
-
-        self.ai_assistant_widget = AIAssistantWidget(ai_assistant=self.ai_assistant)
-        self.tab_widget.addTab(self.ai_assistant_widget, "🤖 AI助手")
-
-        splitter.addWidget(self.tab_widget)
-        splitter.setStretchFactor(0, 7)
-        splitter.setStretchFactor(1, 3)
-
-        main_layout.addWidget(splitter)
-        self.splitter = splitter
-
-        self._create_actions()
-        self._create_menus()
-        self._create_toolbars()
-        self._create_statusbar()
-
-    def _create_actions(self):
-        """创建动作"""
-        self.open_action = QAction("打开DWG文件...", self)
-        self.open_action.setShortcut(QKeySequence.StandardKey.Open)
-        self.open_action.triggered.connect(self.onOpenFile)
-
-        self.batch_action = QAction("批量处理...", self)
-        self.batch_action.setShortcut("Ctrl+B")
-        self.batch_action.triggered.connect(self.onBatchProcessing)
-
-        self.exit_action = QAction("退出", self)
-        self.exit_action.setShortcut(QKeySequence.StandardKey.Quit)
-        self.exit_action.triggered.connect(self.close)
-
-        self.zoom_in_action = QAction("放大", self)
-        self.zoom_in_action.setShortcut(QKeySequence.StandardKey.ZoomIn)
-        self.zoom_in_action.triggered.connect(self.viewer_widget.zoomIn)
-
-        self.zoom_out_action = QAction("缩小", self)
-        self.zoom_out_action.setShortcut(QKeySequence.StandardKey.ZoomOut)
-        self.zoom_out_action.triggered.connect(self.viewer_widget.zoomOut)
-
-        self.fit_view_action = QAction("适应视图", self)
-        self.fit_view_action.setShortcut("F")
-        self.fit_view_action.triggered.connect(self.viewer_widget.fitToView)
-
-        self.settings_action = QAction("设置...", self)
-        self.settings_action.triggered.connect(self.onSettings)
-
-        self.log_viewer_action = QAction("日志查看器", self)
-        self.log_viewer_action.triggered.connect(self.onShowLogViewer)
-
-        self.about_action = QAction("关于", self)
-        self.about_action.triggered.connect(self.onAbout)
-
-    def _create_menus(self):
-        """创建菜单栏"""
-        menubar = self.menuBar()
-
-        file_menu = menubar.addMenu("文件(&F)")
-        file_menu.addAction(self.open_action)
-        file_menu.addAction(self.batch_action)
-        file_menu.addSeparator()
-        file_menu.addAction(self.exit_action)
-
-        view_menu = menubar.addMenu("视图(&V)")
-        view_menu.addAction(self.zoom_in_action)
-        view_menu.addAction(self.zoom_out_action)
-        view_menu.addAction(self.fit_view_action)
-
-        tools_menu = menubar.addMenu("工具(&T)")
-        tools_menu.addAction(self.log_viewer_action)
-        tools_menu.addSeparator()
-        tools_menu.addAction(self.settings_action)
-
-        help_menu = menubar.addMenu("帮助(&H)")
-        help_menu.addAction(self.about_action)
-
-    def _create_toolbars(self):
-        """创建工具栏"""
-        file_toolbar = self.addToolBar("文件")
-        file_toolbar.addAction(self.open_action)
-
-        view_toolbar = self.addToolBar("视图")
-        view_toolbar.addAction(self.zoom_in_action)
-        view_toolbar.addAction(self.zoom_out_action)
-        view_toolbar.addAction(self.fit_view_action)
-
-    def _create_statusbar(self):
-        """创建状态栏"""
-        self.status_bar = QStatusBar()
-        self.setStatusBar(self.status_bar)
-        self.status_bar.showMessage("就绪 | 请打开DWG文件开始使用")
+        # 添加关于按钮
+        about_action = Action(FluentIcon.INFO, "关于")
+        about_action.triggered.connect(self.onAbout)
+        self.titleBar.addWidget(about_action, Qt.AlignmentFlag.AlignRight)
 
     def _connect_signals(self):
         """连接信号"""
@@ -383,21 +291,21 @@ class MainWindow(FluentWindow):
 
     def onBatchProcessing(self):
         """切换到批量处理界面"""
-        if FLUENT_AVAILABLE:
-            # Fluent模式：切换到批量处理子界面
-            self.switchTo(self.batch_widget)
-        else:
-            # 经典模式：切换到批量处理标签页
-            for i in range(self.tab_widget.count()):
-                if self.tab_widget.tabText(i) == "📦 批量处理":
-                    self.tab_widget.setCurrentIndex(i)
-                    break
+        self.switchTo(self.batch_widget)
 
     def openFile(self, file_path: str):
         """打开文件"""
         try:
-            if hasattr(self, 'status_bar'):
-                self.status_bar.showMessage(f"正在打开: {Path(file_path).name}...")
+            # 显示加载提示
+            InfoBar.info(
+                title='正在打开',
+                content=f'{Path(file_path).name}',
+                orient=Qt.Orientation.Horizontal,
+                isClosable=False,
+                position=InfoBarPosition.TOP,
+                duration=1000,
+                parent=self
+            )
 
             parser = DWGParser()
             self.document = parser.parse(file_path)
@@ -410,37 +318,116 @@ class MainWindow(FluentWindow):
             entity_count = len(self.document.entities)
             layer_count = len(self.document.layers)
 
-            if hasattr(self, 'status_bar'):
-                self.status_bar.showMessage(
-                    f"已加载: {self.current_file.name} | "
-                    f"{entity_count} 个实体 | {layer_count} 个图层"
-                )
+            # 显示成功提示
+            InfoBar.success(
+                title='文件已打开',
+                content=f'{self.current_file.name} ({entity_count}个实体, {layer_count}个图层)',
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP_RIGHT,
+                duration=3000,
+                parent=self
+            )
 
-            # Fluent模式下显示成功提示
-            if FLUENT_AVAILABLE:
-                InfoBar.success(
-                    title='文件已打开',
-                    content=f'{self.current_file.name} ({entity_count}个实体)',
-                    orient=Qt.Orientation.Horizontal,
-                    isClosable=True,
-                    position=InfoBarPosition.TOP_RIGHT,
-                    duration=2000,
-                    parent=self
-                )
+            # 启用快捷按钮
+            if hasattr(self, 'quick_translate_btn'):
+                self.quick_translate_btn.setEnabled(True)
+            if hasattr(self, 'quick_calc_btn'):
+                self.quick_calc_btn.setEnabled(True)
 
             logger.info(f"文件打开成功: {file_path}")
 
         except DWGParseError as e:
-            QMessageBox.critical(self, "解析错误", str(e))
+            # 使用Fluent MessageBox
+            w = MessageBox(
+                "解析错误",
+                str(e),
+                self
+            )
+            w.exec()
             logger.error(f"文件解析失败: {e}")
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"打开文件失败:\n{str(e)}")
+            # 使用Fluent MessageBox
+            w = MessageBox(
+                "错误",
+                f"打开文件失败:\n{str(e)}",
+                self
+            )
+            w.exec()
             logger.error(f"打开文件失败: {e}", exc_info=True)
+
+    def onQuickTranslate(self):
+        """快捷翻译 - 切换到翻译界面"""
+        if not self.document:
+            InfoBar.warning(
+                title='请先打开文件',
+                content='请先打开DWG文件再进行翻译',
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+            return
+
+        # 切换到翻译界面
+        self.switchTo(self.translation_widget)
+        logger.info("切换到翻译界面")
+
+    def onQuickCalculate(self):
+        """快捷算量 - 切换到算量界面"""
+        if not self.document:
+            InfoBar.warning(
+                title='请先打开文件',
+                content='请先打开DWG文件再进行算量',
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+            return
+
+        # 切换到算量界面
+        self.switchTo(self.calculation_widget)
+        logger.info("切换到算量界面")
 
     def onSettings(self):
         """打开设置对话框"""
         dialog = SettingsDialog(self)
-        dialog.exec()
+        if dialog.exec():
+            # 设置对话框关闭后，重新加载配置
+            self._reload_config()
+            logger.info("设置已更新并应用")
+
+    def _reload_config(self):
+        """重新加载配置 - API密钥立即生效"""
+        try:
+            # 重新加载配置
+            self.config = ConfigManager()
+
+            # 重新初始化AI助手（使用新的API密钥）
+            if self.ai_assistant:
+                try:
+                    self.ai_assistant = AIAssistant(context_manager=self.context_manager)
+                    # 更新AI助手界面的引用
+                    if hasattr(self, 'ai_assistant_widget'):
+                        self.ai_assistant_widget.ai_assistant = self.ai_assistant
+                    logger.info("AI助手已使用新配置重新初始化")
+                except Exception as e:
+                    logger.warning(f"AI助手重新初始化失败: {e}")
+
+            InfoBar.success(
+                title='配置已更新',
+                content='设置已保存并立即生效',
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+        except Exception as e:
+            logger.error(f"重新加载配置失败: {e}")
 
     def onShowLogViewer(self):
         """显示日志查看器"""
@@ -469,15 +456,14 @@ class MainWindow(FluentWindow):
         """关闭事件"""
         self._save_window_state()
 
-        reply = QMessageBox.question(
-            self,
+        # 使用Fluent MessageBox
+        w = MessageBox(
             "确认退出",
             "确定要退出表哥软件吗？",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
+            self
         )
 
-        if reply == QMessageBox.StandardButton.Yes:
+        if w.exec():
             logger.info("应用程序正常退出")
             event.accept()
         else:

@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 DWG解析器（基于ezdxf）
 """

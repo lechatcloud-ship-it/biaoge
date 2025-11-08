@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 AI助手模块全面测试脚本
 测试所有核心功能而不依赖GUI

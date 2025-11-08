@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Excel导出器"""
 from openpyxl import Workbook
 from ..calculation.quantity_calculator import QuantityResult

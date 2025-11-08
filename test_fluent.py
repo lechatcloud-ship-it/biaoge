@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """测试Fluent Design是否正常工作"""
 import sys
 from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel
