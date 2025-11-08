@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from ..dwg.entities import DWGDocument, EntityType, TextEntity
 from ..translation.engine import TranslationStats
-from ..calculation.recognizer import Component, ComponentType
+from ..calculation.component_recognizer import Component, ComponentType
 from ..utils.logger import logger
 
 
