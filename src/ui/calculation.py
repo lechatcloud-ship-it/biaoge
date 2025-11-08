@@ -15,6 +15,7 @@ except:
 from ..calculation.component_recognizer import ComponentRecognizer
 from ..calculation.advanced_recognizer import AdvancedComponentRecognizer
 from ..calculation.quantity_calculator import QuantityCalculator
+from ..calculation.result_validator import ResultValidator  # 🆕 结果验证器
 from ..utils.logger import logger
 from ..utils.performance import perf_monitor
 from ..utils.resource_manager import resource_manager
@@ -32,16 +33,20 @@ class CalculationInterface(QWidget):
         layout = QVBoxLayout(self)
         title = TitleLabel("工程量计算") if FLUENT else QLabel("工程量计算")
         layout.addWidget(title)
-        
+
         self.recognizeBtn = PrimaryPushButton("识别构件") if FLUENT else QPushButton("识别构件")
         self.recognizeBtn.clicked.connect(self.onRecognize)
         layout.addWidget(self.recognizeBtn)
-        
+
+        # 🆕 验证状态标签
+        self.validationLabel = BodyLabel("等待识别...") if FLUENT else QLabel("等待识别...")
+        layout.addWidget(self.validationLabel)
+
         self.resultTable = TableWidget() if FLUENT else QTableWidget()
-        self.resultTable.setColumnCount(5)
-        self.resultTable.setHorizontalHeaderLabels(["类型", "数量", "体积", "面积", "费用"])
+        self.resultTable.setColumnCount(6)  # 🆕 增加"状态"列
+        self.resultTable.setHorizontalHeaderLabels(["类型", "数量", "体积", "面积", "费用", "状态"])
         layout.addWidget(self.resultTable)
-        
+
         self.reportText = QTextEdit()
         self.reportText.setReadOnly(True)
         layout.addWidget(self.reportText)
@@ -70,6 +75,15 @@ class CalculationInterface(QWidget):
 
         perf_monitor.end_timer('component_recognition', start)
 
+        # 🆕 验证识别结果
+        start_validation = perf_monitor.start_timer('result_validation')
+        validator = ResultValidator()
+        validation_result = validator.validate(self.components)
+        perf_monitor.end_timer('result_validation', start_validation)
+
+        # 🆕 更新验证状态标签
+        self._update_validation_status(validation_result)
+
         # 计算工程量
         start = perf_monitor.start_timer('quantity_calculation')
         calculator = QuantityCalculator()
@@ -85,15 +99,68 @@ class CalculationInterface(QWidget):
             self.resultTable.setItem(i, 3, QTableWidgetItem(f"{result.total_area:.2f}"))
             self.resultTable.setItem(i, 4, QTableWidgetItem(f"¥{result.total_cost:.2f}"))
 
+            # 🆕 添加验证状态
+            status = self._get_component_status(result.component_type, validation_result)
+            status_item = QTableWidgetItem(status)
+            if "❌" in status:
+                status_item.setForeground(Qt.GlobalColor.red)
+            elif "⚠️" in status:
+                status_item.setForeground(Qt.GlobalColor.darkYellow)
+            else:
+                status_item.setForeground(Qt.GlobalColor.darkGreen)
+            self.resultTable.setItem(i, 5, status_item)
+
+        # 🆕 生成包含验证信息的综合报告
         report = calculator.generate_report(self.results)
+        report += "\n" + "=" * 60 + "\n"
+        report += validator.generate_report(validation_result)
         self.reportText.setPlainText(report)
 
         # 打印性能统计
         perf_monitor.print_stats()
         mem_usage = resource_manager.get_memory_usage()
         logger.info(f"识别完成: {len(self.components)} 个构件, 内存: {mem_usage['rss_mb']:.2f} MB")
+        logger.info(f"验证结果: {validation_result.get_summary()}")
 
         # 通知父窗口更新导出界面
         parent = self.parent()
         if parent and hasattr(parent, 'exportInterface'):
             parent.exportInterface.setQuantityResults(self.results)
+
+    def _update_validation_status(self, validation_result):
+        """🆕 更新验证状态标签"""
+        pass_rate = validation_result.passed / validation_result.total_components * 100 if validation_result.total_components > 0 else 0
+
+        if validation_result.errors > 0:
+            status_text = f"⚠️ 验证完成: {pass_rate:.1f}% 通过, {validation_result.errors} 个错误需修正"
+            self.validationLabel.setStyleSheet("color: red; font-weight: bold;")
+        elif validation_result.warnings > 0:
+            status_text = f"⚠️ 验证完成: {pass_rate:.1f}% 通过, {validation_result.warnings} 个警告"
+            self.validationLabel.setStyleSheet("color: orange; font-weight: bold;")
+        else:
+            status_text = f"✅ 验证通过: 所有 {validation_result.total_components} 个构件验证通过"
+            self.validationLabel.setStyleSheet("color: green; font-weight: bold;")
+
+        self.validationLabel.setText(status_text)
+
+    def _get_component_status(self, component_type, validation_result):
+        """🆕 获取构件类型的验证状态"""
+        # 查找该类型的所有问题
+        type_issues = [issue for issue in validation_result.issues if issue.component_type == component_type]
+
+        if not type_issues:
+            return "✅ 通过"
+
+        errors = sum(1 for issue in type_issues if issue.level.value == "错误")
+        warnings = sum(1 for issue in type_issues if issue.level.value == "警告")
+
+        if errors > 0:
+            return f"❌ {errors}错误"
+        elif warnings > 0:
+            return f"⚠️ {warnings}警告"
+        else:
+            return "✅ 通过"
+
+
+# 别名，保持与主窗口导入的兼容性
+CalculationWidget = CalculationInterface
