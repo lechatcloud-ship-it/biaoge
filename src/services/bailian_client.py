@@ -43,6 +43,9 @@ class BailianClient:
         'qwen-mt-plus': {'input': 0.006, 'output': 0.006},
         'qwen-mt-turbo': {'input': 0.003, 'output': 0.003},
         'qwen-mt-image': {'input': 0.012, 'output': 0.012},
+        # 深度思考模型
+        'qwen3-max': {'input': 0.040, 'output': 0.040},
+        'qwq-max-preview': {'input': 0.040, 'output': 0.040},
     }
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
@@ -482,7 +485,150 @@ class BailianClient:
             )
         
         return translations
-    
+
+    def chat_completion(
+        self,
+        messages: List[Dict[str, str]],
+        model: Optional[str] = None,
+        temperature: float = 0.7,
+        top_p: float = 0.9,
+        tools: Optional[List[Dict]] = None,
+        stream: bool = False,
+        enable_thinking: bool = False,
+        thinking_budget: Optional[int] = None
+    ) -> Dict:
+        """
+        通用对话补全API (支持流式、深度思考、工具调用)
+
+        Args:
+            messages: 对话消息列表
+            model: 模型名称，默认使用qwen-max
+            temperature: 温度参数 (0-2)，控制随机性
+            top_p: 核采样参数 (0-1)
+            tools: 工具定义列表（Function Calling）
+            stream: 是否流式输出
+            enable_thinking: 是否启用深度思考模式
+            thinking_budget: 思考过程的最大token数
+
+        Returns:
+            Dict: API响应数据
+        """
+        if model is None:
+            model = 'qwen-max'
+
+        headers = {
+            'Authorization': f'Bearer {self.api_key}',
+            'Content-Type': 'application/json'
+        }
+
+        payload = {
+            'model': model,
+            'messages': messages,
+            'temperature': temperature,
+            'top_p': top_p,
+        }
+
+        # 流式输出
+        if stream:
+            payload['stream'] = True
+            payload['stream_options'] = {"include_usage": True}
+
+        # 工具调用
+        if tools:
+            payload['tools'] = tools
+
+        # 深度思考模式（通过extra_body传递）
+        if enable_thinking:
+            if 'extra_body' not in payload:
+                payload['extra_body'] = {}
+            payload['extra_body']['enable_thinking'] = True
+            if thinking_budget:
+                payload['extra_body']['thinking_budget'] = thinking_budget
+
+        try:
+            response = requests.post(
+                f"{self.base_url}/chat/completions",
+                json=payload,
+                headers=headers,
+                timeout=self.timeout,
+                stream=stream  # 流式请求
+            )
+
+            if response.status_code == 200:
+                if stream:
+                    # 返回流式响应迭代器
+                    return {'stream': response.iter_lines(decode_unicode=True)}
+                else:
+                    # 返回完整响应
+                    return response.json()
+            else:
+                error_msg = response.text
+                logger.error(f"对话API调用失败 (HTTP {response.status_code}): {error_msg}")
+                raise BailianAPIError(f"对话请求失败: {error_msg}")
+
+        except requests.Timeout:
+            raise BailianAPIError("对话请求超时，请稍后重试")
+        except requests.ConnectionError:
+            raise BailianAPIError("无法连接到对话服务，请检查网络")
+        except Exception as e:
+            logger.error(f"对话API异常: {e}", exc_info=True)
+            raise BailianAPIError(f"对话API异常: {str(e)}")
+
+    def chat_stream(
+        self,
+        messages: List[Dict[str, str]],
+        model: Optional[str] = None,
+        temperature: float = 0.7,
+        top_p: float = 0.9,
+        enable_thinking: bool = False
+    ):
+        """
+        流式对话（生成器）
+
+        Args:
+            messages: 对话消息列表
+            model: 模型名称
+            temperature: 温度参数
+            top_p: 核采样参数
+            enable_thinking: 是否启用深度思考
+
+        Yields:
+            Dict: 每个流式响应块
+        """
+        response = self.chat_completion(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            top_p=top_p,
+            stream=True,
+            enable_thinking=enable_thinking
+        )
+
+        import json
+
+        for line in response['stream']:
+            if not line:
+                continue
+
+            # 跳过注释行
+            if line.startswith(':'):
+                continue
+
+            # 解析SSE格式：data: {...}
+            if line.startswith('data: '):
+                data_str = line[6:]  # 移除 "data: " 前缀
+
+                # 结束标记
+                if data_str == '[DONE]':
+                    break
+
+                try:
+                    data = json.loads(data_str)
+                    yield data
+                except json.JSONDecodeError as e:
+                    logger.warning(f"解析流式响应失败: {e}, line: {data_str[:100]}")
+                    continue
+
     def test_connection(self) -> bool:
         """
         测试API连接
