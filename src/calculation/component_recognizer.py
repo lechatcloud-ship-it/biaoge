@@ -559,12 +559,12 @@ class ComponentRecognizer:
     
     def recognize_with_ai(self, document: DWGDocument, context: str = "") -> List[Component]:
         """
-        使用AI识别构件（高级版）
-        
+        使用AI识别构件（高级版 + Few-Shot Learning）
+
         Args:
             document: DWG文档
             context: 上下文信息（如：建筑类型）
-        
+
         Returns:
             List[Component]: 识别出的构件
         """
@@ -573,22 +573,76 @@ class ComponentRecognizer:
         for entity in document.entities:
             if isinstance(entity, TextEntity) and entity.text:
                 text_info.append(entity.text)
-        
+
         if not text_info:
             return []
-        
-        # 构建AI prompt
-        prompt = f"""你是一个专业的CAD图纸识别专家。
-以下是图纸中的文本标注：
 
-{chr(10).join(text_info[:50])}  # 最多50条
+        # 🆕 构建Few-Shot Learning Prompt（专业工程知识）
+        prompt = f"""你是一个精通建筑工程的CAD图纸识别专家，掌握：
+- 建筑结构施工图识别
+- 16G101-1图集标准标注
+- GB 50011-2010抗震设计规范
+- 工程量计算清单规范
 
-请识别这些文本中的建筑构件，输出JSON格式：
+【任务】识别以下CAD图纸文本标注中的建筑构件，提取构件类型和尺寸。
+
+【Few-Shot示例】学习以下标注识别模式：
+
+示例1（梁）：
+输入: "KL1 300×600"
+输出: {{"type": "梁", "name": "KL1", "dimensions": {{"width": 300, "height": 600, "length": 6000}}}}
+
+示例2（柱）：
+输入: "KZ1 600×600"
+输出: {{"type": "柱", "name": "KZ1", "dimensions": {{"width": 600, "height": 600, "length": 3000}}}}
+
+示例3（柱-圆形）：
+输入: "φ500"
+输出: {{"type": "柱", "name": "圆柱φ500", "dimensions": {{"diameter": 500, "width": 500, "height": 500, "length": 3000}}}}
+
+示例4（墙）：
+输入: "剪力墙 200厚"
+输出: {{"type": "墙", "name": "剪力墙", "dimensions": {{"width": 200, "height": 3000, "length": 6000}}}}
+
+示例5（板）：
+输入: "楼板120厚"
+输出: {{"type": "板", "name": "楼板", "dimensions": {{"width": 3000, "height": 120, "length": 6000}}}}
+
+示例6（梁-带跨度）：
+输入: "L1 250×500 L=7200"
+输出: {{"type": "梁", "name": "L1", "dimensions": {{"width": 250, "height": 500, "length": 7200}}}}
+
+【关键识别规则】
+1. 梁（L/KL/B）：标注为"宽×高"（截面），长度=跨度（默认6000mm）
+2. 柱（Z/KZ/C）：标注为"宽×高"（截面），长度=层高（默认3000mm）
+3. 墙（Q/W）：标注为"厚度"，需补充高度（默认3000mm）和长度（默认6000mm）
+4. 板（B）：标注为"厚度"，需补充平面尺寸（默认3000×6000mm）
+5. 直径标注（φ/Φ/ø）：圆形构件，width=height=diameter
+6. 单位统一为mm
+
+【待识别文本】
+{chr(10).join(text_info[:50])}
+
+{f'【图纸类型】{context}' if context else ''}
+
+【输出格式】严格JSON数组，每个构件必须包含：
 [
-  {{"type": "梁/柱/墙/板", "name": "构件名称", "dimensions": {{"width": 300, "height": 600}}}}
+  {{
+    "type": "梁/柱/墙/板/门/窗/楼梯",
+    "name": "构件名称或编号",
+    "dimensions": {{
+      "width": 数值,
+      "height": 数值,
+      "length": 数值
+    }}
+  }}
 ]
 
-{f'图纸类型：{context}' if context else ''}
+【注意】
+- 如果标注缺失维度，请基于建筑规范补充默认值
+- 所有尺寸必须为数值(mm)，不要包含单位字符串
+- 不确定的标注可以跳过，不要猜测
+- 返回有效的JSON格式，不要包含注释或markdown标记
 """
         
         try:
