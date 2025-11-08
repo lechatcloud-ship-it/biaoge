@@ -6,9 +6,10 @@ from qfluentwidgets import (
     FluentWindow, NavigationItemPosition, FluentIcon,
     InfoBar, InfoBarPosition, setTheme, Theme,
     MessageBox, isDarkTheme,
-    SmoothScrollArea
+    SmoothScrollArea, PrimaryPushButton, PushButton,
+    CommandBar, Action
 )
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QFileDialog
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFileDialog
 from PyQt6.QtGui import QAction, QKeySequence
 from PyQt6.QtCore import Qt, pyqtSignal
 from pathlib import Path
@@ -69,6 +70,9 @@ class MainWindow(FluentWindow):
         self.setWindowTitle("表哥 - DWG翻译计算软件 v1.0.0")
         self.setMinimumSize(1200, 800)
         self.resize(1400, 900)
+
+        # 添加标题栏按钮 - 设置和关于
+        self._add_title_bar_buttons()
 
         # 配置导航栏
         self.navigationInterface.setExpandWidth(200)
@@ -148,7 +152,7 @@ class MainWindow(FluentWindow):
         )
 
     def _create_home_page(self) -> QWidget:
-        """创建主页 - 包含DWG查看器"""
+        """创建主页 - 包含DWG查看器和快捷按钮"""
         home_widget = QWidget()
         home_widget.setObjectName("homePage")
 
@@ -156,11 +160,67 @@ class MainWindow(FluentWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
+        # 创建顶部快捷按钮栏
+        button_bar = self._create_quick_actions_bar()
+        layout.addWidget(button_bar)
+
         # 创建查看器组件
         self.viewer_widget = ViewerWidget()
         layout.addWidget(self.viewer_widget)
 
         return home_widget
+
+    def _create_quick_actions_bar(self) -> QWidget:
+        """创建快捷操作栏"""
+        bar_widget = QWidget()
+        bar_widget.setObjectName("quickActionsBar")
+        bar_widget.setStyleSheet("""
+            QWidget#quickActionsBar {
+                background-color: transparent;
+                padding: 10px;
+            }
+        """)
+
+        layout = QHBoxLayout(bar_widget)
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(10)
+
+        # 打开文件按钮
+        open_btn = PrimaryPushButton(FluentIcon.FOLDER, "打开DWG文件")
+        open_btn.clicked.connect(self.onOpenFile)
+        layout.addWidget(open_btn)
+
+        layout.addSpacing(20)
+
+        # 翻译按钮
+        translate_btn = PushButton(FluentIcon.LANGUAGE, "智能翻译")
+        translate_btn.setEnabled(False)  # 默认禁用，打开文件后启用
+        translate_btn.clicked.connect(self.onQuickTranslate)
+        self.quick_translate_btn = translate_btn
+        layout.addWidget(translate_btn)
+
+        # 算量按钮
+        calc_btn = PushButton(FluentIcon.CALCULATOR, "智能算量")
+        calc_btn.setEnabled(False)  # 默认禁用，打开文件后启用
+        calc_btn.clicked.connect(self.onQuickCalculate)
+        self.quick_calc_btn = calc_btn
+        layout.addWidget(calc_btn)
+
+        layout.addStretch()
+
+        return bar_widget
+
+    def _add_title_bar_buttons(self):
+        """在标题栏添加设置和关于按钮"""
+        # 添加设置按钮到标题栏
+        settings_action = Action(FluentIcon.SETTING, "设置")
+        settings_action.triggered.connect(self.onSettings)
+        self.titleBar.addWidget(settings_action, Qt.AlignmentFlag.AlignRight)
+
+        # 添加关于按钮
+        about_action = Action(FluentIcon.INFO, "关于")
+        about_action.triggered.connect(self.onAbout)
+        self.titleBar.addWidget(about_action, Qt.AlignmentFlag.AlignRight)
 
     def _connect_signals(self):
         """连接信号"""
@@ -269,6 +329,12 @@ class MainWindow(FluentWindow):
                 parent=self
             )
 
+            # 启用快捷按钮
+            if hasattr(self, 'quick_translate_btn'):
+                self.quick_translate_btn.setEnabled(True)
+            if hasattr(self, 'quick_calc_btn'):
+                self.quick_calc_btn.setEnabled(True)
+
             logger.info(f"文件打开成功: {file_path}")
 
         except DWGParseError as e:
@@ -290,10 +356,78 @@ class MainWindow(FluentWindow):
             w.exec()
             logger.error(f"打开文件失败: {e}", exc_info=True)
 
+    def onQuickTranslate(self):
+        """快捷翻译 - 切换到翻译界面"""
+        if not self.document:
+            InfoBar.warning(
+                title='请先打开文件',
+                content='请先打开DWG文件再进行翻译',
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+            return
+
+        # 切换到翻译界面
+        self.switchTo(self.translation_widget)
+        logger.info("切换到翻译界面")
+
+    def onQuickCalculate(self):
+        """快捷算量 - 切换到算量界面"""
+        if not self.document:
+            InfoBar.warning(
+                title='请先打开文件',
+                content='请先打开DWG文件再进行算量',
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+            return
+
+        # 切换到算量界面
+        self.switchTo(self.calculation_widget)
+        logger.info("切换到算量界面")
+
     def onSettings(self):
         """打开设置对话框"""
         dialog = SettingsDialog(self)
-        dialog.exec()
+        if dialog.exec():
+            # 设置对话框关闭后，重新加载配置
+            self._reload_config()
+            logger.info("设置已更新并应用")
+
+    def _reload_config(self):
+        """重新加载配置 - API密钥立即生效"""
+        try:
+            # 重新加载配置
+            self.config = ConfigManager()
+
+            # 重新初始化AI助手（使用新的API密钥）
+            if self.ai_assistant:
+                try:
+                    self.ai_assistant = AIAssistant(context_manager=self.context_manager)
+                    # 更新AI助手界面的引用
+                    if hasattr(self, 'ai_assistant_widget'):
+                        self.ai_assistant_widget.ai_assistant = self.ai_assistant
+                    logger.info("AI助手已使用新配置重新初始化")
+                except Exception as e:
+                    logger.warning(f"AI助手重新初始化失败: {e}")
+
+            InfoBar.success(
+                title='配置已更新',
+                content='设置已保存并立即生效',
+                orient=Qt.Orientation.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=2000,
+                parent=self
+            )
+        except Exception as e:
+            logger.error(f"重新加载配置失败: {e}")
 
     def onShowLogViewer(self):
         """显示日志查看器"""
