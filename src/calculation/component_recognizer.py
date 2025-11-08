@@ -50,8 +50,20 @@ class Component:
 class ComponentRecognizer:
     """构件识别器"""
     
-    def __init__(self, client: Optional[BailianClient] = None):
-        self.client = client or BailianClient()
+    def __init__(self, client: Optional[BailianClient] = None, init_client: bool = True):
+        """
+        初始化构件识别器
+
+        Args:
+            client: BailianClient实例，None表示不使用AI
+            init_client: 是否自动初始化client（测试时设为False）
+        """
+        if client is not None:
+            self.client = client
+        elif init_client:
+            self.client = BailianClient()
+        else:
+            self.client = None
         logger.info("构件识别器初始化完成")
     
     def recognize_components(self, document: DWGDocument) -> List[Component]:
