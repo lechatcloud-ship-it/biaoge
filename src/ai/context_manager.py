@@ -488,19 +488,19 @@ class ContextManager:
         parts = []
 
         if self.has_dwg_data():
-            parts.append(f"✓ DWG图纸: {self.dwg_context.filename}")
+            parts.append(f"[已加载] DWG图纸: {self.dwg_context.filename}")
         else:
-            parts.append("✗ DWG图纸: 未加载")
+            parts.append("[未加载] DWG图纸")
 
         if self.has_translation_data():
             stats = self.translation_context.stats
-            parts.append(f"✓ 翻译: {stats.translated_count}条 ({stats.average_quality_score})")
+            parts.append(f"[已完成] 翻译: {stats.translated_count}条 ({stats.average_quality_score})")
         else:
-            parts.append("✗ 翻译: 未完成")
+            parts.append("[未完成] 翻译")
 
         if self.has_calculation_data():
-            parts.append(f"✓ 算量: {len(self.calculation_context.components)}个构件")
+            parts.append(f"[已完成] 算量: {len(self.calculation_context.components)}个构件")
         else:
-            parts.append("✗ 算量: 未完成")
+            parts.append("[未完成] 算量")
 
         return '\n'.join(parts)

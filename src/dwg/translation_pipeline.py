@@ -182,7 +182,7 @@ class TranslationPipeline:
             extract_time = (datetime.now() - extract_start).total_seconds()
             result.extraction_time = extract_time
 
-            logger.info(f"✓ 提取完成: {len(extracted_texts)} 个文本实体 ({extract_time:.2f}秒)")
+            logger.info(f"[是] 提取完成: {len(extracted_texts)} 个文本实体 ({extract_time:.2f}秒)")
 
             # 获取提取统计
             extract_stats = self.extractor.get_statistics()
@@ -199,7 +199,7 @@ class TranslationPipeline:
             extracted_texts = self.classifier.classify_batch(extracted_texts)
             result.classification_stats = self.classifier.get_statistics()
 
-            logger.info(f"✓ 分类完成: {result.classification_stats}")
+            logger.info(f"[是] 分类完成: {result.classification_stats}")
 
             # ========== 阶段3：智能翻译 ==========
             logger.info("\n【阶段3/4】智能翻译...")
@@ -228,7 +228,7 @@ class TranslationPipeline:
             if confidences:
                 result.average_confidence = sum(confidences) / len(confidences)
 
-            logger.info(f"✓ 翻译完成: {translated_count} 个文本 ({translate_time:.2f}秒)")
+            logger.info(f"[是] 翻译完成: {translated_count} 个文本 ({translate_time:.2f}秒)")
             logger.info(f"  跳过: {skipped_count}, 需要审查: {needs_review_count}")
             logger.info(f"  平均置信度: {result.average_confidence:.2%}")
 
@@ -254,7 +254,7 @@ class TranslationPipeline:
             result.backup_path = mod_result.backup_path
             result.failed_texts = mod_result.stats.error_count
 
-            logger.info(f"✓ 修改完成 ({modify_time:.2f}秒)")
+            logger.info(f"[是] 修改完成 ({modify_time:.2f}秒)")
             logger.info(f"  成功: {mod_result.stats.success_count}, 失败: {mod_result.stats.error_count}")
 
             if mod_result.backup_path:

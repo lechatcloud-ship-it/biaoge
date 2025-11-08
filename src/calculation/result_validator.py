@@ -66,16 +66,16 @@ class ValidationResult:
 
         pass_rate = self.passed / self.total_components * 100
         summary = f"验证完成: {self.total_components} 个构件\n"
-        summary += f"  ✅ 通过: {self.passed} ({pass_rate:.1f}%)\n"
-        summary += f"  ⚠️  警告: {self.warnings}\n"
-        summary += f"  ❌ 错误: {self.errors}\n"
+        summary += f"  通过: {self.passed} ({pass_rate:.1f}%)\n"
+        summary += f"  警告: {self.warnings}\n"
+        summary += f"  错误: {self.errors}\n"
 
         if self.errors > 0:
             summary += f"\n严重问题需要修正！"
         elif self.warnings > 0:
             summary += f"\n存在警告，建议检查"
         else:
-            summary += f"\n所有构件验证通过 ✅"
+            summary += f"\n所有构件验证通过"
 
         return summary
 
@@ -428,13 +428,13 @@ class ResultValidator:
             if errors:
                 report += "【严重错误】需要立即修正：\n\n"
                 for issue in errors:
-                    report += f"❌ {issue.component_type.value} - {issue.message}\n"
+                    report += f"[错误] {issue.component_type.value} - {issue.message}\n"
                     report += f"   建议: {issue.suggestion}\n\n"
 
             if warnings:
                 report += "【警告】建议检查：\n\n"
                 for issue in warnings:
-                    report += f"⚠️  {issue.component_type.value} - {issue.message}\n"
+                    report += f"[警告] {issue.component_type.value} - {issue.message}\n"
                     report += f"   建议: {issue.suggestion}\n\n"
 
         report += "=" * 60 + "\n"

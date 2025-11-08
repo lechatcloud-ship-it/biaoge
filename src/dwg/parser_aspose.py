@@ -23,13 +23,13 @@ class AsposeDWGParser:
     基于Aspose.CAD的DWG解析器
 
     优势：
-    - ✅ 完整支持DWG R12-R2021
-    - ✅ 无需外部工具
-    - ✅ 性能优秀
-    - ✅ 商业级质量
+    - [是] 完整支持DWG R12-R2021
+    - [是] 无需外部工具
+    - [是] 性能优秀
+    - [是] 商业级质量
 
     试用限制：
-    - ⚠️ 输出有水印（读取无限制）
+    - [警告] 输出有水印（读取无限制）
     """
 
     def parse(self, filepath: str) -> DWGDocument:

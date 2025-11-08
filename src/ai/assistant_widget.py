@@ -322,7 +322,7 @@ class AIAssistantWidget(QWidget):
         formatted_message = f"""
 <div style='margin: 10px 0; text-align: center;'>
     <span style='color: gray; font-size: 11px;'>
-        ℹ️ {message} ({timestamp})
+        {message} ({timestamp})
     </span>
 </div>
 """
@@ -432,7 +432,7 @@ class AIAssistantWidget(QWidget):
     def onStreamError(self, error_msg: str):
         """流式对话错误"""
         logger.error(f"流式对话错误: {error_msg}")
-        self._appendToCurrentAIMessage(f"\n\n❌ 错误: {error_msg}")
+        self._appendToCurrentAIMessage(f"\n\n错误: {error_msg}")
         self._finalizeCurrentAIMessage()
 
         # 重新启用发送按钮

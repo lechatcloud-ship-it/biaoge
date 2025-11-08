@@ -46,12 +46,12 @@ class PrecisionDWGModifier:
     精确DWG修改器
 
     核心原则：
-    1. ✅ 只修改 entity.dxf.text 属性（或equivalent）
-    2. ❌ 不创建新实体
-    3. ❌ 不删除实体
-    4. ❌ 不改变任何其他属性
-    5. ❌ 不改变实体顺序
-    6. ✅ 保持文件结构完整性
+    1. [是] 只修改 entity.dxf.text 属性（或equivalent）
+    2. [否] 不创建新实体
+    3. [否] 不删除实体
+    4. [否] 不改变任何其他属性
+    5. [否] 不改变实体顺序
+    6. [是] 保持文件结构完整性
     """
 
     def __init__(self):
@@ -142,7 +142,7 @@ class PrecisionDWGModifier:
                 continue
 
             try:
-                # ⚠️ 关键修复：根据entity_id重新查找实体
+                # [警告] 关键修复：根据entity_id重新查找实体
                 # entity_ref可能指向旧文档，需要从当前doc中重新查找
                 try:
                     entity = doc.entitydb[trans.entity_id]
@@ -208,7 +208,7 @@ class PrecisionDWGModifier:
         """
         entity = trans.entity_ref
 
-        # ✅ 只修改这一行！
+        # [是] 只修改这一行！
         entity.dxf.text = trans.translated_text
 
         logger.debug(
@@ -223,7 +223,7 @@ class PrecisionDWGModifier:
         """
         entity = trans.entity_ref
 
-        # ✅ 只修改text属性
+        # [是] 只修改text属性
         # 注意：MTEXT使用 .text 属性，不是 .dxf.text
         if hasattr(entity, 'text'):
             entity.text = trans.translated_text
@@ -241,7 +241,7 @@ class PrecisionDWGModifier:
         """
         修改DIMENSION实体
 
-        ⚠️ 警告：这是高风险操作！
+        [警告] 警告：这是高风险操作！
         尺寸标注的文本通常是自动计算的数值，不应该修改。
         只有当用户明确设置了覆盖文本时才应该修改。
         """
@@ -249,14 +249,14 @@ class PrecisionDWGModifier:
 
         # 检查是否有覆盖文本
         if hasattr(entity.dxf, 'text'):
-            # ✅ 只修改覆盖文本
+            # [是] 只修改覆盖文本
             entity.dxf.text = trans.translated_text
             logger.warning(
                 f"DIMENSION覆盖文本修改: '{trans.original_text}' → "
                 f"'{trans.translated_text}' (请人工审查！)"
             )
         else:
-            # ❌ 不应该修改自动计算的尺寸数值
+            # [否] 不应该修改自动计算的尺寸数值
             logger.error(
                 f"DIMENSION实体 {trans.entity_id} 没有覆盖文本，"
                 f"不应修改自动计算的数值！"
@@ -289,11 +289,11 @@ class PrecisionDWGModifier:
         """
         修改ATTRIB/ATTDEF实体
 
-        ⚠️ 警告：块属性的修改会影响所有使用该块的实例！
+        [警告] 警告：块属性的修改会影响所有使用该块的实例！
         """
         entity = trans.entity_ref
 
-        # ✅ 修改text属性
+        # [是] 修改text属性
         entity.dxf.text = trans.translated_text
 
         logger.warning(
