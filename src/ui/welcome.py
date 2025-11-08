@@ -80,7 +80,7 @@ class WelcomeInterface(ScrollArea):
         layout.addWidget(title)
 
         description = BodyLabel(
-            "点击左侧"图纸查看"，开始导入DWG文件...",
+            '点击左侧"图纸查看"，开始导入DWG文件...',
             self
         )
         layout.addWidget(description)

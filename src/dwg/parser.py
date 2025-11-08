@@ -330,7 +330,7 @@ class DWGParser:
             }
 
             return aci_colors.get(aci, "#FFFFFF")
-        except:
+        except (AttributeError, TypeError, KeyError):
             return "#FFFFFF"
 
 
