@@ -3,14 +3,19 @@
 批量处理界面组件
 """
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
-    QTableWidget, QTableWidgetItem, QHeaderView, QFileDialog,
-    QProgressBar, QLabel, QGroupBox, QMessageBox, QCheckBox
+    QWidget, QVBoxLayout, QHBoxLayout,
+    QHeaderView, QFileDialog
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QColor, QBrush
 from pathlib import Path
 from typing import List
+
+from qfluentwidgets import (
+    PushButton, TableWidget, BodyLabel, TitleLabel,
+    ProgressBar, CheckBox, CardWidget, MessageBox,
+    FluentIcon
+)
 
 from ..batch.processor import BatchProcessor, BatchTask, TaskStatus
 from ..utils.logger import logger
@@ -80,27 +85,26 @@ class BatchWidget(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
 
         # 标题
-        title = QLabel("📦 批量文件处理")
-        title.setStyleSheet("font-size: 16px; font-weight: bold; color: #0078D4;")
+        title = TitleLabel("批量文件处理")
         layout.addWidget(title)
 
         # 文件列表组
-        file_group = QGroupBox("文件列表")
+        file_group = CardWidget()
         file_layout = QVBoxLayout(file_group)
 
         # 文件操作按钮
         btn_layout = QHBoxLayout()
 
-        self.add_files_btn = QPushButton("➕ 添加文件")
+        self.add_files_btn = PushButton(FluentIcon.ADD, "添加文件")
         self.add_files_btn.setToolTip("添加DWG/DXF文件到批处理列表")
         btn_layout.addWidget(self.add_files_btn)
 
-        self.remove_selected_btn = QPushButton("➖ 移除选中")
+        self.remove_selected_btn = PushButton(FluentIcon.REMOVE, "移除选中")
         self.remove_selected_btn.setToolTip("移除选中的文件")
         self.remove_selected_btn.setEnabled(False)
         btn_layout.addWidget(self.remove_selected_btn)
 
-        self.clear_all_btn = QPushButton("🗑️ 清空列表")
+        self.clear_all_btn = PushButton(FluentIcon.DELETE, "清空列表")
         self.clear_all_btn.setToolTip("清空所有文件")
         btn_layout.addWidget(self.clear_all_btn)
 
@@ -108,7 +112,7 @@ class BatchWidget(QWidget):
         file_layout.addLayout(btn_layout)
 
         # 文件表格
-        self.file_table = QTableWidget()
+        self.file_table = TableWidget()
         self.file_table.setColumnCount(4)
         self.file_table.setHorizontalHeaderLabels(["文件名", "状态", "进度", "错误信息"])
         self.file_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -117,22 +121,26 @@ class BatchWidget(QWidget):
         self.file_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         self.file_table.setColumnWidth(1, 80)
         self.file_table.setColumnWidth(2, 100)
-        self.file_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.file_table.setSelectionBehavior(TableWidget.SelectionBehavior.SelectRows)
         file_layout.addWidget(self.file_table)
 
         layout.addWidget(file_group)
 
         # 处理选项组
-        options_group = QGroupBox("处理选项")
+        options_group = CardWidget()
         options_layout = QVBoxLayout(options_group)
 
-        self.translate_checkbox = QCheckBox("翻译文本")
+        options_title = BodyLabel("处理选项")
+        options_title.setStyleSheet("font-weight: bold;")
+        options_layout.addWidget(options_title)
+
+        self.translate_checkbox = CheckBox("翻译文本")
         self.translate_checkbox.setChecked(True)
         self.translate_checkbox.setToolTip("自动翻译DWG文件中的文本")
         options_layout.addWidget(self.translate_checkbox)
 
         # TODO: 导出选项暂时禁用，等导出功能完善后启用
-        self.export_checkbox = QCheckBox("导出处理后的文件")
+        self.export_checkbox = CheckBox("导出处理后的文件")
         self.export_checkbox.setEnabled(False)
         self.export_checkbox.setToolTip("将处理后的文件导出到指定目录（暂未实现）")
         options_layout.addWidget(self.export_checkbox)
@@ -140,14 +148,17 @@ class BatchWidget(QWidget):
         layout.addWidget(options_group)
 
         # 统计信息
-        stats_group = QGroupBox("统计信息")
+        stats_group = CardWidget()
         stats_layout = QVBoxLayout(stats_group)
 
-        self.stats_label = QLabel("总计: 0 | 完成: 0 | 失败: 0 | 成功率: 0%")
-        self.stats_label.setStyleSheet("font-size: 12px;")
+        stats_title = BodyLabel("统计信息")
+        stats_title.setStyleSheet("font-weight: bold;")
+        stats_layout.addWidget(stats_title)
+
+        self.stats_label = BodyLabel("总计: 0 | 完成: 0 | 失败: 0 | 成功率: 0%")
         stats_layout.addWidget(self.stats_label)
 
-        self.overall_progress = QProgressBar()
+        self.overall_progress = ProgressBar()
         self.overall_progress.setTextVisible(True)
         self.overall_progress.setFormat("总进度: %p%")
         stats_layout.addWidget(self.overall_progress)
@@ -158,26 +169,11 @@ class BatchWidget(QWidget):
         control_layout = QHBoxLayout()
         control_layout.addStretch()
 
-        self.start_btn = QPushButton("▶️ 开始处理")
-        self.start_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #0078D4;
-                color: white;
-                font-weight: bold;
-                padding: 8px 20px;
-                border-radius: 4px;
-            }
-            QPushButton:hover {
-                background-color: #106EBE;
-            }
-            QPushButton:disabled {
-                background-color: #CCCCCC;
-            }
-        """)
+        self.start_btn = PushButton(FluentIcon.PLAY, "开始处理")
         self.start_btn.setEnabled(False)
         control_layout.addWidget(self.start_btn)
 
-        self.cancel_btn = QPushButton("⏹️ 取消")
+        self.cancel_btn = PushButton(FluentIcon.CANCEL, "取消")
         self.cancel_btn.setEnabled(False)
         control_layout.addWidget(self.cancel_btn)
 
@@ -222,14 +218,12 @@ class BatchWidget(QWidget):
     def on_clear_all(self):
         """清空所有文件"""
         if self.processor.tasks:
-            reply = QMessageBox.question(
-                self,
+            w = MessageBox(
                 "确认清空",
                 f"确定要清空所有 {len(self.processor.tasks)} 个文件吗？",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                self
             )
-
-            if reply == QMessageBox.StandardButton.Yes:
+            if w.exec():
                 self.processor.clear_tasks()
                 self.refresh_file_table()
                 self.update_ui_state()
@@ -242,7 +236,7 @@ class BatchWidget(QWidget):
     def on_start_processing(self):
         """开始处理"""
         if not self.processor.tasks:
-            QMessageBox.warning(self, "无文件", "请先添加文件到批处理列表")
+            MessageBox("无文件", "请先添加文件到批处理列表", self).exec()
             return
 
         # 创建处理线程
@@ -270,14 +264,12 @@ class BatchWidget(QWidget):
 
     def on_cancel_processing(self):
         """取消处理"""
-        reply = QMessageBox.question(
-            self,
+        w = MessageBox(
             "确认取消",
             "确定要取消批处理吗？",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            self
         )
-
-        if reply == QMessageBox.StandardButton.Yes:
+        if w.exec():
             self.processor.cancel()
             self.cancel_btn.setEnabled(False)
             logger.info("用户请求取消批处理")
@@ -314,8 +306,7 @@ class BatchWidget(QWidget):
         """全部完成"""
         stats = self.processor.get_statistics()
 
-        QMessageBox.information(
-            self,
+        MessageBox(
             "批处理完成",
             f"批处理已完成！\n\n"
             f"总计: {stats['total']}\n"
@@ -323,8 +314,9 @@ class BatchWidget(QWidget):
             f"失败: {stats['failed']}\n"
             f"跳过: {stats['skipped']}\n"
             f"成功率: {stats['success_rate']:.1f}%\n"
-            f"总耗时: {stats['total_duration']:.2f}秒"
-        )
+            f"总耗时: {stats['total_duration']:.2f}秒",
+            self
+        ).exec()
 
         # 恢复UI状态
         self.start_btn.setEnabled(True)
@@ -336,6 +328,7 @@ class BatchWidget(QWidget):
 
     def refresh_file_table(self):
         """刷新文件表格"""
+        from PyQt6.QtWidgets import QTableWidgetItem
         self.file_table.setRowCount(len(self.processor.tasks))
 
         for index, task in enumerate(self.processor.tasks):
@@ -343,6 +336,8 @@ class BatchWidget(QWidget):
 
     def update_task_row(self, row: int, task: BatchTask):
         """更新任务行"""
+        from PyQt6.QtWidgets import QTableWidgetItem
+
         # 文件名
         filename_item = QTableWidgetItem(task.filename)
         filename_item.setToolTip(str(task.file_path))
@@ -365,7 +360,7 @@ class BatchWidget(QWidget):
         self.file_table.setItem(row, 1, status_item)
 
         # 进度
-        progress_widget = QProgressBar()
+        progress_widget = ProgressBar()
         progress_widget.setMaximum(100)
         progress_widget.setValue(int(task.progress * 100))
         progress_widget.setTextVisible(True)

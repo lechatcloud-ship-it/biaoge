@@ -3,11 +3,12 @@
 查看器组件 - 包含工具栏和画布
 """
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QToolBar,
-    QPushButton, QLabel, QComboBox
+    QWidget, QVBoxLayout, QHBoxLayout, QToolBar
 )
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QAction, QIcon
+
+from qfluentwidgets import PushButton, BodyLabel, ComboBox
 
 from ..dwg.renderer import DWGCanvas
 from ..dwg.entities import DWGDocument
@@ -50,22 +51,22 @@ class ViewerWidget(QWidget):
         toolbar.setMovable(False)
 
         # 缩放按钮
-        zoom_in_btn = QPushButton("+")
+        zoom_in_btn = PushButton("+")
         zoom_in_btn.setToolTip("放大 (Ctrl++)")
         zoom_in_btn.clicked.connect(self.canvas.zoomIn)
         toolbar.addWidget(zoom_in_btn)
 
-        zoom_out_btn = QPushButton("-")
+        zoom_out_btn = PushButton("-")
         zoom_out_btn.setToolTip("缩小 (Ctrl+-)")
         zoom_out_btn.clicked.connect(self.canvas.zoomOut)
         toolbar.addWidget(zoom_out_btn)
 
-        fit_btn = QPushButton("适应")
+        fit_btn = PushButton("适应")
         fit_btn.setToolTip("适应视图 (F)")
         fit_btn.clicked.connect(self.canvas.fitToView)
         toolbar.addWidget(fit_btn)
 
-        reset_btn = QPushButton("重置")
+        reset_btn = PushButton("重置")
         reset_btn.setToolTip("重置视图 (R)")
         reset_btn.clicked.connect(self.canvas.resetView)
         toolbar.addWidget(reset_btn)
@@ -73,9 +74,9 @@ class ViewerWidget(QWidget):
         toolbar.addSeparator()
 
         # 图层控制
-        toolbar.addWidget(QLabel(" 图层: "))
+        toolbar.addWidget(BodyLabel(" 图层: "))
 
-        self.layer_combo = QComboBox()
+        self.layer_combo = ComboBox()
         self.layer_combo.addItem("显示所有图层")
         self.layer_combo.currentIndexChanged.connect(self._on_layer_changed)
         toolbar.addWidget(self.layer_combo)
@@ -83,13 +84,13 @@ class ViewerWidget(QWidget):
         toolbar.addSeparator()
 
         # 选项
-        self.axes_btn = QPushButton("☑ 坐标轴")
+        self.axes_btn = PushButton("坐标轴")
         self.axes_btn.setCheckable(True)
         self.axes_btn.setChecked(True)
         self.axes_btn.toggled.connect(self._on_axes_toggled)
         toolbar.addWidget(self.axes_btn)
 
-        self.aa_btn = QPushButton("☑ 抗锯齿")
+        self.aa_btn = PushButton("抗锯齿")
         self.aa_btn.setCheckable(True)
         self.aa_btn.setChecked(True)
         self.aa_btn.toggled.connect(self._on_aa_toggled)
@@ -107,13 +108,13 @@ class ViewerWidget(QWidget):
         layout.setContentsMargins(10, 2, 10, 2)
 
         # 缩放级别
-        self.zoom_label = QLabel("缩放: 1.00x")
+        self.zoom_label = BodyLabel("缩放: 1.00x")
         layout.addWidget(self.zoom_label)
 
         layout.addStretch()
 
         # 实体数量
-        self.entity_label = QLabel("实体: 0")
+        self.entity_label = BodyLabel("实体: 0")
         layout.addWidget(self.entity_label)
 
         # 监听视口变化
@@ -140,13 +141,11 @@ class ViewerWidget(QWidget):
         """坐标轴切换"""
         self.canvas.show_axes = checked
         self.canvas.update()
-        self.axes_btn.setText("☑ 坐标轴" if checked else "☐ 坐标轴")
 
     def _on_aa_toggled(self, checked):
         """抗锯齿切换"""
         self.canvas.antialiasing = checked
         self.canvas.update()
-        self.aa_btn.setText("☑ 抗锯齿" if checked else "☐ 抗锯齿")
 
     def setDocument(self, document: DWGDocument):
         """设置文档"""

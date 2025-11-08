@@ -4,15 +4,19 @@ AI对话助手窗口
 基于业界最佳实践（微软、IBM对话设计指南）
 """
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QTextEdit,
-    QLineEdit, QPushButton, QLabel, QScrollArea,
-    QFrame, QMessageBox, QSplitter
+    QWidget, QVBoxLayout, QHBoxLayout,
+    QFrame, QSplitter
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QTextCursor, QFont, QColor
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 import json
+
+from qfluentwidgets import (
+    LineEdit, PrimaryPushButton, BodyLabel, TitleLabel,
+    TextEdit, SmoothScrollArea, MessageBox, FluentIcon
+)
 
 from ..services.bailian_client import BailianClient
 from ..dwg.entities import DWGDocument
@@ -40,7 +44,8 @@ class AIMessageWidget(QFrame):
         # 头部：角色 + 时间
         header_layout = QHBoxLayout()
 
-        role_label = QLabel(f"{'👤 您' if self.role == 'user' else '🤖 AI助手'}")
+        role_text = "您" if self.role == "user" else "AI助手"
+        role_label = BodyLabel(role_text)
         role_label.setStyleSheet(f"""
             font-weight: bold;
             color: {'#0078D4' if self.role == 'user' else '#107C10'};
@@ -49,14 +54,14 @@ class AIMessageWidget(QFrame):
 
         header_layout.addStretch()
 
-        time_label = QLabel(self.timestamp)
+        time_label = BodyLabel(self.timestamp)
         time_label.setStyleSheet("color: #666; font-size: 11px;")
         header_layout.addWidget(time_label)
 
         layout.addLayout(header_layout)
 
         # 消息内容
-        content_label = QLabel(self.content)
+        content_label = BodyLabel(self.content)
         content_label.setWordWrap(True)
         content_label.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse |
@@ -176,7 +181,7 @@ class AIChatWidget(QWidget):
         title_layout = QHBoxLayout(title_bar)
         title_layout.setContentsMargins(10, 5, 10, 5)
 
-        title_label = QLabel("💬 AI智能助手")
+        title_label = TitleLabel("AI智能助手")
         title_label.setStyleSheet("""
             font-size: 14px;
             font-weight: bold;
@@ -184,7 +189,7 @@ class AIChatWidget(QWidget):
         """)
         title_layout.addWidget(title_label)
 
-        subtitle_label = QLabel("由 qwen-max 驱动 · 专业建筑工程助手")
+        subtitle_label = BodyLabel("由 qwen-max 驱动 · 专业建筑工程助手")
         subtitle_label.setStyleSheet("""
             font-size: 11px;
             color: rgba(255,255,255,0.8);
@@ -195,7 +200,7 @@ class AIChatWidget(QWidget):
         layout.addWidget(title_bar)
 
         # 消息显示区域（滚动）
-        scroll_area = QScrollArea()
+        scroll_area = SmoothScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setStyleSheet("""
             QScrollArea {
@@ -227,50 +232,19 @@ class AIChatWidget(QWidget):
         input_layout.setContentsMargins(10, 10, 10, 10)
 
         # 快捷命令提示
-        hint_label = QLabel("💡 提示：直接输入问题，或使用 /help 查看帮助")
+        hint_label = BodyLabel("提示：直接输入问题，或使用 /help 查看帮助")
         hint_label.setStyleSheet("color: #666; font-size: 11px;")
         input_layout.addWidget(hint_label)
 
         # 输入框和发送按钮
         input_row = QHBoxLayout()
 
-        self.user_input = QLineEdit()
+        self.user_input = LineEdit()
         self.user_input.setPlaceholderText("输入您的问题，例如：这个梁的长度为什么是0？")
-        self.user_input.setStyleSheet("""
-            QLineEdit {
-                padding: 10px;
-                border: 1px solid #CCC;
-                border-radius: 6px;
-                font-size: 13px;
-                background-color: white;
-            }
-            QLineEdit:focus {
-                border: 2px solid #0078D4;
-            }
-        """)
         self.user_input.returnPressed.connect(self.on_send_message)
         input_row.addWidget(self.user_input, 1)
 
-        self.send_button = QPushButton("📤 发送")
-        self.send_button.setStyleSheet("""
-            QPushButton {
-                background-color: #0078D4;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 6px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #106EBE;
-            }
-            QPushButton:pressed {
-                background-color: #005A9E;
-            }
-            QPushButton:disabled {
-                background-color: #CCCCCC;
-            }
-        """)
+        self.send_button = PrimaryPushButton(FluentIcon.SEND, "发送")
         self.send_button.clicked.connect(self.on_send_message)
         input_row.addWidget(self.send_button)
 
@@ -280,13 +254,13 @@ class AIChatWidget(QWidget):
 
     def send_welcome_message(self):
         """发送欢迎消息"""
-        welcome = """您好！我是表哥软件的AI助手 🤖
+        welcome = """您好！我是表哥软件的AI助手
 
 我可以帮您：
-✅ 解释翻译结果
-✅ 修正算量错误
-✅ 分析尺寸异常
-✅ 提供专业建议
+• 解释翻译结果
+• 修正算量错误
+• 分析尺寸异常
+• 提供专业建议
 
 常用命令：
 /help - 查看完整帮助
@@ -346,7 +320,7 @@ class AIChatWidget(QWidget):
         self.send_button.setEnabled(False)
 
         # 显示"思考中..."
-        self.add_message('assistant', '🤔 思考中...')
+        self.add_message('assistant', '思考中...')
 
         # 异步调用AI
         if self.ai_client:
@@ -395,7 +369,7 @@ class AIChatWidget(QWidget):
                 item.widget().deleteLater()
 
         # 显示错误
-        error_msg = f"❌ 抱歉，出现了错误：\n\n{error_message}\n\n请稍后重试或检查网络连接。"
+        error_msg = f"抱歉，出现了错误：\n\n{error_message}\n\n请稍后重试或检查网络连接。"
         self.add_message('assistant', error_msg)
 
         # 恢复输入
@@ -408,7 +382,7 @@ class AIChatWidget(QWidget):
         cmd = command.lower().strip()
 
         if cmd == '/help':
-            help_text = """📖 AI助手帮助文档
+            help_text = """AI助手帮助文档
 
 【可用命令】
 /help - 显示此帮助
@@ -434,25 +408,24 @@ class AIChatWidget(QWidget):
             self.check_current_results()
 
         elif cmd == '/clear':
-            reply = QMessageBox.question(
-                self,
+            w = MessageBox(
                 "确认清空",
                 "确定要清空对话历史吗？此操作不可恢复。",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+                self
             )
-            if reply == QMessageBox.StandardButton.Yes:
+            if w.exec():
                 self.clear_chat()
 
         elif cmd == '/context':
             self.show_context_info()
 
         else:
-            self.add_message('assistant', f"❓ 未知命令：{command}\n\n请输入 /help 查看可用命令。")
+            self.add_message('assistant', f"未知命令：{command}\n\n请输入 /help 查看可用命令。")
 
     def check_current_results(self):
         """检查当前结果"""
         if not self.current_document:
-            self.add_message('assistant', "⚠️ 当前没有打开的文档。请先打开一个DWG文件。")
+            self.add_message('assistant', "当前没有打开的文档。请先打开一个DWG文件。")
             return
 
         # 构建检查消息
@@ -486,7 +459,7 @@ class AIChatWidget(QWidget):
     def show_context_info(self):
         """显示上下文信息"""
         if self.current_document:
-            info = f"""📋 当前上下文信息
+            info = f"""当前上下文信息
 
 【文档】
 - 文件名：{self.current_document.metadata.get('filename', '未知')}

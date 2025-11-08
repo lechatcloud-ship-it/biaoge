@@ -3,13 +3,17 @@
 性能监控面板
 """
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QGroupBox, QTextEdit, QPushButton, QProgressBar
+    QWidget, QVBoxLayout, QHBoxLayout
 )
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QFont
 import psutil
 import os
+
+from qfluentwidgets import (
+    CardWidget, BodyLabel, TitleLabel, TextEdit,
+    PushButton, ProgressBar, MessageBox
+)
 
 from ..utils.performance import perf_monitor
 from ..utils.resource_manager import resource_manager
@@ -34,49 +38,49 @@ class PerformancePanel(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
 
         # 标题
-        title = QLabel("⚡ 性能监控")
-        title_font = QFont("Microsoft YaHei UI", 12, QFont.Weight.Bold)
-        title.setFont(title_font)
+        title = TitleLabel("性能监控")
         layout.addWidget(title)
 
         # CPU和内存组
-        system_group = QGroupBox("系统资源")
-        system_layout = QVBoxLayout()
+        system_group = CardWidget()
+        system_layout = QVBoxLayout(system_group)
 
         # CPU
         cpu_layout = QHBoxLayout()
-        cpu_layout.addWidget(QLabel("CPU使用率:"))
-        self.cpu_label = QLabel("0%")
+        cpu_layout.addWidget(BodyLabel("CPU使用率:"))
+        self.cpu_label = BodyLabel("0%")
         self.cpu_label.setStyleSheet("font-weight: bold; color: #2196F3;")
         cpu_layout.addWidget(self.cpu_label)
         cpu_layout.addStretch()
         system_layout.addLayout(cpu_layout)
 
-        self.cpu_bar = QProgressBar()
+        self.cpu_bar = ProgressBar()
         self.cpu_bar.setMaximum(100)
         system_layout.addWidget(self.cpu_bar)
 
         # 内存
         mem_layout = QHBoxLayout()
-        mem_layout.addWidget(QLabel("内存使用:"))
-        self.mem_label = QLabel("0 MB")
+        mem_layout.addWidget(BodyLabel("内存使用:"))
+        self.mem_label = BodyLabel("0 MB")
         self.mem_label.setStyleSheet("font-weight: bold; color: #4CAF50;")
         mem_layout.addWidget(self.mem_label)
         mem_layout.addStretch()
         system_layout.addLayout(mem_layout)
 
-        self.mem_bar = QProgressBar()
+        self.mem_bar = ProgressBar()
         self.mem_bar.setMaximum(1000)  # 1GB
         system_layout.addWidget(self.mem_bar)
 
-        system_group.setLayout(system_layout)
         layout.addWidget(system_group)
 
         # 性能统计组
-        stats_group = QGroupBox("性能统计")
-        stats_layout = QVBoxLayout()
+        stats_group = CardWidget()
+        stats_layout = QVBoxLayout(stats_group)
 
-        self.stats_text = QTextEdit()
+        stats_title = TitleLabel("性能统计")
+        stats_layout.addWidget(stats_title)
+
+        self.stats_text = TextEdit()
         self.stats_text.setReadOnly(True)
         self.stats_text.setMaximumHeight(200)
         font = QFont("Consolas", 9)
@@ -84,17 +88,16 @@ class PerformancePanel(QWidget):
 
         stats_layout.addWidget(self.stats_text)
 
-        stats_group.setLayout(stats_layout)
         layout.addWidget(stats_group)
 
         # 操作按钮
         button_layout = QHBoxLayout()
 
-        self.optimize_btn = QPushButton("优化内存")
+        self.optimize_btn = PushButton("优化内存")
         self.optimize_btn.clicked.connect(self._optimize_memory)
         button_layout.addWidget(self.optimize_btn)
 
-        self.clear_stats_btn = QPushButton("清除统计")
+        self.clear_stats_btn = PushButton("清除统计")
         self.clear_stats_btn.clicked.connect(self._clear_stats)
         button_layout.addWidget(self.clear_stats_btn)
 
@@ -184,18 +187,16 @@ class PerformancePanel(QWidget):
         try:
             freed = resource_manager.optimize_memory()
 
-            from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.information(
-                self,
+            MessageBox(
                 "优化完成",
-                f"内存优化完成\n\n释放内存: {freed:.2f} MB"
-            )
+                f"内存优化完成\n\n释放内存: {freed:.2f} MB",
+                self
+            ).exec()
 
             self._update_metrics()
 
         except Exception as e:
-            from PyQt6.QtWidgets import QMessageBox
-            QMessageBox.critical(self, "错误", f"优化失败:\n{e}")
+            MessageBox("错误", f"优化失败:\n{e}", self).exec()
 
     def _clear_stats(self):
         """清除统计"""
@@ -205,8 +206,7 @@ class PerformancePanel(QWidget):
 
         self.stats_text.setPlainText("统计已清除")
 
-        from PyQt6.QtWidgets import QMessageBox
-        QMessageBox.information(self, "完成", "性能统计已清除")
+        MessageBox("完成", "性能统计已清除", self).exec()
 
     def showEvent(self, event):
         """显示事件"""

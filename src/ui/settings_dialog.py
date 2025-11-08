@@ -2,22 +2,25 @@
 """
 完整的设置对话框 - 符合国内商业软件标准
 """
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
-    QTabWidget, QWidget, QPushButton, QLineEdit,
-    QComboBox, QSpinBox, QCheckBox, QLabel,
-    QGroupBox, QMessageBox, QFileDialog, QTextEdit,
-    QRadioButton, QButtonGroup
-)
 from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QVBoxLayout, QHBoxLayout, QFormLayout,
+    QWidget, QFileDialog, QStackedWidget, QTabWidget
+)
 from pathlib import Path
 import os
+
+from qfluentwidgets import (
+    Dialog, PrimaryPushButton, PushButton, LineEdit,
+    ComboBox, SpinBox, CheckBox, BodyLabel, CardWidget,
+    MessageBox, FluentIcon
+)
 
 from ..utils.config_manager import ConfigManager
 from ..utils.logger import logger
 
 
-class SettingsDialog(QDialog):
+class SettingsDialog(Dialog):
     """完整设置对话框 - 国内商业软件标准"""
 
     def __init__(self, parent=None):
@@ -26,7 +29,6 @@ class SettingsDialog(QDialog):
         self.config = ConfigManager()
         self.setWindowTitle("设置")
         self.setMinimumSize(800, 700)
-        self.setModal(True)
 
         self._init_ui()
         self._load_settings()
@@ -35,26 +37,16 @@ class SettingsDialog(QDialog):
         """初始化UI"""
         layout = QVBoxLayout(self)
 
-        # 创建选项卡
+        # 使用QTabWidget作为选项卡容器(简化实现)
         tab_widget = QTabWidget()
 
-        # 1. 阿里云百炼设置
-        tab_widget.addTab(self._create_bailian_tab(), "🤖 阿里云百炼")
-
-        # 2. 翻译设置
-        tab_widget.addTab(self._create_translation_tab(), "🌐 翻译设置")
-
-        # 3. 性能设置
-        tab_widget.addTab(self._create_performance_tab(), "⚡ 性能优化")
-
-        # 4. 界面设置
-        tab_widget.addTab(self._create_ui_tab(), "🎨 界面设置")
-
-        # 5. 数据管理
-        tab_widget.addTab(self._create_data_tab(), "💾 数据管理")
-
-        # 6. 高级设置
-        tab_widget.addTab(self._create_advanced_tab(), "🔧 高级")
+        # 添加各个选项卡
+        tab_widget.addTab(self._create_bailian_tab(), "阿里云百炼")
+        tab_widget.addTab(self._create_translation_tab(), "翻译设置")
+        tab_widget.addTab(self._create_performance_tab(), "性能优化")
+        tab_widget.addTab(self._create_ui_tab(), "界面设置")
+        tab_widget.addTab(self._create_data_tab(), "数据管理")
+        tab_widget.addTab(self._create_advanced_tab(), "高级")
 
         layout.addWidget(tab_widget)
 
@@ -62,13 +54,13 @@ class SettingsDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        self.ok_button = QPushButton("确定")
+        self.ok_button = PrimaryPushButton("确定")
         self.ok_button.clicked.connect(self._on_ok)
 
-        self.cancel_button = QPushButton("取消")
+        self.cancel_button = PushButton("取消")
         self.cancel_button.clicked.connect(self.reject)
 
-        self.apply_button = QPushButton("应用")
+        self.apply_button = PushButton("应用")
         self.apply_button.clicked.connect(self._on_apply)
 
         button_layout.addWidget(self.ok_button)
@@ -83,21 +75,21 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         # API配置组
-        api_group = QGroupBox("API配置")
+        api_group = CardWidget()
         api_layout = QFormLayout()
 
         # API密钥
-        self.api_key_edit = QLineEdit()
-        self.api_key_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        self.api_key_edit = LineEdit()
+        self.api_key_edit.setEchoMode(LineEdit.EchoMode.Password)
         self.api_key_edit.setPlaceholderText("请输入阿里云DashScope API Key")
         self.api_key_edit.setMinimumWidth(400)
 
-        show_key_btn = QPushButton("👁")
+        show_key_btn = PushButton(FluentIcon.VIEW, "")
         show_key_btn.setFixedWidth(30)
         show_key_btn.setCheckable(True)
         show_key_btn.toggled.connect(
             lambda checked: self.api_key_edit.setEchoMode(
-                QLineEdit.EchoMode.Normal if checked else QLineEdit.EchoMode.Password
+                LineEdit.EchoMode.Normal if checked else LineEdit.EchoMode.Password
             )
         )
 
@@ -108,7 +100,7 @@ class SettingsDialog(QDialog):
         api_layout.addRow("API密钥:", key_layout)
 
         # API密钥说明
-        key_help = QLabel(
+        key_help = BodyLabel(
             '<a href="https://dashscope.console.aliyun.com/apiKey">点击获取API密钥</a> | '
             '密钥将安全保存在本地配置文件中'
         )
@@ -117,18 +109,18 @@ class SettingsDialog(QDialog):
         api_layout.addRow("", key_help)
 
         # API端点
-        self.endpoint_edit = QLineEdit()
+        self.endpoint_edit = LineEdit()
         self.endpoint_edit.setPlaceholderText("https://dashscope.aliyuncs.com")
         api_layout.addRow("API端点:", self.endpoint_edit)
 
         # 超时设置
-        self.timeout_spin = QSpinBox()
+        self.timeout_spin = SpinBox()
         self.timeout_spin.setRange(10, 300)
         self.timeout_spin.setSuffix(" 秒")
         api_layout.addRow("请求超时:", self.timeout_spin)
 
         # 重试次数
-        self.retry_spin = QSpinBox()
+        self.retry_spin = SpinBox()
         self.retry_spin.setRange(1, 10)
         self.retry_spin.setSuffix(" 次")
         api_layout.addRow("重试次数:", self.retry_spin)
@@ -137,12 +129,12 @@ class SettingsDialog(QDialog):
         layout.addWidget(api_group)
 
         # 模型配置组
-        model_group = QGroupBox("模型配置")
+        model_group = CardWidget()
         model_layout = QVBoxLayout()
 
         # 多模态模型
         multimodal_layout = QFormLayout()
-        self.multimodal_combo = QComboBox()
+        self.multimodal_combo = ComboBox()
         self.multimodal_combo.addItems([
             "qwen-vl-max (多模态-最强) - ¥0.020/1K tokens",
             "qwen-vl-plus (多模态-推荐) - ¥0.008/1K tokens",
@@ -153,7 +145,7 @@ class SettingsDialog(QDialog):
 
         # 图片翻译模型
         image_layout = QFormLayout()
-        self.image_model_combo = QComboBox()
+        self.image_model_combo = ComboBox()
         self.image_model_combo.addItems([
             "qwen-vl-max (图片识别-最强) - ¥0.020/1K tokens",
             "qwen-vl-plus (图片识别-推荐) - ¥0.008/1K tokens",
@@ -164,7 +156,7 @@ class SettingsDialog(QDialog):
 
         # 文本翻译模型
         text_layout = QFormLayout()
-        self.text_model_combo = QComboBox()
+        self.text_model_combo = ComboBox()
         self.text_model_combo.addItems([
             "qwen-mt-plus (翻译专用-推荐) - ¥0.006/1K tokens",
             "qwen-mt-turbo (翻译专用-快速) - ¥0.003/1K tokens",
@@ -178,16 +170,16 @@ class SettingsDialog(QDialog):
         # 自定义模型
         custom_layout = QFormLayout()
 
-        self.use_custom_model = QCheckBox("使用自定义模型")
+        self.use_custom_model = CheckBox("使用自定义模型")
         self.use_custom_model.toggled.connect(self._on_custom_model_toggled)
         custom_layout.addRow("", self.use_custom_model)
 
-        self.custom_model_edit = QLineEdit()
+        self.custom_model_edit = LineEdit()
         self.custom_model_edit.setPlaceholderText("输入自定义模型名称，如: qwen-max-0428")
         self.custom_model_edit.setEnabled(False)
         custom_layout.addRow("自定义模型:", self.custom_model_edit)
 
-        custom_help = QLabel(
+        custom_help = BodyLabel(
             "支持所有DashScope兼容的模型名称 | "
             '<a href="https://help.aliyun.com/zh/dashscope/developer-reference/model-square">查看模型列表</a>'
         )
@@ -204,7 +196,7 @@ class SettingsDialog(QDialog):
         test_layout = QHBoxLayout()
         test_layout.addStretch()
 
-        test_btn = QPushButton("测试连接")
+        test_btn = PrimaryPushButton("测试连接")
         test_btn.clicked.connect(self._test_api_connection)
         test_layout.addWidget(test_btn)
 
@@ -220,17 +212,17 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         # 翻译引擎组
-        engine_group = QGroupBox("翻译引擎配置")
+        engine_group = CardWidget()
         engine_layout = QFormLayout()
 
         # 批量大小
-        self.batch_size_spin = QSpinBox()
+        self.batch_size_spin = SpinBox()
         self.batch_size_spin.setRange(10, 200)
         self.batch_size_spin.setSuffix(" 条/批")
         engine_layout.addRow("批量翻译大小:", self.batch_size_spin)
 
         # 并发数
-        self.concurrent_spin = QSpinBox()
+        self.concurrent_spin = SpinBox()
         self.concurrent_spin.setRange(1, 10)
         self.concurrent_spin.setSuffix(" 个线程")
         engine_layout.addRow("并发翻译线程:", self.concurrent_spin)
@@ -239,22 +231,22 @@ class SettingsDialog(QDialog):
         layout.addWidget(engine_group)
 
         # 缓存设置组
-        cache_group = QGroupBox("智能缓存")
+        cache_group = CardWidget()
         cache_layout = QFormLayout()
 
         # 缓存启用
-        self.cache_enabled_check = QCheckBox("启用翻译缓存（可节省90%+成本）")
+        self.cache_enabled_check = CheckBox("启用翻译缓存（可节省90%+成本）")
         self.cache_enabled_check.setChecked(True)
         cache_layout.addRow("", self.cache_enabled_check)
 
         # 缓存TTL
-        self.cache_ttl_spin = QSpinBox()
+        self.cache_ttl_spin = SpinBox()
         self.cache_ttl_spin.setRange(1, 365)
         self.cache_ttl_spin.setSuffix(" 天")
         cache_layout.addRow("缓存有效期:", self.cache_ttl_spin)
 
         # 自动清理
-        self.auto_cleanup_check = QCheckBox("自动清理过期缓存")
+        self.auto_cleanup_check = CheckBox("自动清理过期缓存")
         self.auto_cleanup_check.setChecked(True)
         cache_layout.addRow("", self.auto_cleanup_check)
 
@@ -262,22 +254,22 @@ class SettingsDialog(QDialog):
         layout.addWidget(cache_group)
 
         # 质量设置组
-        quality_group = QGroupBox("翻译质量")
+        quality_group = CardWidget()
         quality_layout = QFormLayout()
 
         # 上下文窗口
-        self.context_window_spin = QSpinBox()
+        self.context_window_spin = SpinBox()
         self.context_window_spin.setRange(0, 10)
         self.context_window_spin.setSuffix(" 条")
         quality_layout.addRow("上下文窗口:", self.context_window_spin)
 
         # 专业术语库
-        self.use_terminology_check = QCheckBox("使用专业术语库")
+        self.use_terminology_check = CheckBox("使用专业术语库")
         self.use_terminology_check.setChecked(True)
         quality_layout.addRow("", self.use_terminology_check)
 
         # 后处理
-        self.post_process_check = QCheckBox("启用后处理优化")
+        self.post_process_check = CheckBox("启用后处理优化")
         self.post_process_check.setChecked(True)
         quality_layout.addRow("", self.post_process_check)
 
@@ -285,17 +277,17 @@ class SettingsDialog(QDialog):
         layout.addWidget(quality_group)
 
         # 语言对设置
-        lang_group = QGroupBox("默认语言对")
+        lang_group = CardWidget()
         lang_layout = QFormLayout()
 
-        self.default_source_combo = QComboBox()
+        self.default_source_combo = ComboBox()
         self.default_source_combo.addItems([
             "自动检测", "中文", "英文", "日文", "韩文",
             "法文", "德文", "西班牙文", "俄文"
         ])
         lang_layout.addRow("默认源语言:", self.default_source_combo)
 
-        self.default_target_combo = QComboBox()
+        self.default_target_combo = ComboBox()
         self.default_target_combo.addItems([
             "英文", "中文", "日文", "韩文",
             "法文", "德文", "西班牙文", "俄文"
@@ -315,26 +307,26 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         # 渲染性能组
-        render_group = QGroupBox("渲染性能")
+        render_group = CardWidget()
         render_layout = QFormLayout()
 
         # 空间索引
-        self.spatial_index_check = QCheckBox("启用空间索引（大幅提升大型图纸性能）")
+        self.spatial_index_check = CheckBox("启用空间索引（大幅提升大型图纸性能）")
         render_layout.addRow("", self.spatial_index_check)
 
         # 抗锯齿
-        self.antialiasing_check = QCheckBox("启用抗锯齿（更清晰，但略慢）")
+        self.antialiasing_check = CheckBox("启用抗锯齿（更清晰，但略慢）")
         render_layout.addRow("", self.antialiasing_check)
 
         # 实体阈值
-        self.entity_threshold_spin = QSpinBox()
+        self.entity_threshold_spin = SpinBox()
         self.entity_threshold_spin.setRange(100, 100000)
         self.entity_threshold_spin.setSingleStep(1000)
         self.entity_threshold_spin.setSuffix(" 个")
         render_layout.addRow("空间索引阈值:", self.entity_threshold_spin)
 
         # 帧率限制
-        self.fps_limit_spin = QSpinBox()
+        self.fps_limit_spin = SpinBox()
         self.fps_limit_spin.setRange(30, 144)
         self.fps_limit_spin.setSuffix(" FPS")
         render_layout.addRow("最大帧率:", self.fps_limit_spin)
@@ -343,22 +335,22 @@ class SettingsDialog(QDialog):
         layout.addWidget(render_group)
 
         # 内存管理组
-        memory_group = QGroupBox("内存管理")
+        memory_group = CardWidget()
         memory_layout = QFormLayout()
 
         # 内存阈值
-        self.memory_threshold_spin = QSpinBox()
+        self.memory_threshold_spin = SpinBox()
         self.memory_threshold_spin.setRange(100, 4000)
         self.memory_threshold_spin.setSingleStep(50)
         self.memory_threshold_spin.setSuffix(" MB")
         memory_layout.addRow("内存警告阈值:", self.memory_threshold_spin)
 
         # 自动优化
-        self.auto_optimize_check = QCheckBox("内存超限自动优化")
+        self.auto_optimize_check = CheckBox("内存超限自动优化")
         memory_layout.addRow("", self.auto_optimize_check)
 
         # 缓存大小
-        self.cache_size_spin = QSpinBox()
+        self.cache_size_spin = SpinBox()
         self.cache_size_spin.setRange(10, 1000)
         self.cache_size_spin.setSuffix(" MB")
         memory_layout.addRow("渲染缓存大小:", self.cache_size_spin)
@@ -367,21 +359,21 @@ class SettingsDialog(QDialog):
         layout.addWidget(memory_group)
 
         # 性能监控组
-        monitor_group = QGroupBox("性能监控")
+        monitor_group = CardWidget()
         monitor_layout = QFormLayout()
 
         # 启用监控
-        self.perf_monitor_check = QCheckBox("启用性能监控（开发模式）")
+        self.perf_monitor_check = CheckBox("启用性能监控（开发模式）")
         monitor_layout.addRow("", self.perf_monitor_check)
 
         # 监控历史
-        self.perf_history_spin = QSpinBox()
+        self.perf_history_spin = SpinBox()
         self.perf_history_spin.setRange(10, 1000)
         self.perf_history_spin.setSuffix(" 条")
         monitor_layout.addRow("保留历史记录:", self.perf_history_spin)
 
         # 性能报告
-        self.perf_report_check = QCheckBox("生成性能报告")
+        self.perf_report_check = CheckBox("生成性能报告")
         monitor_layout.addRow("", self.perf_report_check)
 
         monitor_group.setLayout(monitor_layout)
@@ -397,29 +389,29 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         # 外观组
-        appearance_group = QGroupBox("外观")
+        appearance_group = CardWidget()
         appearance_layout = QFormLayout()
 
         # 主题
-        self.theme_combo = QComboBox()
+        self.theme_combo = ComboBox()
         self.theme_combo.addItems(["亮色主题", "暗色主题", "跟随系统", "蓝色主题", "绿色主题"])
         appearance_layout.addRow("主题:", self.theme_combo)
 
         # 字体大小
-        self.font_size_spin = QSpinBox()
+        self.font_size_spin = SpinBox()
         self.font_size_spin.setRange(8, 18)
         self.font_size_spin.setSuffix(" pt")
         appearance_layout.addRow("字体大小:", self.font_size_spin)
 
         # 字体
-        self.font_family_combo = QComboBox()
+        self.font_family_combo = ComboBox()
         self.font_family_combo.addItems([
             "微软雅黑", "宋体", "黑体", "Arial", "Consolas"
         ])
         appearance_layout.addRow("字体:", self.font_family_combo)
 
         # UI缩放
-        self.ui_scale_spin = QSpinBox()
+        self.ui_scale_spin = SpinBox()
         self.ui_scale_spin.setRange(80, 150)
         self.ui_scale_spin.setSuffix(" %")
         appearance_layout.addRow("UI缩放:", self.ui_scale_spin)
@@ -428,27 +420,27 @@ class SettingsDialog(QDialog):
         layout.addWidget(appearance_group)
 
         # 窗口组
-        window_group = QGroupBox("窗口")
+        window_group = CardWidget()
         window_layout = QFormLayout()
 
         # 启动时最大化
-        self.start_maximized_check = QCheckBox("启动时窗口最大化")
+        self.start_maximized_check = CheckBox("启动时窗口最大化")
         window_layout.addRow("", self.start_maximized_check)
 
         # 记住窗口位置
-        self.remember_position_check = QCheckBox("记住窗口位置和大小")
+        self.remember_position_check = CheckBox("记住窗口位置和大小")
         window_layout.addRow("", self.remember_position_check)
 
         # 显示状态栏
-        self.show_statusbar_check = QCheckBox("显示状态栏")
+        self.show_statusbar_check = CheckBox("显示状态栏")
         window_layout.addRow("", self.show_statusbar_check)
 
         # 显示工具栏
-        self.show_toolbar_check = QCheckBox("显示工具栏")
+        self.show_toolbar_check = CheckBox("显示工具栏")
         window_layout.addRow("", self.show_toolbar_check)
 
         # 标签页位置
-        self.tab_position_combo = QComboBox()
+        self.tab_position_combo = ComboBox()
         self.tab_position_combo.addItems(["顶部", "底部", "左侧", "右侧"])
         window_layout.addRow("标签页位置:", self.tab_position_combo)
 
@@ -456,25 +448,25 @@ class SettingsDialog(QDialog):
         layout.addWidget(window_group)
 
         # 交互组
-        interaction_group = QGroupBox("交互")
+        interaction_group = CardWidget()
         interaction_layout = QFormLayout()
 
         # 确认退出
-        self.confirm_exit_check = QCheckBox("退出时显示确认对话框")
+        self.confirm_exit_check = CheckBox("退出时显示确认对话框")
         interaction_layout.addRow("", self.confirm_exit_check)
 
         # 拖放支持
-        self.drag_drop_check = QCheckBox("启用文件拖放")
+        self.drag_drop_check = CheckBox("启用文件拖放")
         interaction_layout.addRow("", self.drag_drop_check)
 
         # 最近文件数
-        self.recent_files_spin = QSpinBox()
+        self.recent_files_spin = SpinBox()
         self.recent_files_spin.setRange(5, 30)
         self.recent_files_spin.setSuffix(" 个")
         interaction_layout.addRow("最近文件数:", self.recent_files_spin)
 
         # 双击行为
-        self.double_click_combo = QComboBox()
+        self.double_click_combo = ComboBox()
         self.double_click_combo.addItems(["打开文件", "预览", "编辑"])
         interaction_layout.addRow("双击文件:", self.double_click_combo)
 
@@ -491,13 +483,13 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         # 自动保存组
-        autosave_group = QGroupBox("自动保存")
+        autosave_group = CardWidget()
         autosave_layout = QFormLayout()
 
-        self.autosave_enabled_check = QCheckBox("启用自动保存")
+        self.autosave_enabled_check = CheckBox("启用自动保存")
         autosave_layout.addRow("", self.autosave_enabled_check)
 
-        self.autosave_interval_spin = QSpinBox()
+        self.autosave_interval_spin = SpinBox()
         self.autosave_interval_spin.setRange(1, 60)
         self.autosave_interval_spin.setSuffix(" 分钟")
         autosave_layout.addRow("保存间隔:", self.autosave_interval_spin)
@@ -506,17 +498,17 @@ class SettingsDialog(QDialog):
         layout.addWidget(autosave_group)
 
         # 备份设置组
-        backup_group = QGroupBox("数据备份")
+        backup_group = CardWidget()
         backup_layout = QVBoxLayout()
 
         backup_form = QFormLayout()
 
-        self.backup_enabled_check = QCheckBox("启用自动备份")
+        self.backup_enabled_check = CheckBox("启用自动备份")
         backup_form.addRow("", self.backup_enabled_check)
 
-        self.backup_path_edit = QLineEdit()
+        self.backup_path_edit = LineEdit()
         self.backup_path_edit.setPlaceholderText("选择备份目录")
-        browse_backup_btn = QPushButton("浏览...")
+        browse_backup_btn = PushButton("浏览...")
         browse_backup_btn.clicked.connect(self._browse_backup_path)
 
         backup_path_layout = QHBoxLayout()
@@ -524,7 +516,7 @@ class SettingsDialog(QDialog):
         backup_path_layout.addWidget(browse_backup_btn)
         backup_form.addRow("备份目录:", backup_path_layout)
 
-        self.backup_count_spin = QSpinBox()
+        self.backup_count_spin = SpinBox()
         self.backup_count_spin.setRange(1, 100)
         self.backup_count_spin.setSuffix(" 个")
         backup_form.addRow("保留备份数:", self.backup_count_spin)
@@ -533,9 +525,9 @@ class SettingsDialog(QDialog):
 
         # 备份操作按钮
         backup_btn_layout = QHBoxLayout()
-        backup_now_btn = QPushButton("立即备份")
+        backup_now_btn = PushButton("立即备份")
         backup_now_btn.clicked.connect(self._backup_now)
-        restore_btn = QPushButton("恢复备份")
+        restore_btn = PushButton("恢复备份")
         restore_btn.clicked.connect(self._restore_backup)
 
         backup_btn_layout.addWidget(backup_now_btn)
@@ -548,19 +540,19 @@ class SettingsDialog(QDialog):
         layout.addWidget(backup_group)
 
         # 数据清理组
-        cleanup_group = QGroupBox("数据清理")
+        cleanup_group = CardWidget()
         cleanup_layout = QVBoxLayout()
 
         # 清理按钮
-        clear_cache_btn = QPushButton("清除翻译缓存")
+        clear_cache_btn = PushButton("清除翻译缓存")
         clear_cache_btn.clicked.connect(self._clear_cache)
         cleanup_layout.addWidget(clear_cache_btn)
 
-        clear_logs_btn = QPushButton("清除日志文件")
+        clear_logs_btn = PushButton("清除日志文件")
         clear_logs_btn.clicked.connect(self._clear_logs)
         cleanup_layout.addWidget(clear_logs_btn)
 
-        clear_temp_btn = QPushButton("清除临时文件")
+        clear_temp_btn = PushButton("清除临时文件")
         clear_temp_btn.clicked.connect(self._clear_temp)
         cleanup_layout.addWidget(clear_temp_btn)
 
@@ -577,19 +569,19 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout(widget)
 
         # 日志组
-        log_group = QGroupBox("日志")
+        log_group = CardWidget()
         log_layout = QFormLayout()
 
         # 日志级别
-        self.log_level_combo = QComboBox()
+        self.log_level_combo = ComboBox()
         self.log_level_combo.addItems(["DEBUG", "INFO", "WARNING", "ERROR"])
         log_layout.addRow("日志级别:", self.log_level_combo)
 
         # 日志文件
         log_file_layout = QHBoxLayout()
-        self.log_file_edit = QLineEdit()
+        self.log_file_edit = LineEdit()
         self.log_file_edit.setReadOnly(True)
-        browse_log_btn = QPushButton("浏览...")
+        browse_log_btn = PushButton("浏览...")
         browse_log_btn.clicked.connect(self._browse_log_file)
 
         log_file_layout.addWidget(self.log_file_edit)
@@ -598,7 +590,7 @@ class SettingsDialog(QDialog):
         log_layout.addRow("日志文件:", log_file_layout)
 
         # 日志大小限制
-        self.log_size_spin = QSpinBox()
+        self.log_size_spin = SpinBox()
         self.log_size_spin.setRange(1, 100)
         self.log_size_spin.setSuffix(" MB")
         log_layout.addRow("日志文件大小:", self.log_size_spin)
@@ -607,17 +599,17 @@ class SettingsDialog(QDialog):
         layout.addWidget(log_group)
 
         # 更新设置组
-        update_group = QGroupBox("软件更新")
+        update_group = CardWidget()
         update_layout = QFormLayout()
 
-        self.auto_check_update_check = QCheckBox("启动时自动检查更新")
+        self.auto_check_update_check = CheckBox("启动时自动检查更新")
         update_layout.addRow("", self.auto_check_update_check)
 
-        update_channel_combo = QComboBox()
+        update_channel_combo = ComboBox()
         update_channel_combo.addItems(["稳定版", "测试版", "开发版"])
         update_layout.addRow("更新通道:", update_channel_combo)
 
-        check_update_btn = QPushButton("检查更新")
+        check_update_btn = PushButton("检查更新")
         check_update_btn.clicked.connect(self._check_update)
         update_layout.addRow("", check_update_btn)
 
@@ -625,13 +617,13 @@ class SettingsDialog(QDialog):
         layout.addWidget(update_group)
 
         # 使用统计组
-        stats_group = QGroupBox("使用统计")
+        stats_group = CardWidget()
         stats_layout = QFormLayout()
 
-        self.enable_stats_check = QCheckBox("帮助我们改进产品（匿名统计）")
+        self.enable_stats_check = CheckBox("帮助我们改进产品（匿名统计）")
         stats_layout.addRow("", self.enable_stats_check)
 
-        view_stats_btn = QPushButton("查看统计数据")
+        view_stats_btn = PushButton("查看统计数据")
         view_stats_btn.clicked.connect(self._view_stats)
         stats_layout.addRow("", view_stats_btn)
 
@@ -639,14 +631,14 @@ class SettingsDialog(QDialog):
         layout.addWidget(stats_group)
 
         # 重置设置组
-        reset_group = QGroupBox("重置")
+        reset_group = CardWidget()
         reset_layout = QVBoxLayout()
 
-        reset_settings_btn = QPushButton("恢复默认设置")
+        reset_settings_btn = PushButton("恢复默认设置")
         reset_settings_btn.clicked.connect(self._reset_settings)
         reset_layout.addWidget(reset_settings_btn)
 
-        reset_all_btn = QPushButton("重置所有数据（包括缓存）")
+        reset_all_btn = PushButton("重置所有数据（包括缓存）")
         reset_all_btn.clicked.connect(self._reset_all)
         reset_layout.addWidget(reset_all_btn)
 
@@ -654,18 +646,18 @@ class SettingsDialog(QDialog):
         layout.addWidget(reset_group)
 
         # 环境变量组
-        env_group = QGroupBox("环境信息")
+        env_group = CardWidget()
         env_layout = QFormLayout()
 
         # DASHSCOPE_API_KEY
         env_key = os.getenv('DASHSCOPE_API_KEY', '(未设置)')
-        env_label = QLabel(env_key[:20] + '...' if len(env_key) > 20 else env_key)
+        env_label = BodyLabel(env_key[:20] + '...' if len(env_key) > 20 else env_key)
         env_label.setStyleSheet("font-family: monospace;")
         env_layout.addRow("DASHSCOPE_API_KEY:", env_label)
 
         # 配置目录
         config_dir = Path.home() / ".biaoge"
-        config_label = QLabel(str(config_dir))
+        config_label = BodyLabel(str(config_dir))
         config_label.setStyleSheet("font-family: monospace; font-size: 10px;")
         env_layout.addRow("配置目录:", config_label)
 
@@ -865,7 +857,7 @@ class SettingsDialog(QDialog):
 
             api_key = self.api_key_edit.text().strip()
             if not api_key:
-                QMessageBox.warning(self, "警告", "请先输入API密钥")
+                MessageBox("警告", "请先输入API密钥", self).exec()
                 return
 
             # 确定使用的模型
@@ -881,19 +873,19 @@ class SettingsDialog(QDialog):
             client = BailianClient(api_key=api_key, model=model)
 
             if client.test_connection():
-                QMessageBox.information(
-                    self,
+                MessageBox(
                     "测试成功",
-                    f"✅ API连接测试成功！\n\n"
+                    f"API连接测试成功！\n\n"
                     f"模型: {model}\n"
                     f"端点: {self.endpoint_edit.text()}\n\n"
-                    f"您的配置已正确设置"
-                )
+                    f"您的配置已正确设置",
+                    self
+                ).exec()
             else:
-                QMessageBox.warning(self, "测试失败", "API连接测试失败，请检查配置")
+                MessageBox("测试失败", "API连接测试失败，请检查配置", self).exec()
 
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"测试失败:\n{str(e)}")
+            MessageBox("错误", f"测试失败:\n{str(e)}", self).exec()
 
     def _browse_backup_path(self):
         """浏览备份目录"""
@@ -918,61 +910,54 @@ class SettingsDialog(QDialog):
 
     def _backup_now(self):
         """立即备份"""
-        QMessageBox.information(self, "备份", "备份功能将在后续版本中实现")
+        MessageBox("备份", "备份功能将在后续版本中实现", self).exec()
 
     def _restore_backup(self):
         """恢复备份"""
-        QMessageBox.information(self, "恢复", "恢复功能将在后续版本中实现")
+        MessageBox("恢复", "恢复功能将在后续版本中实现", self).exec()
 
     def _clear_cache(self):
         """清除缓存"""
-        reply = QMessageBox.question(
-            self,
-            "确认",
-            "确定要清除所有翻译缓存吗？\n这将删除所有已缓存的翻译结果。",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-
-        if reply == QMessageBox.StandardButton.Yes:
+        w = MessageBox("确认", "确定要清除所有翻译缓存吗？\n这将删除所有已缓存的翻译结果。", self)
+        if w.exec():
             try:
                 from ..translation.cache import TranslationCache
                 cache = TranslationCache()
                 cache.clear()
-                QMessageBox.information(self, "成功", "✅ 缓存已清除")
+                MessageBox("成功", "缓存已清除", self).exec()
                 logger.info("翻译缓存已清除")
             except Exception as e:
-                QMessageBox.critical(self, "错误", f"清除缓存失败:\n{str(e)}")
+                MessageBox("错误", f"清除缓存失败:\n{str(e)}", self).exec()
 
     def _clear_logs(self):
         """清除日志"""
-        QMessageBox.information(self, "清除日志", "日志清除功能将在后续版本中实现")
+        MessageBox("清除日志", "日志清除功能将在后续版本中实现", self).exec()
 
     def _clear_temp(self):
         """清除临时文件"""
-        QMessageBox.information(self, "清除临时文件", "临时文件清除功能将在后续版本中实现")
+        MessageBox("清除临时文件", "临时文件清除功能将在后续版本中实现", self).exec()
 
     def _check_update(self):
         """检查更新"""
-        QMessageBox.information(
-            self,
+        MessageBox(
             "检查更新",
-            "当前版本: 1.0.0\n\n✅ 您使用的是最新版本！"
-        )
+            "当前版本: 1.0.0\n\n您使用的是最新版本！",
+            self
+        ).exec()
 
     def _view_stats(self):
         """查看统计"""
-        QMessageBox.information(self, "使用统计", "统计数据查看功能将在后续版本中实现")
+        MessageBox("使用统计", "统计数据查看功能将在后续版本中实现", self).exec()
 
     def _reset_settings(self):
         """重置设置"""
-        reply = QMessageBox.question(
-            self,
+        w = MessageBox(
             "确认",
             "确定要恢复所有默认设置吗？\n这将重置所有配置（不包括API密钥）。",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            self
         )
 
-        if reply == QMessageBox.StandardButton.Yes:
+        if w.exec():
             # 保存API密钥
             api_key = self.api_key_edit.text()
 
@@ -988,27 +973,25 @@ class SettingsDialog(QDialog):
             # 重新加载
             self._load_settings()
 
-            QMessageBox.information(self, "成功", "✅ 已恢复默认设置")
+            MessageBox("成功", "已恢复默认设置", self).exec()
             logger.info("设置已重置为默认值")
 
     def _reset_all(self):
         """重置所有数据"""
-        reply = QMessageBox.warning(
-            self,
+        w = MessageBox(
             "危险操作",
-            "⚠️ 警告：此操作将删除所有数据！\n\n"
+            "警告：此操作将删除所有数据！\n\n"
             "包括：\n"
             "- 所有配置\n"
             "- 翻译缓存\n"
             "- 日志文件\n"
             "- 临时文件\n\n"
             "确定要继续吗？",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No
+            self
         )
 
-        if reply == QMessageBox.StandardButton.Yes:
-            QMessageBox.information(self, "提示", "数据重置功能将在后续版本中实现")
+        if w.exec():
+            MessageBox("提示", "数据重置功能将在后续版本中实现", self).exec()
 
     def _on_ok(self):
         """确定按钮"""
@@ -1018,8 +1001,8 @@ class SettingsDialog(QDialog):
     def _on_apply(self):
         """应用按钮"""
         self._save_settings()
-        QMessageBox.information(
-            self,
+        MessageBox(
             "提示",
-            "✅ 设置已应用\n\n部分设置需要重启应用后生效"
-        )
+            "设置已应用\n\n部分设置需要重启应用后生效",
+            self
+        ).exec()
