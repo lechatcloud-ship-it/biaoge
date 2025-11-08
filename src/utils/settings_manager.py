@@ -250,9 +250,9 @@ class SettingsManager:
                 model="qwen-mt-plus"
             )
             if success:
-                print(f"✓ 连接成功：{message}")
+                print(f"[是] 连接成功：{message}")
             else:
-                print(f"✗ 连接失败：{message}")
+                print(f"[否] 连接失败：{message}")
         """
         try:
             # 导入BailianClient
@@ -284,7 +284,7 @@ class SettingsManager:
                 cost = result[0].cost_estimate
 
                 success_msg = (
-                    f"✓ API连接成功\n"
+                    f"[是] API连接成功\n"
                     f"  模型: {test_model}\n"
                     f"  测试翻译: Hello → {translated}\n"
                     f"  Token消耗: {tokens}\n"

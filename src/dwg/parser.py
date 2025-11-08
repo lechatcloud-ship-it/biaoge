@@ -79,7 +79,7 @@ class DWGParser:
                 raise DWGPasswordError(
                     f"文件已加密，需要密码\n\n"
                     f"文件：{filepath.name}\n\n"
-                    "💡 解决方案：\n\n"
+                    "[提示] 解决方案：\n\n"
                     "方法1（推荐）：使用AutoCAD解密\n"
                     "1. 用AutoCAD打开此文件\n"
                     "2. 输入密码解密\n"
@@ -92,7 +92,7 @@ class DWGParser:
                     "方法3：联系图纸提供方\n"
                     "• 请求提供无密码版本\n"
                     "• 或获取密码后自行解密\n\n"
-                    "⚠️ 注意：\n"
+                    "[警告] 注意：\n"
                     "由于技术限制，本软件无法直接打开加密的DWG文件。\n"
                     "这是为了保护知识产权和数据安全。"
                 )

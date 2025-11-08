@@ -10,7 +10,7 @@ from PyQt6.QtCore import QThread, pyqtSignal
 from ..dwg.entities import DWGDocument, TextEntity
 from ..services.bailian_client import BailianClient, BailianAPIError
 from .cache import TranslationCache
-from .quality_control import TranslationQualityControl, QualityLevel  # 🚀 翻译质量控制 (99.9999%)
+from .quality_control import TranslationQualityControl, QualityLevel  # 翻译质量控制 (99.9999%)
 from ..utils.logger import logger
 from ..utils.config_manager import ConfigManager
 
@@ -26,7 +26,7 @@ class TranslationStats:
     total_tokens: int = 0  # 总token消耗
     total_cost: float = 0.0  # 总成本（元）
     duration_seconds: float = 0.0  # 耗时（秒）
-    # 🚀 质量控制统计
+    # 质量控制统计
     quality_checked: int = 0  # 质量检查数
     quality_perfect: int = 0  # 完美翻译数
     quality_corrected: int = 0  # 自动修正数
@@ -46,7 +46,7 @@ class TranslationStats:
             'total_cost': self.total_cost,
             'duration_seconds': self.duration_seconds,
             'cache_hit_rate': f"{self.cached_count / self.unique_texts * 100:.1f}%" if self.unique_texts > 0 else "0%",
-            # 🚀 质量控制统计
+            # 质量控制统计
             'quality_checked': self.quality_checked,
             'quality_perfect': self.quality_perfect,
             'quality_corrected': self.quality_corrected,
@@ -75,7 +75,7 @@ class TranslationEngine:
 
         self.client = client or BailianClient()
         self.cache = cache or TranslationCache()
-        self.quality_control = TranslationQualityControl()  # 🚀 质量控制器 (99.9999%)
+        self.quality_control = TranslationQualityControl()  # 质量控制器 (99.9999%)
 
         # 从配置读取翻译设置（确保设置生效）
         self.batch_size = config.get('translation.batch_size', 50)
@@ -83,7 +83,7 @@ class TranslationEngine:
         self.context_window = config.get('translation.context_window', 3)
         self.use_terminology = config.get('translation.use_terminology', True)
         self.post_process = config.get('translation.post_process', True)
-        self.enable_quality_control = config.get('translation.quality_control', True)  # 🚀 默认启用质量控制
+        self.enable_quality_control = config.get('translation.quality_control', True)  # 默认启用质量控制
 
         logger.info(
             f"翻译引擎初始化完成 - "
@@ -92,7 +92,7 @@ class TranslationEngine:
             f"上下文窗口: {self.context_window}, "
             f"术语库: {self.use_terminology}, "
             f"后处理: {self.post_process}, "
-            f"质量控制: {self.enable_quality_control}"  # 🚀
+            f"质量控制: {self.enable_quality_control}"
         )
     
     def translate_document(
@@ -172,12 +172,12 @@ class TranslationEngine:
                 stats.cached_count
             )
 
-            # 🚀 质量控制检查
+            # 质量控制检查
             if self.enable_quality_control:
                 if progress_callback:
                     progress_callback(stats.cached_count, stats.unique_texts, "正在进行质量控制检查...")
 
-                logger.info(f"🚀 开始质量控制检查: {len(new_translations)}条翻译")
+                logger.info(f"开始质量控制检查: {len(new_translations)}条翻译")
                 new_translations, quality_stats = self._perform_quality_control(
                     new_translations,
                     from_lang,
@@ -193,7 +193,7 @@ class TranslationEngine:
                 stats.average_quality_score = quality_stats['average_score']
 
                 logger.info(
-                    f"🚀 质量控制完成: 完美{quality_stats['perfect']}, "
+                    f"质量控制完成: 完美{quality_stats['perfect']}, "
                     f"修正{quality_stats['corrected']}, "
                     f"警告{quality_stats['warnings']}, "
                     f"错误{quality_stats['errors']}, "
@@ -334,7 +334,7 @@ class TranslationEngine:
         to_lang: str
     ) -> tuple:
         """
-        🚀 执行翻译质量控制
+        执行翻译质量控制
 
         Args:
             translation_results: 翻译结果列表
@@ -395,7 +395,7 @@ class TranslationEngine:
                     result.translated_text = corrected
                     quality_stats['corrected'] += 1
                     logger.debug(
-                        f"🚀 翻译已修正: {original[:20]}... | "
+                        f"翻译已修正: {original[:20]}... | "
                         f"{translated[:20]}... -> {corrected[:20]}..."
                     )
 

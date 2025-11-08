@@ -87,11 +87,11 @@ class AIAssistant:
         self.system_prompt = self._build_system_prompt()
 
         # AI配置
-        self.model = self.config.get('ai.model', 'qwen-max')  # 🚀 默认使用qwen-max
+        self.model = self.config.get('ai.model', 'qwen-max')  # 默认使用qwen-max
         self.temperature = self.config.get('ai.temperature', 0.7)
         self.top_p = self.config.get('ai.top_p', 0.9)
-        self.enable_thinking = self.config.get('ai.enable_thinking', False)  # 🚀 深度思考
-        self.use_streaming = self.config.get('ai.use_streaming', True)  # 🚀 流式输出
+        self.enable_thinking = self.config.get('ai.enable_thinking', False)  # 深度思考
+        self.use_streaming = self.config.get('ai.use_streaming', True)  # 流式输出
 
         logger.info(
             f"AI助手初始化完成 - 模型: {self.model}, "
@@ -107,12 +107,12 @@ class AIAssistant:
         return """你是一个专业的DWG图纸智能分析助手，具备以下能力：
 
 **核心能力：**
-1. 📐 图纸分析：理解DWG图纸内容、图层结构、构件信息
-2. 🌐 翻译质量分析：检查翻译准确性、识别专业术语问题
-3. 📊 算量结果分析：解释工程量计算、材料用量统计
-4. 🏗️ 钢筋分析：钢筋配置方案、用量汇总
-5. 💡 智能建议：优化方案、规范检查、成本估算
-6. 📚 学习改进：根据用户反馈持续优化
+1. 图纸分析：理解DWG图纸内容、图层结构、构件信息
+2. 翻译质量分析：检查翻译准确性、识别专业术语问题
+3. 算量结果分析：解释工程量计算、材料用量统计
+4. 钢筋分析：钢筋配置方案、用量汇总
+5. 智能建议：优化方案、规范检查、成本估算
+6. 学习改进：根据用户反馈持续优化
 
 **专业知识：**
 - 建筑行业标准：GB 50011-2010（抗震规范）、GB 50009-2012（荷载规范）、16G101-1（钢筋图集）
@@ -565,19 +565,19 @@ class AIAssistant:
             # DWG信息
             dwg_info = self.context_manager.get_dwg_info()
             if dwg_info:
-                summary_parts.append(f"📐 图纸: {dwg_info.get('filename', 'Unknown')}")
+                summary_parts.append(f"图纸: {dwg_info.get('filename', 'Unknown')}")
                 summary_parts.append(f"   实体数: {dwg_info.get('entity_count', 0)}")
 
             # 翻译状态
             trans_info = self.context_manager.get_translation_info()
             if trans_info:
-                summary_parts.append(f"🌐 翻译: 已完成 {trans_info.get('translated_count', 0)} 条")
+                summary_parts.append(f"翻译: 已完成 {trans_info.get('translated_count', 0)} 条")
                 summary_parts.append(f"   质量分数: {trans_info.get('average_quality_score', 'N/A')}")
 
             # 算量状态
             calc_info = self.context_manager.get_calculation_info()
             if calc_info:
-                summary_parts.append(f"📊 算量: 已识别 {calc_info.get('component_count', 0)} 个构件")
+                summary_parts.append(f"算量: 已识别 {calc_info.get('component_count', 0)} 个构件")
                 summary_parts.append(f"   总费用: ¥{calc_info.get('total_cost', 0):,.2f}")
 
             return '\n'.join(summary_parts)
