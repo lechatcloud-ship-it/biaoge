@@ -2,7 +2,7 @@
 DWG解析器（基于ezdxf）
 """
 import ezdxf
-from typing import Optional
+from typing import Optional, Callable
 from pathlib import Path
 
 from .entities import (
@@ -18,21 +18,37 @@ class DWGParseError(Exception):
     pass
 
 
-class DWGParser:
-    """DWG解析器"""
+class DWGPasswordError(DWGParseError):
+    """DWG文件需要密码或密码错误"""
+    pass
 
-    def parse(self, filepath: str) -> DWGDocument:
+
+class DWGParser:
+    """DWG解析器（支持密码保护）"""
+
+    def __init__(self, password_callback: Optional[Callable[[str], tuple[str | None, bool]]] = None):
         """
-        解析DWG文件
+        初始化解析器
+
+        Args:
+            password_callback: 密码输入回调函数，参数为文件名，返回(密码, 是否记住)
+        """
+        self.password_callback = password_callback
+
+    def parse(self, filepath: str, password: Optional[str] = None) -> DWGDocument:
+        """
+        解析DWG文件（支持密码保护）
 
         Args:
             filepath: DWG文件路径
+            password: 文件密码（可选）
 
         Returns:
             解析后的DWG文档模型
 
         Raises:
             DWGParseError: 解析失败
+            DWGPasswordError: 需要密码或密码错误
         """
         filepath = Path(filepath)
 
@@ -49,8 +65,37 @@ class DWGParser:
 
         try:
             logger.info(f"开始解析DWG文件: {filepath}")
+
+            # 注意：ezdxf本身不支持密码保护的DWG文件
+            # 如果文件有密码保护，需要先用AutoCAD等软件解密
             doc = ezdxf.readfile(str(filepath))
+
         except IOError as e:
+            error_msg = str(e).lower()
+
+            # 检测是否为加密文件
+            if any(keyword in error_msg for keyword in ['encrypt', 'password', 'protected', 'locked']):
+                raise DWGPasswordError(
+                    f"文件已加密，需要密码\n\n"
+                    f"文件：{filepath.name}\n\n"
+                    "💡 解决方案：\n\n"
+                    "方法1（推荐）：使用AutoCAD解密\n"
+                    "1. 用AutoCAD打开此文件\n"
+                    "2. 输入密码解密\n"
+                    "3. 另存为新文件（无密码）\n"
+                    "4. 在本软件中打开新文件\n\n"
+                    "方法2：使用DWG TrueView\n"
+                    "• 下载免费的Autodesk DWG TrueView\n"
+                    "• 打开文件并导出为DXF格式\n"
+                    "• 在本软件中打开DXF文件\n\n"
+                    "方法3：联系图纸提供方\n"
+                    "• 请求提供无密码版本\n"
+                    "• 或获取密码后自行解密\n\n"
+                    "⚠️ 注意：\n"
+                    "由于技术限制，本软件无法直接打开加密的DWG文件。\n"
+                    "这是为了保护知识产权和数据安全。"
+                )
+
             raise DWGParseError(
                 f"文件读取失败\n\n"
                 f"文件：{filepath.name}\n"
@@ -58,13 +103,31 @@ class DWGParser:
                 "可能的原因：\n"
                 "1. 文件正被其他程序占用\n"
                 "2. 文件权限不足\n"
-                "3. 磁盘读取错误\n\n"
+                "3. 文件已加密（需要密码）\n"
+                "4. 磁盘读取错误\n\n"
                 "建议：\n"
                 "• 关闭其他可能打开该文件的程序\n"
                 "• 检查文件访问权限\n"
+                "• 如果文件有密码，请先用AutoCAD解密\n"
                 "• 尝试复制文件到其他位置后重试"
             )
         except ezdxf.DXFStructureError as e:
+            error_msg = str(e).lower()
+
+            # 检测是否为加密导致的结构错误
+            if any(keyword in error_msg for keyword in ['encrypt', 'decode', 'invalid']):
+                raise DWGPasswordError(
+                    f"文件可能已加密或损坏\n\n"
+                    f"文件：{filepath.name}\n"
+                    f"错误：{str(e)}\n\n"
+                    "如果文件已加密：\n"
+                    "• 请使用AutoCAD打开并解密\n"
+                    "• 另存为无密码版本后重试\n\n"
+                    "如果文件未加密：\n"
+                    "• 文件可能已损坏\n"
+                    "• 尝试使用CAD软件修复"
+                )
+
             raise DWGParseError(
                 f"DWG文件格式错误\n\n"
                 f"文件：{filepath.name}\n"
@@ -72,10 +135,12 @@ class DWGParser:
                 "可能的原因：\n"
                 "1. 文件已损坏\n"
                 "2. 文件版本不受支持\n"
-                "3. 文件不是有效的DWG/DXF格式\n\n"
+                "3. 文件不是有效的DWG/DXF格式\n"
+                "4. 文件已加密（需要解密）\n\n"
                 "建议：\n"
                 "• 使用CAD软件打开并另存为DXF格式\n"
                 "• 确认文件扩展名正确（.dwg或.dxf）\n"
+                "• 如果文件有密码，请先解密\n"
                 "• 尝试使用CAD软件修复文件"
             )
         except ezdxf.DXFVersionError as e:
@@ -90,6 +155,17 @@ class DWGParser:
                 "• 确认文件是否为有效的DWG格式"
             )
         except Exception as e:
+            error_msg = str(e).lower()
+
+            # 最后检查是否可能是加密问题
+            if any(keyword in error_msg for keyword in ['encrypt', 'password', 'protected']):
+                raise DWGPasswordError(
+                    f"文件可能已加密\n\n"
+                    f"文件：{filepath.name}\n"
+                    f"错误：{str(e)}\n\n"
+                    "请使用AutoCAD打开并解密后重试。"
+                )
+
             raise DWGParseError(
                 f"解析DWG文件时发生未知错误\n\n"
                 f"文件：{filepath.name}\n"
@@ -97,6 +173,7 @@ class DWGParser:
                 f"错误信息：{str(e)[:200]}\n\n"
                 "建议：\n"
                 "• 检查文件是否完整\n"
+                "• 确认文件未加密\n"
                 "• 尝试用CAD软件打开文件验证其有效性\n"
                 "• 如问题持续，请联系技术支持并提供错误信息"
             )
