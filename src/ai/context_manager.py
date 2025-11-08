@@ -286,8 +286,9 @@ class ContextManager:
         for comp in components:
             if comp.material and 'C' in comp.material:  # C20, C30等
                 grade = comp.material
-                if comp.volume:
-                    concrete[grade] = concrete.get(grade, 0.0) + comp.volume
+                volume = comp.calculate_volume()
+                if volume:
+                    concrete[grade] = concrete.get(grade, 0.0) + volume
 
         # 钢筋用量（简化统计，实际需要更详细的钢筋配置数据）
         # 这里按构件类型估算钢筋含量
@@ -305,9 +306,10 @@ class ContextManager:
         }
 
         for comp in components:
-            if comp.volume and comp.component_type in rebar_density:
-                density = rebar_density[comp.component_type]
-                weight = comp.volume * density / 1000  # 转换为吨
+            volume = comp.calculate_volume()
+            if volume and comp.type in rebar_density:
+                density = rebar_density[comp.type]
+                weight = volume * density / 1000  # 转换为吨
                 # 80%主筋，20%箍筋
                 rebar['HRB400'] += weight * 0.8
                 rebar['HPB300'] += weight * 0.2

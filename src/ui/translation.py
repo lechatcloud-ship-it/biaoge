@@ -318,7 +318,23 @@ Token消耗: {stats.total_tokens}
         parent = self.parent()
         if parent and hasattr(parent, 'refreshCanvas'):
             parent.refreshCanvas()
-        
+
+        # 更新AI助手上下文
+        if hasattr(self, 'parent_window') and hasattr(self.parent_window, 'context_manager'):
+            try:
+                from datetime import datetime
+                from_lang = self.LANGUAGES[self.fromLangCombo.currentText()]
+                to_lang = self.LANGUAGES[self.toLangCombo.currentText()]
+                self.parent_window.context_manager.set_translation_results(
+                    stats,
+                    from_lang,
+                    to_lang,
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                )
+                logger.info("翻译结果已更新到AI助手上下文")
+            except Exception as e:
+                logger.warning(f"更新翻译上下文失败: {e}")
+
         logger.info(f"翻译完成: {stats.to_dict()}")
     
     def _onError(self, error_message: str):

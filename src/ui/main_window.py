@@ -18,8 +18,9 @@ from .translation import TranslationWidget
 from .calculation import CalculationWidget
 from .export import ExportWidget
 from .batch_widget import BatchWidget
-from .ai_chat_widget import AIChatWidget
 from .settings_dialog import SettingsDialog
+# 新的AI助手架构
+from ..ai import AIAssistant, AIAssistantWidget, ContextManager
 from .about import AboutDialog
 from .log_viewer import LogViewerDialog
 from .performance_panel import PerformancePanel
@@ -40,6 +41,14 @@ class MainWindow(QMainWindow):
         self.current_file: Optional[Path] = None
         self.config = ConfigManager()
         self.app_state = AppState()
+
+        # 创建AI助手和上下文管理器
+        self.context_manager = ContextManager()
+        try:
+            self.ai_assistant = AIAssistant(context_manager=self.context_manager)
+        except Exception as e:
+            logger.warning(f"AI助手初始化失败 (可能未配置API密钥): {e}")
+            self.ai_assistant = None
 
         self._init_ui()
         self._create_actions()
@@ -89,8 +98,9 @@ class MainWindow(QMainWindow):
         self.performance_panel = PerformancePanel()
         self.tab_widget.addTab(self.performance_panel, "⚡ 性能")
 
-        self.ai_chat_widget = AIChatWidget()
-        self.tab_widget.addTab(self.ai_chat_widget, "💬 AI助手")
+        # 使用新的AI助手组件
+        self.ai_assistant_widget = AIAssistantWidget(ai_assistant=self.ai_assistant)
+        self.tab_widget.addTab(self.ai_assistant_widget, "🤖 AI助手")
 
         splitter.addWidget(self.tab_widget)
         splitter.setStretchFactor(0, 7)
@@ -179,10 +189,26 @@ class MainWindow(QMainWindow):
         self.documentLoaded.connect(self.translation_widget.setDocument)
         self.documentLoaded.connect(self.calculation_widget.setDocument)
         self.documentLoaded.connect(self.export_widget.setDocument)
-        self.documentLoaded.connect(self.ai_chat_widget.set_document)
+        # 连接到上下文管理器
+        self.documentLoaded.connect(self._update_dwg_context)
 
         self.calculation_widget.parent_window = self
         self.export_widget.parent_window = self
+        self.translation_widget.parent_window = self
+
+    def _update_dwg_context(self, document: DWGDocument):
+        """更新DWG上下文到AI助手"""
+        try:
+            from datetime import datetime
+            self.context_manager.set_dwg_document(
+                document,
+                self.current_file.name if self.current_file else "未命名",
+                str(self.current_file) if self.current_file else "",
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            )
+            logger.info("DWG上下文已更新到AI助手")
+        except Exception as e:
+            logger.error(f"更新DWG上下文失败: {e}")
 
     def _restore_window_state(self):
         """恢复窗口状态"""

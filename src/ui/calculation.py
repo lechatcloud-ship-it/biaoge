@@ -154,6 +154,19 @@ class CalculationInterface(QWidget):
         if parent and hasattr(parent, 'exportInterface'):
             parent.exportInterface.setQuantityResults(self.results)
 
+        # 更新AI助手上下文
+        if hasattr(self, 'parent_window') and hasattr(self.parent_window, 'context_manager'):
+            try:
+                from datetime import datetime
+                self.parent_window.context_manager.set_calculation_results(
+                    self.components,
+                    self.component_confidences,
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                )
+                logger.info("算量结果已更新到AI助手上下文")
+            except Exception as e:
+                logger.warning(f"更新算量上下文失败: {e}")
+
     def _update_validation_status(self, validation_result):
         """🆕 更新验证状态标签"""
         pass_rate = validation_result.passed / validation_result.total_components * 100 if validation_result.total_components > 0 else 0
