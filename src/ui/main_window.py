@@ -17,6 +17,7 @@ from .viewer import ViewerWidget
 from .translation import TranslationWidget
 from .calculation import CalculationWidget
 from .export import ExportWidget
+from .batch_widget import BatchWidget
 from .settings_dialog import SettingsDialog
 from .about import AboutDialog
 from .log_viewer import LogViewerDialog
@@ -81,6 +82,9 @@ class MainWindow(QMainWindow):
         self.export_widget = ExportWidget()
         self.tab_widget.addTab(self.export_widget, "💾 导出")
 
+        self.batch_widget = BatchWidget()
+        self.tab_widget.addTab(self.batch_widget, "📦 批量处理")
+
         self.performance_panel = PerformancePanel()
         self.tab_widget.addTab(self.performance_panel, "⚡ 性能")
 
@@ -96,6 +100,10 @@ class MainWindow(QMainWindow):
         self.open_action = QAction("打开DWG文件...", self)
         self.open_action.setShortcut(QKeySequence.StandardKey.Open)
         self.open_action.triggered.connect(self.onOpenFile)
+
+        self.batch_action = QAction("批量处理...", self)
+        self.batch_action.setShortcut("Ctrl+B")
+        self.batch_action.triggered.connect(self.onBatchProcessing)
 
         self.exit_action = QAction("退出", self)
         self.exit_action.setShortcut(QKeySequence.StandardKey.Quit)
@@ -128,6 +136,7 @@ class MainWindow(QMainWindow):
 
         file_menu = menubar.addMenu("文件(&F)")
         file_menu.addAction(self.open_action)
+        file_menu.addAction(self.batch_action)
         file_menu.addSeparator()
         file_menu.addAction(self.exit_action)
 
@@ -209,6 +218,14 @@ class MainWindow(QMainWindow):
 
         if file_path:
             self.openFile(file_path)
+
+    def onBatchProcessing(self):
+        """切换到批量处理标签页"""
+        # 找到批量处理标签页的索引
+        for i in range(self.tab_widget.count()):
+            if self.tab_widget.tabText(i) == "📦 批量处理":
+                self.tab_widget.setCurrentIndex(i)
+                break
 
     def openFile(self, file_path: str):
         """打开文件"""
