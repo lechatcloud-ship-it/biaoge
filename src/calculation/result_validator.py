@@ -367,12 +367,16 @@ class ResultValidator:
         """验证体积和面积合理性"""
         issues = []
 
-        volume = component.calculate_volume()
-        area = component.calculate_area()
+        volume = component.calculate_volume()  # mm³
+        area = component.calculate_area()  # mm²
 
-        # 体积为0的ERROR
+        # 转换为标准单位（m³ 和 m²）
+        volume_m3 = volume / 1e9  # mm³ to m³
+        area_m2 = area / 1e6  # mm² to m²
+
+        # 体积为零或负数的ERROR
         if component.type in [ComponentType.BEAM, ComponentType.COLUMN, ComponentType.WALL, ComponentType.SLAB]:
-            if volume == 0:
+            if volume <= 0:  # 检查<= 0而非== 0
                 issues.append(ValidationIssue(
                     level=ValidationLevel.ERROR,
                     component_id=component.id,
@@ -383,13 +387,13 @@ class ResultValidator:
                 ))
 
         # 体积过大的WARNING（可能是单位错误）
-        if volume > 1000:  # 大于1000 m³
+        if volume_m3 > 1000:  # 大于1000 m³
             issues.append(ValidationIssue(
                 level=ValidationLevel.WARNING,
                 component_id=component.id,
                 component_type=component.type,
                 issue_type="体积异常大",
-                message=f"构件 {component.name} 体积 {volume:.2f} m³ 异常大",
+                message=f"构件 {component.name} 体积 {volume_m3:.2f} m³ 异常大",
                 suggestion="请检查尺寸单位是否正确（应为mm）"
             ))
 
