@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Avalonia UI -->
+    <PackageReference Include="Avalonia" Version="11.0.10" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.0.10" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.0.10" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="11.0.10" />
+    <PackageReference Include="Avalonia.ReactiveUI" Version="11.0.10" />
+
+    <!-- Aspose.CAD -->
+    <PackageReference Include="Aspose.CAD" Version="25.4.0" />
+
+    <!-- SkiaSharp -->
+    <PackageReference Include="SkiaSharp" Version="2.88.7" />
+    <PackageReference Include="Avalonia.Skia" Version="11.0.10" />
+
+    <!-- 数据库 -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+
+    <!-- HTTP -->
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
+
+    <!-- JSON -->
+    <PackageReference Include="System.Text.Json" Version="8.0.0" />
+
+    <!-- Excel -->
+    <PackageReference Include="EPPlus" Version="7.0.10" />
+
+    <!-- PDF -->
+    <PackageReference Include="PdfSharp" Version="6.0.0" />
+
+    <!-- 日志 -->
+    <PackageReference Include="Serilog" Version="3.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
+
+    <!-- 依赖注入 -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+
+    <!-- MVVM -->
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+
+    <!-- 空间索引 -->
+    <PackageReference Include="RBush" Version="3.2.0" />
+  </ItemGroup>
+</Project>
