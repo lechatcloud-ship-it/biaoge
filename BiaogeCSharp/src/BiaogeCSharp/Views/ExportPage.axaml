@@ -59,14 +59,14 @@
                             <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                 <TextBox Grid.Column="0"
                                         Classes="modern"
-                                        Text="{Binding DwgExportPath}"
+                                        Text="{Binding DwgOutputPath}"
                                         Watermark="选择保存位置"
                                         IsReadOnly="True"
                                         Height="40"/>
                                 <Button Grid.Column="1"
                                        Classes="secondary"
                                        Content="浏览..."
-                                       Command="{Binding BrowseDwgPathCommand}"
+                                       Command="{Binding BrowseDwgOutputCommand}"
                                        Padding="20,0"
                                        Height="40"/>
                             </Grid>
@@ -131,14 +131,14 @@
                             <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                 <TextBox Grid.Column="0"
                                         Classes="modern"
-                                        Text="{Binding PdfExportPath}"
+                                        Text="{Binding PdfOutputPath}"
                                         Watermark="选择保存位置"
                                         IsReadOnly="True"
                                         Height="40"/>
                                 <Button Grid.Column="1"
                                        Classes="secondary"
                                        Content="浏览..."
-                                       Command="{Binding BrowsePdfPathCommand}"
+                                       Command="{Binding BrowsePdfOutputCommand}"
                                        Padding="20,0"
                                        Height="40"/>
                             </Grid>
@@ -146,7 +146,7 @@
 
                         <CheckBox Content="嵌入字体"
                                  Foreground="{DynamicResource BrushTextPrimary}"
-                                 IsChecked="{Binding EmbedFonts}"/>
+                                 IsChecked="{Binding PdfEmbedFonts}"/>
 
                         <!-- 导出按钮 -->
                         <Button Classes="modern"
@@ -191,14 +191,14 @@
                             <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
                                 <TextBox Grid.Column="0"
                                         Classes="modern"
-                                        Text="{Binding ExcelExportPath}"
+                                        Text="{Binding ExcelOutputPath}"
                                         Watermark="选择保存位置"
                                         IsReadOnly="True"
                                         Height="40"/>
                                 <Button Grid.Column="1"
                                        Classes="secondary"
                                        Content="浏览..."
-                                       Command="{Binding BrowseExcelPathCommand}"
+                                       Command="{Binding BrowseExcelOutputCommand}"
                                        Padding="20,0"
                                        Height="40"/>
                             </Grid>
@@ -207,16 +207,16 @@
                         <StackPanel Spacing="12">
                             <CheckBox Content="包含构件详细信息"
                                      Foreground="{DynamicResource BrushTextPrimary}"
-                                     IsChecked="{Binding IncludeComponentDetails}"/>
+                                     IsChecked="{Binding ExcelIncludeDetails}"/>
                             <CheckBox Content="包含置信度评分"
                                      Foreground="{DynamicResource BrushTextPrimary}"
-                                     IsChecked="{Binding IncludeConfidenceScores}"/>
+                                     IsChecked="{Binding ExcelIncludeConfidence}"/>
                             <CheckBox Content="包含材料清单"
                                      Foreground="{DynamicResource BrushTextPrimary}"
-                                     IsChecked="{Binding IncludeMaterialList}"/>
+                                     IsChecked="{Binding ExcelIncludeMaterials}"/>
                             <CheckBox Content="包含成本估算"
                                      Foreground="{DynamicResource BrushTextPrimary}"
-                                     IsChecked="{Binding IncludeCostEstimate}"/>
+                                     IsChecked="{Binding ExcelIncludeCost}"/>
                         </StackPanel>
 
                         <!-- 导出按钮 -->
