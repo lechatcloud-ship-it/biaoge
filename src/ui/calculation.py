@@ -212,7 +212,7 @@ class CalculationInterface(QWidget):
         type_confidences = []
         for comp in type_components:
             for conf in self.component_confidences:
-                if conf.component_id == comp.id:
+                if conf.component.id == comp.id:
                     type_confidences.append(conf.confidence)
                     break
 

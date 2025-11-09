@@ -7,7 +7,7 @@ from qfluentwidgets import (
     InfoBar, InfoBarPosition, setTheme, Theme,
     MessageBox, isDarkTheme,
     SmoothScrollArea, PrimaryPushButton, PushButton,
-    CommandBar, Action
+    CommandBar, TransparentToolButton
 )
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFileDialog
 from PyQt6.QtGui import QAction, QKeySequence
@@ -213,14 +213,26 @@ class MainWindow(FluentWindow):
     def _add_title_bar_buttons(self):
         """在标题栏添加设置和关于按钮"""
         # 添加设置按钮到标题栏
-        settings_action = Action(FluentIcon.SETTING, "设置")
-        settings_action.triggered.connect(self.onSettings)
-        self.titleBar.addWidget(settings_action, Qt.AlignmentFlag.AlignRight)
+        settings_btn = TransparentToolButton(FluentIcon.SETTING, self)
+        settings_btn.setToolTip("设置")
+        settings_btn.clicked.connect(self.onSettings)
+        self.titleBar.hBoxLayout.insertWidget(
+            self.titleBar.hBoxLayout.count() - 1,
+            settings_btn,
+            0,
+            Qt.AlignmentFlag.AlignVCenter
+        )
 
         # 添加关于按钮
-        about_action = Action(FluentIcon.INFO, "关于")
-        about_action.triggered.connect(self.onAbout)
-        self.titleBar.addWidget(about_action, Qt.AlignmentFlag.AlignRight)
+        about_btn = TransparentToolButton(FluentIcon.INFO, self)
+        about_btn.setToolTip("关于")
+        about_btn.clicked.connect(self.onAbout)
+        self.titleBar.hBoxLayout.insertWidget(
+            self.titleBar.hBoxLayout.count() - 1,
+            about_btn,
+            0,
+            Qt.AlignmentFlag.AlignVCenter
+        )
 
     def _connect_signals(self):
         """连接信号"""
