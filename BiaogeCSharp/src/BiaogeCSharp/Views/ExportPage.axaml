@@ -1,0 +1,165 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:BiaogeCSharp.Controls"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="BiaogeCSharp.Views.ExportPage">
+
+    <ScrollViewer Background="#1E1E1E">
+        <StackPanel Margin="20" Spacing="20" MaxWidth="800">
+            <!-- DWG/DXF导出卡片 -->
+            <controls:CardWidget Title="导出为 DWG/DXF">
+                <controls:CardWidget.CardContent>
+                    <StackPanel Spacing="15">
+                        <TextBlock Text="导出翻译后的图纸为 AutoCAD 格式" Foreground="#CCCCCC" FontSize="13"/>
+
+                        <!-- 格式选择 -->
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="文件格式" Foreground="White" FontSize="14" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1" SelectedIndex="0" MinWidth="200" FontSize="14">
+                                <ComboBoxItem Content="DWG R2024"/>
+                                <ComboBoxItem Content="DWG R2018"/>
+                                <ComboBoxItem Content="DWG R2013"/>
+                                <ComboBoxItem Content="DWG R2010"/>
+                                <ComboBoxItem Content="DXF R2024"/>
+                                <ComboBoxItem Content="DXF R2018"/>
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="编码方式" Foreground="White" FontSize="14" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="1" Grid.Column="1" SelectedIndex="0" MinWidth="200" FontSize="14">
+                                <ComboBoxItem Content="UTF-8"/>
+                                <ComboBoxItem Content="GBK (简体中文)"/>
+                                <ComboBoxItem Content="Big5 (繁体中文)"/>
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="保存位置" Foreground="White" FontSize="14" VerticalAlignment="Center"/>
+                            <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,Auto">
+                                <TextBox Grid.Column="0" Text="" Watermark="选择保存位置" IsReadOnly="True" FontSize="14"/>
+                                <Button Grid.Column="1" Content="浏览..." Margin="5,0,0,0" FontSize="14" Padding="15,0"/>
+                            </Grid>
+                        </Grid>
+
+                        <!-- 导出按钮 -->
+                        <Button Content="导出 DWG/DXF"
+                                FontSize="14"
+                                Height="40"
+                                HorizontalAlignment="Stretch"
+                                Background="#0078D4"
+                                Foreground="White"
+                                BorderThickness="0"
+                                CornerRadius="4">
+                            <Button.Styles>
+                                <Style Selector="Button:pointerover">
+                                    <Setter Property="Background" Value="#1F8FE8"/>
+                                </Style>
+                            </Button.Styles>
+                        </Button>
+                    </StackPanel>
+                </controls:CardWidget.CardContent>
+            </controls:CardWidget>
+
+            <!-- PDF导出卡片 -->
+            <controls:CardWidget Title="导出为 PDF">
+                <controls:CardWidget.CardContent>
+                    <StackPanel Spacing="15">
+                        <TextBlock Text="将图纸导出为矢量 PDF 文档" Foreground="#CCCCCC" FontSize="13"/>
+
+                        <!-- PDF选项 -->
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="纸张大小" Foreground="White" FontSize="14" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1" SelectedIndex="0" MinWidth="200" FontSize="14">
+                                <ComboBoxItem Content="A0 (841×1189mm)"/>
+                                <ComboBoxItem Content="A1 (594×841mm)"/>
+                                <ComboBoxItem Content="A2 (420×594mm)"/>
+                                <ComboBoxItem Content="A3 (297×420mm)"/>
+                                <ComboBoxItem Content="A4 (210×297mm)"/>
+                                <ComboBoxItem Content="自定义"/>
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="质量" Foreground="White" FontSize="14" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="1" Grid.Column="1" SelectedIndex="1" MinWidth="200" FontSize="14">
+                                <ComboBoxItem Content="标准 (72 DPI)"/>
+                                <ComboBoxItem Content="高质量 (150 DPI)"/>
+                                <ComboBoxItem Content="打印质量 (300 DPI)"/>
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="保存位置" Foreground="White" FontSize="14" VerticalAlignment="Center"/>
+                            <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,Auto">
+                                <TextBox Grid.Column="0" Text="" Watermark="选择保存位置" IsReadOnly="True" FontSize="14"/>
+                                <Button Grid.Column="1" Content="浏览..." Margin="5,0,0,0" FontSize="14" Padding="15,0"/>
+                            </Grid>
+                        </Grid>
+
+                        <CheckBox Content="嵌入字体" Foreground="White" IsChecked="True"/>
+
+                        <!-- 导出按钮 -->
+                        <Button Content="导出 PDF"
+                                FontSize="14"
+                                Height="40"
+                                HorizontalAlignment="Stretch"
+                                Background="#0078D4"
+                                Foreground="White"
+                                BorderThickness="0"
+                                CornerRadius="4">
+                            <Button.Styles>
+                                <Style Selector="Button:pointerover">
+                                    <Setter Property="Background" Value="#1F8FE8"/>
+                                </Style>
+                            </Button.Styles>
+                        </Button>
+                    </StackPanel>
+                </controls:CardWidget.CardContent>
+            </controls:CardWidget>
+
+            <!-- Excel导出卡片 -->
+            <controls:CardWidget Title="导出为 Excel">
+                <controls:CardWidget.CardContent>
+                    <StackPanel Spacing="15">
+                        <TextBlock Text="导出工程量清单到 Excel 表格" Foreground="#CCCCCC" FontSize="13"/>
+
+                        <!-- Excel选项 -->
+                        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" RowDefinitions="Auto,Auto" RowSpacing="10">
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="模板" Foreground="White" FontSize="14" VerticalAlignment="Center"/>
+                            <ComboBox Grid.Row="0" Grid.Column="1" SelectedIndex="0" MinWidth="200" FontSize="14">
+                                <ComboBoxItem Content="标准工程量清单"/>
+                                <ComboBoxItem Content="成本估算表"/>
+                                <ComboBoxItem Content="材料汇总表"/>
+                                <ComboBoxItem Content="自定义模板"/>
+                            </ComboBox>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="保存位置" Foreground="White" FontSize="14" VerticalAlignment="Center"/>
+                            <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,Auto">
+                                <TextBox Grid.Column="0" Text="" Watermark="选择保存位置" IsReadOnly="True" FontSize="14"/>
+                                <Button Grid.Column="1" Content="浏览..." Margin="5,0,0,0" FontSize="14" Padding="15,0"/>
+                            </Grid>
+                        </Grid>
+
+                        <StackPanel Spacing="8">
+                            <CheckBox Content="包含构件详细信息" Foreground="White" IsChecked="True"/>
+                            <CheckBox Content="包含置信度评分" Foreground="White" IsChecked="True"/>
+                            <CheckBox Content="包含材料清单" Foreground="White" IsChecked="True"/>
+                            <CheckBox Content="包含成本估算" Foreground="White"/>
+                        </StackPanel>
+
+                        <!-- 导出按钮 -->
+                        <Button Content="导出 Excel"
+                                FontSize="14"
+                                Height="40"
+                                HorizontalAlignment="Stretch"
+                                Background="#0078D4"
+                                Foreground="White"
+                                BorderThickness="0"
+                                CornerRadius="4">
+                            <Button.Styles>
+                                <Style Selector="Button:pointerover">
+                                    <Setter Property="Background" Value="#1F8FE8"/>
+                                </Style>
+                            </Button.Styles>
+                        </Button>
+                    </StackPanel>
+                </controls:CardWidget.CardContent>
+            </controls:CardWidget>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

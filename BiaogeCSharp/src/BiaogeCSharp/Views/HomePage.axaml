@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:BiaogeCSharp.Controls"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="BiaogeCSharp.Views.HomePage">
+
+    <DockPanel Background="#1E1E1E">
+        <!-- 顶部快捷操作栏 -->
+        <Border DockPanel.Dock="Top" Background="#252526" Padding="20,15" BorderBrush="#3E3E42" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <Button Name="OpenFileButton"
+                        Content="打开DWG文件"
+                        FontSize="14"
+                        Height="36"
+                        Padding="20,0"
+                        Background="#0078D4"
+                        Foreground="White"
+                        BorderThickness="0"
+                        CornerRadius="4"
+                        Click="OnOpenFileClick">
+                    <Button.Styles>
+                        <Style Selector="Button:pointerover">
+                            <Setter Property="Background" Value="#1F8FE8"/>
+                        </Style>
+                        <Style Selector="Button:pressed">
+                            <Setter Property="Background" Value="#006ABC"/>
+                        </Style>
+                    </Button.Styles>
+                </Button>
+
+                <Button Content="最近文件"
+                        FontSize="14"
+                        Height="36"
+                        Padding="20,0"
+                        Background="#3E3E42"
+                        Foreground="White"
+                        BorderThickness="0"
+                        CornerRadius="4">
+                    <Button.Styles>
+                        <Style Selector="Button:pointerover">
+                            <Setter Property="Background" Value="#505050"/>
+                        </Style>
+                    </Button.Styles>
+                </Button>
+
+                <Button Content="帮助文档"
+                        FontSize="14"
+                        Height="36"
+                        Padding="20,0"
+                        Background="#3E3E42"
+                        Foreground="White"
+                        BorderThickness="0"
+                        CornerRadius="4">
+                    <Button.Styles>
+                        <Style Selector="Button:pointerover">
+                            <Setter Property="Background" Value="#505050"/>
+                        </Style>
+                    </Button.Styles>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- DWG查看器 -->
+        <controls:DwgCanvas Name="DwgViewer" Document="{Binding CurrentDocument}"/>
+    </DockPanel>
+</UserControl>

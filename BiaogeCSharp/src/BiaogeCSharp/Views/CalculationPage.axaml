@@ -1,0 +1,164 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="using:BiaogeCSharp.Controls"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:Class="BiaogeCSharp.Views.CalculationPage">
+
+    <Grid Background="#1E1E1E" RowDefinitions="Auto,*,Auto">
+        <!-- 顶部控制区 -->
+        <Border Grid.Row="0" Background="#252526" Padding="20,15" BorderBrush="#3E3E42" BorderThickness="0,0,0,1">
+            <StackPanel Spacing="15">
+                <!-- 识别模式选择 -->
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                    <TextBlock Grid.Column="0"
+                              Text="识别模式"
+                              Foreground="White"
+                              FontSize="14"
+                              VerticalAlignment="Center"/>
+                    <ComboBox Grid.Column="1"
+                             SelectedIndex="0"
+                             MinWidth="200"
+                             FontSize="14"
+                             HorizontalAlignment="Left">
+                        <ComboBoxItem Content="超高精度识别 (99.9999%)"/>
+                        <ComboBoxItem Content="标准识别"/>
+                        <ComboBoxItem Content="快速识别"/>
+                    </ComboBox>
+
+                    <Button Grid.Column="2"
+                            Content="开始识别"
+                            FontSize="14"
+                            Height="36"
+                            Padding="20,0"
+                            Background="#0078D4"
+                            Foreground="White"
+                            BorderThickness="0"
+                            CornerRadius="4">
+                        <Button.Styles>
+                            <Style Selector="Button:pointerover">
+                                <Setter Property="Background" Value="#1F8FE8"/>
+                            </Style>
+                        </Button.Styles>
+                    </Button>
+                </Grid>
+
+                <!-- 过滤选项 -->
+                <StackPanel Orientation="Horizontal" Spacing="15">
+                    <CheckBox Content="仅显示有效构件" Foreground="White" IsChecked="True"/>
+                    <CheckBox Content="显示低置信度" Foreground="White"/>
+                    <CheckBox Content="显示验证错误" Foreground="White"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- 中间：结果表格 -->
+        <Border Grid.Row="1" Margin="20">
+            <DataGrid Name="ResultsDataGrid"
+                     Background="#2D2D30"
+                     GridLinesVisibility="All"
+                     BorderBrush="#3E3E42"
+                     BorderThickness="1"
+                     CanUserReorderColumns="True"
+                     CanUserResizeColumns="True"
+                     CanUserSortColumns="True"
+                     AutoGenerateColumns="False"
+                     HeadersVisibility="Column">
+
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="类型" Width="150" Binding="{Binding Type}"/>
+                    <DataGridTextColumn Header="数量" Width="100" Binding="{Binding Quantity}"/>
+                    <DataGridTextColumn Header="体积 (m³)" Width="120" Binding="{Binding Volume}"/>
+                    <DataGridTextColumn Header="面积 (m²)" Width="120" Binding="{Binding Area}"/>
+                    <DataGridTextColumn Header="费用 (¥)" Width="120" Binding="{Binding Cost}"/>
+                    <DataGridTextColumn Header="状态" Width="100" Binding="{Binding Status}"/>
+                    <DataGridTextColumn Header="置信度" Width="100" Binding="{Binding Confidence}"/>
+                </DataGrid.Columns>
+
+                <DataGrid.Styles>
+                    <Style Selector="DataGridColumnHeader">
+                        <Setter Property="Background" Value="#252526"/>
+                        <Setter Property="Foreground" Value="White"/>
+                        <Setter Property="FontWeight" Value="SemiBold"/>
+                        <Setter Property="FontSize" Value="14"/>
+                        <Setter Property="Padding" Value="10,8"/>
+                    </Style>
+
+                    <Style Selector="DataGridRow">
+                        <Setter Property="Background" Value="#2D2D30"/>
+                    </Style>
+
+                    <Style Selector="DataGridRow:pointerover /template/ Rectangle#BackgroundRectangle">
+                        <Setter Property="Fill" Value="#3E3E42"/>
+                    </Style>
+
+                    <Style Selector="DataGridRow:selected /template/ Rectangle#BackgroundRectangle">
+                        <Setter Property="Fill" Value="#0078D4"/>
+                    </Style>
+
+                    <Style Selector="DataGridCell">
+                        <Setter Property="Foreground" Value="White"/>
+                        <Setter Property="FontSize" Value="13"/>
+                    </Style>
+                </DataGrid.Styles>
+            </DataGrid>
+        </Border>
+
+        <!-- 底部：统计和操作 -->
+        <Border Grid.Row="2" Background="#252526" Padding="20,15" BorderBrush="#3E3E42" BorderThickness="0,1,0,0">
+            <Grid ColumnDefinitions="*,Auto">
+                <!-- 左侧统计 -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="30">
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                        <TextBlock Text="总构件数:" Foreground="#CCCCCC" FontSize="14"/>
+                        <TextBlock Text="0" Foreground="White" FontSize="14" FontWeight="SemiBold"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                        <TextBlock Text="有效构件:" Foreground="#CCCCCC" FontSize="14"/>
+                        <TextBlock Text="0" Foreground="#0F7B0F" FontSize="14" FontWeight="SemiBold"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="5">
+                        <TextBlock Text="总费用:" Foreground="#CCCCCC" FontSize="14"/>
+                        <TextBlock Text="¥0.00" Foreground="#0078D4" FontSize="14" FontWeight="SemiBold"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- 右侧操作按钮 -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                    <Button Content="生成报告"
+                            FontSize="14"
+                            Height="36"
+                            Padding="20,0"
+                            Background="#0078D4"
+                            Foreground="White"
+                            BorderThickness="0"
+                            CornerRadius="4">
+                        <Button.Styles>
+                            <Style Selector="Button:pointerover">
+                                <Setter Property="Background" Value="#1F8FE8"/>
+                            </Style>
+                        </Button.Styles>
+                    </Button>
+
+                    <Button Content="导出Excel"
+                            FontSize="14"
+                            Height="36"
+                            Padding="20,0"
+                            Background="#3E3E42"
+                            Foreground="White"
+                            BorderThickness="0"
+                            CornerRadius="4">
+                        <Button.Styles>
+                            <Style Selector="Button:pointerover">
+                                <Setter Property="Background" Value="#505050"/>
+                            </Style>
+                        </Button.Styles>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

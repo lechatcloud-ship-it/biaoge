@@ -6,40 +6,74 @@
         x:Class="BiaogeCSharp.Views.MainWindow"
         Title="表哥 - 建筑工程CAD翻译工具 (C# Edition)"
         Width="1400" Height="900"
-        Icon="/Assets/avalonia-logo.ico">
+        Icon="/Assets/avalonia-logo.ico"
+        Background="#1E1E1E">
 
     <Design.DataContext>
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
     <DockPanel>
-        <!-- 顶部菜单栏 -->
-        <Menu DockPanel.Dock="Top">
-            <MenuItem Header="文件">
-                <MenuItem Header="打开DWG文件" Command="{Binding OpenDwgFileCommand}"/>
-                <Separator/>
-                <MenuItem Header="退出"/>
-            </MenuItem>
-            <MenuItem Header="视图">
-                <MenuItem Header="放大" Command="{Binding ZoomInCommand}"/>
-                <MenuItem Header="缩小" Command="{Binding ZoomOutCommand}"/>
-                <MenuItem Header="适应窗口" Command="{Binding FitToViewCommand}"/>
-            </MenuItem>
-            <MenuItem Header="工具">
-                <MenuItem Header="设置"/>
-            </MenuItem>
-            <MenuItem Header="帮助">
-                <MenuItem Header="关于"/>
-            </MenuItem>
-        </Menu>
+        <!-- 顶部标题栏和菜单栏 -->
+        <Border DockPanel.Dock="Top" Background="#2D2D30" BorderBrush="#3E3E42" BorderThickness="0,0,0,1">
+            <DockPanel Height="50">
+                <!-- 左侧：标题和图标 -->
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Margin="15,0" VerticalAlignment="Center" Spacing="10">
+                    <TextBlock Text="📐" FontSize="24"/>
+                    <TextBlock Text="表哥 - 建筑工程CAD翻译工具"
+                              FontSize="16"
+                              FontWeight="SemiBold"
+                              Foreground="White"
+                              VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- 右侧：顶部操作按钮 -->
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="15,0" VerticalAlignment="Center" Spacing="10">
+                    <Button Name="SettingsButton"
+                            Content="⚙"
+                            FontSize="18"
+                            Width="36"
+                            Height="36"
+                            Padding="0"
+                            Background="Transparent"
+                            Foreground="White"
+                            BorderThickness="0"
+                            ToolTip.Tip="设置">
+                        <Button.Styles>
+                            <Style Selector="Button:pointerover">
+                                <Setter Property="Background" Value="#3E3E42"/>
+                            </Style>
+                        </Button.Styles>
+                    </Button>
+
+                    <Button Name="AboutButton"
+                            Content="ℹ"
+                            FontSize="18"
+                            Width="36"
+                            Height="36"
+                            Padding="0"
+                            Background="Transparent"
+                            Foreground="White"
+                            BorderThickness="0"
+                            ToolTip.Tip="关于">
+                        <Button.Styles>
+                            <Style Selector="Button:pointerover">
+                                <Setter Property="Background" Value="#3E3E42"/>
+                            </Style>
+                        </Button.Styles>
+                    </Button>
+                </StackPanel>
+            </DockPanel>
+        </Border>
 
         <!-- 底部状态栏 -->
-        <Border DockPanel.Dock="Bottom" Background="#2D2D30" Height="30">
+        <Border DockPanel.Dock="Bottom" Background="#2D2D30" Height="30" BorderBrush="#3E3E42" BorderThickness="0,1,0,0">
             <DockPanel>
                 <TextBlock Text="{Binding StatusText}"
                           Foreground="White"
                           VerticalAlignment="Center"
-                          Margin="10,0"/>
+                          Margin="10,0"
+                          FontSize="12"/>
                 <ProgressBar IsIndeterminate="True"
                             IsVisible="{Binding IsBusy}"
                             Width="100"
@@ -49,92 +83,7 @@
             </DockPanel>
         </Border>
 
-        <!-- 主内容区 -->
-        <Grid ColumnDefinitions="250,*,350">
-            <!-- 左侧：图层控制 -->
-            <Border Grid.Column="0" Background="#2D2D30" Padding="10">
-                <StackPanel>
-                    <TextBlock Text="图层" FontSize="18" FontWeight="Bold"
-                              Foreground="White" Margin="0,0,0,10"/>
-
-                    <ListBox ItemsSource="{Binding Layers}"
-                            Background="Transparent"
-                            BorderThickness="0">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <CheckBox Content="{Binding Name}"
-                                         IsChecked="{Binding IsVisible}"
-                                         Foreground="White"/>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                        <Button Content="全部显示" Margin="0,0,5,0"/>
-                        <Button Content="全部隐藏"/>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-
-            <!-- 中间：DWG渲染画布 -->
-            <Border Grid.Column="1" Background="Black">
-                <controls:DwgCanvas Document="{Binding CurrentDocument}"/>
-            </Border>
-
-            <!-- 右侧：功能面板 -->
-            <Border Grid.Column="2" Background="#252526">
-                <TabControl>
-                    <TabItem Header="翻译">
-                        <Border Padding="10">
-                            <StackPanel>
-                                <TextBlock Text="目标语言" Foreground="White" Margin="0,0,0,5"/>
-                                <ComboBox SelectedValue="{Binding TranslationViewModel.TargetLanguage}">
-                                    <ComboBoxItem Content="英语" Tag="en"/>
-                                    <ComboBoxItem Content="日语" Tag="ja"/>
-                                    <ComboBoxItem Content="韩语" Tag="ko"/>
-                                    <ComboBoxItem Content="法语" Tag="fr"/>
-                                    <ComboBoxItem Content="德语" Tag="de"/>
-                                    <ComboBoxItem Content="西班牙语" Tag="es"/>
-                                    <ComboBoxItem Content="俄语" Tag="ru"/>
-                                </ComboBox>
-
-                                <Button Content="开始翻译"
-                                       Command="{Binding TranslationViewModel.StartTranslationCommand}"
-                                       IsEnabled="{Binding !TranslationViewModel.IsTranslating}"
-                                       Margin="0,20,0,0"
-                                       HorizontalAlignment="Stretch"/>
-
-                                <ProgressBar Value="{Binding TranslationViewModel.Progress}"
-                                            Maximum="100"
-                                            Margin="0,10,0,0"
-                                            IsVisible="{Binding TranslationViewModel.IsTranslating}"/>
-
-                                <TextBlock Text="{Binding TranslationViewModel.StatusText}"
-                                          Foreground="White"
-                                          Margin="0,10,0,0"/>
-                            </StackPanel>
-                        </Border>
-                    </TabItem>
-
-                    <TabItem Header="算量">
-                        <Border Padding="10">
-                            <TextBlock Text="构件识别功能（待实现）" Foreground="White"/>
-                        </Border>
-                    </TabItem>
-
-                    <TabItem Header="导出">
-                        <Border Padding="10">
-                            <TextBlock Text="导出功能（待实现）" Foreground="White"/>
-                        </Border>
-                    </TabItem>
-
-                    <TabItem Header="设置">
-                        <Border Padding="10">
-                            <TextBlock Text="设置功能（待实现）" Foreground="White"/>
-                        </Border>
-                    </TabItem>
-                </TabControl>
-            </Border>
-        </Grid>
+        <!-- 主内容区：使用NavigationView -->
+        <controls:NavigationView Name="MainNavigation"/>
     </DockPanel>
 </Window>

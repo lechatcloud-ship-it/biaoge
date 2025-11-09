@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="BiaogeCSharp.Controls.CardWidget">
+
+    <Border Background="#2D2D30"
+            CornerRadius="8"
+            Padding="20"
+            Margin="10"
+            BorderBrush="#3E3E42"
+            BorderThickness="1">
+
+        <Border.Effect>
+            <DropShadowEffect Color="#000000"
+                            Opacity="0.3"
+                            BlurRadius="10"
+                            OffsetX="0"
+                            OffsetY="2"/>
+        </Border.Effect>
+
+        <StackPanel>
+            <!-- 标题 -->
+            <TextBlock Name="TitleTextBlock"
+                      FontSize="18"
+                      FontWeight="SemiBold"
+                      Foreground="White"
+                      Margin="0,0,0,15"
+                      IsVisible="{Binding !#TitleTextBlock.Text, Converter={x:Static StringConverters.IsNullOrEmpty}, ConverterParameter=True}"/>
+
+            <!-- 内容区域 -->
+            <ContentControl Name="ContentArea"/>
+        </StackPanel>
+    </Border>
+</UserControl>
