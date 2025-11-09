@@ -8,6 +8,7 @@
 from typing import List, Dict, Optional, Tuple, Set
 from dataclasses import dataclass
 import re
+import ast
 
 from ..dwg.entities import DWGDocument, Entity, TextEntity
 from ..domain.construction_terminology import (
@@ -365,7 +366,7 @@ class UltraPreciseRecognizer:
 
         # 返回最常见的尺寸
         most_common = max(dim_counts.items(), key=lambda x: x[1])[0]
-        return eval(f"dict({most_common})")
+        return dict(ast.literal_eval(most_common))
 
     def _ai_assisted_validation(
         self,

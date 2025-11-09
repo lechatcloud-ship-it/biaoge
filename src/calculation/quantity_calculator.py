@@ -110,8 +110,8 @@ class QuantityCalculator:
                 lengths.append(length)
         
         # 使用Numba加速求和
-        total_volume = self._sum_array(np.array(volumes)) / 1000000  # mm³ to m³
-        total_area = self._sum_array(np.array(areas)) / 1000000  # mm² to m²
+        total_volume = self._sum_array(np.array(volumes)) / 1e9  # mm³ to m³ (1000^3)
+        total_area = self._sum_array(np.array(areas)) / 1e6  # mm² to m² (1000^2)
         total_length = self._sum_array(np.array(lengths)) / 1000  # mm to m
         
         # 计算成本

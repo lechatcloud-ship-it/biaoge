@@ -5,7 +5,7 @@ from PyQt6.QtCore import Qt
 
 from qfluentwidgets import (
     CardWidget, PrimaryPushButton, PushButton, TitleLabel,
-    InfoBar, InfoBarPosition, FluentIcon
+    InfoBar, InfoBarPosition, FluentIcon, MessageBox
 )
 
 from ..export.dwg_exporter import DWGExporter
@@ -102,29 +102,45 @@ class ExportInterface(QWidget):
             return
         path, _ = QFileDialog.getSaveFileName(self, "保存PDF", "", "PDF Files (*.pdf)")
         if path:
-            PDFExporter().export(self.document, path)
-            InfoBar.success(
-                title='导出成功',
-                content="PDF文件已保存",
-                orient=Qt.Orientation.Horizontal,
-                isClosable=True,
-                position=InfoBarPosition.TOP,
-                duration=2000,
-                parent=self
-            )
+            try:
+                PDFExporter().export(self.document, path)
+                InfoBar.success(
+                    title='导出成功',
+                    content="PDF文件已保存",
+                    orient=Qt.Orientation.Horizontal,
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=2000,
+                    parent=self
+                )
+            except Exception as e:
+                logger.error(f"PDF导出失败: {e}", exc_info=True)
+                MessageBox(
+                    "导出失败",
+                    f"PDF导出失败:\n{str(e)}",
+                    self
+                ).exec()
 
     def onExportExcel(self):
         if not self.quantity_results:
             return
         path, _ = QFileDialog.getSaveFileName(self, "保存Excel", "", "Excel Files (*.xlsx)")
         if path:
-            ExcelExporter().export_quantity(self.quantity_results, path)
-            InfoBar.success(
-                title='导出成功',
-                content="Excel文件已保存",
-                orient=Qt.Orientation.Horizontal,
-                isClosable=True,
-                position=InfoBarPosition.TOP,
-                duration=2000,
-                parent=self
-            )
+            try:
+                ExcelExporter().export_quantity(self.quantity_results, path)
+                InfoBar.success(
+                    title='导出成功',
+                    content="Excel文件已保存",
+                    orient=Qt.Orientation.Horizontal,
+                    isClosable=True,
+                    position=InfoBarPosition.TOP,
+                    duration=2000,
+                    parent=self
+                )
+            except Exception as e:
+                logger.error(f"Excel导出失败: {e}", exc_info=True)
+                MessageBox(
+                    "导出失败",
+                    f"Excel导出失败:\n{str(e)}",
+                    self
+                ).exec()

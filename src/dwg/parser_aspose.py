@@ -150,23 +150,35 @@ class AsposeDWGParser:
     def _parse_line(self, cad_entity) -> Optional[LineEntity]:
         """解析直线"""
         try:
-            entity = LineEntity(EntityType.Line)
+            # 提取起点和终点
+            start = (0.0, 0.0, 0.0)
+            end = (0.0, 0.0, 0.0)
 
             if hasattr(cad_entity, 'first_point'):
-                entity.start = (
+                start = (
                     cad_entity.first_point.x,
                     cad_entity.first_point.y,
                     cad_entity.first_point.z if hasattr(cad_entity.first_point, 'z') else 0
                 )
 
             if hasattr(cad_entity, 'second_point'):
-                entity.end = (
+                end = (
                     cad_entity.second_point.x,
                     cad_entity.second_point.y,
                     cad_entity.second_point.z if hasattr(cad_entity.second_point, 'z') else 0
                 )
 
-            entity.layer = cad_entity.layer_name if hasattr(cad_entity, 'layer_name') else "0"
+            layer = cad_entity.layer_name if hasattr(cad_entity, 'layer_name') else "0"
+
+            # 正确构造LineEntity，传入所有必需参数
+            entity = LineEntity(
+                id=str(id(cad_entity)),
+                entity_type=EntityType.LINE,
+                layer=layer,
+                color="#FFFFFF",
+                start=start,
+                end=end
+            )
 
             return entity
         except Exception as e:
@@ -176,19 +188,31 @@ class AsposeDWGParser:
     def _parse_circle(self, cad_entity) -> Optional[CircleEntity]:
         """解析圆"""
         try:
-            entity = CircleEntity(EntityType.Circle)
+            # 提取圆心和半径
+            center = (0.0, 0.0, 0.0)
+            radius = 0.0
 
             if hasattr(cad_entity, 'center_point'):
-                entity.center = (
+                center = (
                     cad_entity.center_point.x,
                     cad_entity.center_point.y,
                     cad_entity.center_point.z if hasattr(cad_entity.center_point, 'z') else 0
                 )
 
             if hasattr(cad_entity, 'radius'):
-                entity.radius = cad_entity.radius
+                radius = cad_entity.radius
 
-            entity.layer = cad_entity.layer_name if hasattr(cad_entity, 'layer_name') else "0"
+            layer = cad_entity.layer_name if hasattr(cad_entity, 'layer_name') else "0"
+
+            # 正确构造CircleEntity
+            entity = CircleEntity(
+                id=str(id(cad_entity)),
+                entity_type=EntityType.CIRCLE,
+                layer=layer,
+                color="#FFFFFF",
+                center=center,
+                radius=radius
+            )
 
             return entity
         except Exception as e:
@@ -198,23 +222,27 @@ class AsposeDWGParser:
     def _parse_text(self, cad_entity) -> Optional[TextEntity]:
         """解析文本"""
         try:
-            entity = TextEntity(EntityType.Text)
+            # 提取文本属性
+            text_content = ""
+            position = (0.0, 0.0, 0.0)
+            height = 2.5
+            rotation = 0.0
 
             # 获取文本内容
             if hasattr(cad_entity, 'default_value'):
-                entity.text = cad_entity.default_value
+                text_content = cad_entity.default_value
             elif hasattr(cad_entity, 'text'):
-                entity.text = cad_entity.text
+                text_content = cad_entity.text
 
             # 获取位置
             if hasattr(cad_entity, 'first_alignment_point'):
-                entity.position = (
+                position = (
                     cad_entity.first_alignment_point.x,
                     cad_entity.first_alignment_point.y,
                     cad_entity.first_alignment_point.z if hasattr(cad_entity.first_alignment_point, 'z') else 0
                 )
             elif hasattr(cad_entity, 'insertion_point'):
-                entity.position = (
+                position = (
                     cad_entity.insertion_point.x,
                     cad_entity.insertion_point.y,
                     cad_entity.insertion_point.z if hasattr(cad_entity.insertion_point, 'z') else 0
@@ -222,13 +250,25 @@ class AsposeDWGParser:
 
             # 获取高度
             if hasattr(cad_entity, 'height'):
-                entity.height = cad_entity.height
+                height = cad_entity.height
 
             # 获取旋转角度
             if hasattr(cad_entity, 'rotation'):
-                entity.rotation = cad_entity.rotation
+                rotation = cad_entity.rotation
 
-            entity.layer = cad_entity.layer_name if hasattr(cad_entity, 'layer_name') else "0"
+            layer = cad_entity.layer_name if hasattr(cad_entity, 'layer_name') else "0"
+
+            # 正确构造TextEntity
+            entity = TextEntity(
+                id=str(id(cad_entity)),
+                entity_type=EntityType.TEXT,
+                layer=layer,
+                color="#FFFFFF",
+                text=text_content,
+                position=position,
+                height=height,
+                rotation=rotation
+            )
 
             return entity
         except Exception as e:
@@ -238,7 +278,9 @@ class AsposeDWGParser:
     def _parse_polyline(self, cad_entity) -> Optional[PolylineEntity]:
         """解析多段线"""
         try:
-            entity = PolylineEntity(EntityType.Polyline)
+            # 提取顶点和属性
+            points = []
+            closed = False
 
             # 获取顶点
             if hasattr(cad_entity, 'vertices'):
@@ -249,13 +291,23 @@ class AsposeDWGParser:
                             vertex.location.y,
                             vertex.location.z if hasattr(vertex.location, 'z') else 0
                         )
-                        entity.points.append(point)
+                        points.append(point)
 
             # 是否闭合
             if hasattr(cad_entity, 'flag'):
-                entity.closed = bool(cad_entity.flag & 1)
+                closed = bool(cad_entity.flag & 1)
 
-            entity.layer = cad_entity.layer_name if hasattr(cad_entity, 'layer_name') else "0"
+            layer = cad_entity.layer_name if hasattr(cad_entity, 'layer_name') else "0"
+
+            # 正确构造PolylineEntity
+            entity = PolylineEntity(
+                id=str(id(cad_entity)),
+                entity_type=EntityType.POLYLINE,
+                layer=layer,
+                color="#FFFFFF",
+                points=points,
+                closed=closed
+            )
 
             return entity
         except Exception as e:
