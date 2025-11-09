@@ -5,28 +5,22 @@
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="BiaogeCSharp.Controls.CardWidget">
 
-    <Border Background="#2D2D30"
-            CornerRadius="8"
-            Padding="20"
-            Margin="10"
-            BorderBrush="#3E3E42"
-            BorderThickness="1">
-
-        <Border.Effect>
-            <DropShadowEffect Color="#000000"
-                            Opacity="0.3"
-                            BlurRadius="10"
-                            OffsetX="0"
-                            OffsetY="2"/>
-        </Border.Effect>
+    <Border Classes="card"
+            Background="{DynamicResource BrushAcrylicCard}"
+            CornerRadius="12"
+            Padding="24"
+            Margin="12"
+            BorderBrush="{DynamicResource BrushBorder}"
+            BorderThickness="1"
+            Effect="{DynamicResource ShadowMD}">
 
         <StackPanel>
             <!-- 标题 -->
             <TextBlock Name="TitleTextBlock"
-                      FontSize="18"
+                      FontSize="20"
                       FontWeight="SemiBold"
-                      Foreground="White"
-                      Margin="0,0,0,15"/>
+                      Foreground="{DynamicResource BrushTextPrimary}"
+                      Margin="0,0,0,16"/>
 
             <!-- 内容区域 -->
             <ContentControl Name="ContentArea"/>

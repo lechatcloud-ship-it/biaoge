@@ -4,65 +4,75 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:controls="using:BiaogeCSharp.Controls"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-             x:Class="BiaogeCSharp.Views.HomePage">
+             x:Class="BiaogeCSharp.Views.HomePage"
+             DragDrop.AllowDrop="True">
 
-    <DockPanel Background="#1E1E1E">
+    <DockPanel Background="{DynamicResource BrushBgPrimary}">
         <!-- 顶部快捷操作栏 -->
-        <Border DockPanel.Dock="Top" Background="#252526" Padding="20,15" BorderBrush="#3E3E42" BorderThickness="0,0,0,1">
-            <StackPanel Orientation="Horizontal" Spacing="10">
+        <Border DockPanel.Dock="Top"
+                Background="{DynamicResource BrushBgElevated}"
+                Padding="24,16"
+                BorderBrush="{DynamicResource BrushBorder}"
+                BorderThickness="0,0,0,1"
+                Effect="{DynamicResource ShadowSM}">
+            <StackPanel Orientation="Horizontal" Spacing="12">
                 <Button Name="OpenFileButton"
+                        Classes="modern"
                         Content="打开DWG文件"
-                        FontSize="14"
-                        Height="36"
-                        Padding="20,0"
-                        Background="#0078D4"
-                        Foreground="White"
-                        BorderThickness="0"
-                        CornerRadius="4"
-                        Click="OnOpenFileClick">
-                    <Button.Styles>
-                        <Style Selector="Button:pointerover">
-                            <Setter Property="Background" Value="#1F8FE8"/>
-                        </Style>
-                        <Style Selector="Button:pressed">
-                            <Setter Property="Background" Value="#006ABC"/>
-                        </Style>
-                    </Button.Styles>
-                </Button>
+                        Height="40"
+                        Click="OnOpenFileClick"/>
 
-                <Button Content="最近文件"
-                        FontSize="14"
-                        Height="36"
-                        Padding="20,0"
-                        Background="#3E3E42"
-                        Foreground="White"
-                        BorderThickness="0"
-                        CornerRadius="4">
-                    <Button.Styles>
-                        <Style Selector="Button:pointerover">
-                            <Setter Property="Background" Value="#505050"/>
-                        </Style>
-                    </Button.Styles>
-                </Button>
+                <Button Classes="secondary"
+                        Content="最近文件"
+                        Height="40"/>
 
-                <Button Content="帮助文档"
-                        FontSize="14"
-                        Height="36"
-                        Padding="20,0"
-                        Background="#3E3E42"
-                        Foreground="White"
-                        BorderThickness="0"
-                        CornerRadius="4">
-                    <Button.Styles>
-                        <Style Selector="Button:pointerover">
-                            <Setter Property="Background" Value="#505050"/>
-                        </Style>
-                    </Button.Styles>
-                </Button>
+                <Button Classes="text"
+                        Content="帮助文档"
+                        Height="40"/>
             </StackPanel>
         </Border>
 
-        <!-- DWG查看器 -->
-        <controls:DwgCanvas Name="DwgViewer" Document="{Binding CurrentDocument}"/>
+        <!-- DWG查看器和拖放区域 -->
+        <Grid>
+            <controls:DwgCanvas Name="DwgViewer" Document="{Binding CurrentDocument}"/>
+
+            <!-- 空状态拖放提示 (当没有文件时显示) -->
+            <Border Name="EmptyStateOverlay"
+                    IsVisible="{Binding CurrentDocument, Converter={x:Static ObjectConverters.IsNull}}"
+                    Background="{DynamicResource BrushBgPrimary}"
+                    DragDrop.AllowDrop="True">
+                <Border Background="{DynamicResource BrushAcrylicCard}"
+                        BorderBrush="{DynamicResource BrushBorder}"
+                        BorderThickness="2"
+                        BorderDashArray="8,4"
+                        CornerRadius="12"
+                        Padding="48"
+                        Margin="48"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                    <StackPanel Spacing="24" HorizontalAlignment="Center">
+                        <TextBlock Text="📐"
+                                  FontSize="64"
+                                  HorizontalAlignment="Center"/>
+                        <TextBlock Text="拖放DWG文件到此处"
+                                  FontSize="24"
+                                  FontWeight="SemiBold"
+                                  Foreground="{DynamicResource BrushTextPrimary}"
+                                  HorizontalAlignment="Center"/>
+                        <TextBlock Text="或点击下方按钮打开文件"
+                                  FontSize="14"
+                                  Foreground="{DynamicResource BrushTextSecondary}"
+                                  HorizontalAlignment="Center"/>
+                        <Button Classes="modern"
+                                Content="选择DWG文件"
+                                Height="44"
+                                Padding="32,0"
+                                FontSize="15"
+                                Click="OnOpenFileClick"
+                                HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </Border>
+        </Grid>
     </DockPanel>
 </UserControl>
