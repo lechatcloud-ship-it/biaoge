@@ -26,7 +26,7 @@
 
 - **性能提升 4-7倍**：DWG加载 4.2x，渲染 7.5x
 - **内存优化 75%**：从 600MB 降至 150MB
-- **现代化UI**：Fluent Design 2.0 + Acrylic效果
+- **现代化UI**：基于Avalonia UI原生设计，简洁流畅
 - **原生.NET API**：Aspose.CAD .NET（非Python binding）
 - **跨平台支持**：Windows / macOS / Linux
 - **启动更快**：从 3.2s 降至 0.8s
@@ -37,7 +37,7 @@
 
 ### 🎨 现代化用户界面
 
-- ✅ **Fluent Design 2.0**：毛玻璃效果、流畅动画
+- ✅ **Avalonia UI**：基于原生Fluent主题，简洁现代
 - ✅ **深色主题**：护眼舒适的专业界面
 - ✅ **拖放支持**：直接拖放DWG文件打开
 - ✅ **Toast通知**：优雅的操作反馈
@@ -191,7 +191,7 @@ sk-your-api-key-here
 ```
 用户界面层
 ├── Avalonia UI 11.0         - 跨平台XAML UI框架
-├── Fluent Design 2.0        - 现代化设计语言
+├── Avalonia.Themes.Fluent   - 原生Fluent主题
 ├── SkiaSharp 2.88          - 2D图形渲染引擎
 └── MVVM + ReactiveUI        - 数据绑定架构
 
@@ -247,13 +247,14 @@ BiaogeCSharp/
 
 ## 🎨 UI设计系统
 
-### Fluent Design 2.0
+### 设计原则
+
+基于 **Avalonia.Themes.Fluent** 原生主题，适度增强视觉效果：
 
 - **颜色系统**：深色主题 + 品牌蓝
-- **Acrylic效果**：毛玻璃半透明背景
 - **阴影系统**：6级深度（XS到2XL）
 - **动画系统**：150-400ms流畅过渡
-- **微动效果**：hover放大、press缩小
+- **交互反馈**：清晰的hover和press状态
 
 ### 组件样式
 

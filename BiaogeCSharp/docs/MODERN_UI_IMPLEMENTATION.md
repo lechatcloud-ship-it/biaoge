@@ -1,12 +1,12 @@
-# 现代化UI设计系统 - 实现总结
+# UI设计系统 - 实现总结
 
 ## 概述
 
-本文档记录了BiaogeCSharp项目的现代化UI设计系统实现，基于Fluent Design 2.0和Neumorphism设计原则。
+本文档记录了BiaogeCSharp项目的UI设计系统实现，基于Avalonia.Themes.Fluent原生主题，并进行适度的样式增强。
 
 ## 已完成的功能
 
-### 1. 现代化颜色系统 2.0
+### 1. 颜色系统
 
 创建了完整的颜色系统资源文件：`Styles/ModernStyles.axaml`
 
