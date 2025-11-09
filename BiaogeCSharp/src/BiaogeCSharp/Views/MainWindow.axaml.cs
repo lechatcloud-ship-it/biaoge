@@ -2,17 +2,26 @@ using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using BiaogeCSharp.Controls;
 using BiaogeCSharp.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
+using System;
 
 namespace BiaogeCSharp.Views;
 
 public partial class MainWindow : Window
 {
     private NavigationView _mainNavigation;
+    private Button? _settingsButton;
 
     public MainWindow()
     {
         InitializeComponent();
         _mainNavigation = this.FindControl<NavigationView>("MainNavigation")!;
+        _settingsButton = this.FindControl<Button>("SettingsButton");
+
+        if (_settingsButton != null)
+        {
+            _settingsButton.Click += OnSettingsClick;
+        }
     }
 
     public MainWindow(MainWindowViewModel viewModel) : this()
@@ -42,5 +51,12 @@ public partial class MainWindow : Window
 
         // 添加底部导航项
         // _mainNavigation.AddBottomNavigationItem("设置", "⚙", new SettingsPage());
+    }
+
+    private async void OnSettingsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        var settingsViewModel = App.Current.Services.GetRequiredService<SettingsViewModel>();
+        var settingsDialog = new SettingsDialog(settingsViewModel);
+        await settingsDialog.ShowDialog(this);
     }
 }

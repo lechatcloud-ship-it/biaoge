@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
+using BiaogeCSharp.ViewModels;
 
 namespace BiaogeCSharp.Views;
 
@@ -9,10 +10,18 @@ namespace BiaogeCSharp.Views;
 /// </summary>
 public partial class SettingsDialog : Window
 {
+    private SettingsViewModel? _viewModel;
+
     public SettingsDialog()
     {
         InitializeComponent();
         InitializeControls();
+    }
+
+    public SettingsDialog(SettingsViewModel viewModel) : this()
+    {
+        _viewModel = viewModel;
+        DataContext = viewModel;
     }
 
     private void InitializeComponent()
@@ -42,7 +51,6 @@ public partial class SettingsDialog : Window
 
     private void ApplySettings()
     {
-        // TODO: 应用设置到ConfigManager
-        // 这里将实现保存所有设置到配置文件的逻辑
+        _viewModel?.SaveSettingsCommand.Execute(null);
     }
 }

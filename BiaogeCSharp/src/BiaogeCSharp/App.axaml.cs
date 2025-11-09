@@ -69,8 +69,10 @@ public partial class App : Application
         services.AddTransient<TranslationViewModel>();
         services.AddTransient<CalculationViewModel>();
         services.AddTransient<ExportViewModel>();
+        services.AddTransient<SettingsViewModel>();
 
         // Views
         services.AddTransient<MainWindow>();
+        services.AddTransient<SettingsDialog>();
     }
 }

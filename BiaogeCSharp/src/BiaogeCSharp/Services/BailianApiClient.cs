@@ -17,23 +17,64 @@ public class BailianApiClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<BailianApiClient> _logger;
-    private readonly string _apiKey;
+    private readonly ConfigManager _configManager;
+    private readonly IConfiguration _configuration;
+    private string? _apiKey;
 
     public BailianApiClient(
         HttpClient httpClient,
-        IConfiguration config,
+        ConfigManager configManager,
+        IConfiguration configuration,
         ILogger<BailianApiClient> logger)
     {
         _httpClient = httpClient;
+        _configManager = configManager;
+        _configuration = configuration;
         _logger = logger;
-        _apiKey = config["Bailian:ApiKey"] ?? "";
 
         _httpClient.BaseAddress = new Uri("https://dashscope.aliyuncs.com");
+
+        // 初始化API密钥
+        RefreshApiKey();
+    }
+
+    /// <summary>
+    /// 刷新API密钥 - 从ConfigManager或IConfiguration读取
+    /// </summary>
+    public void RefreshApiKey()
+    {
+        // 优先从ConfigManager读取（用户通过设置对话框保存的）
+        _apiKey = _configManager.GetString("Bailian:ApiKey");
+
+        // 如果ConfigManager中没有，尝试从IConfiguration读取（appsettings.json）
+        if (string.IsNullOrEmpty(_apiKey))
+        {
+            _apiKey = _configuration["Bailian:ApiKey"];
+        }
+
+        // 如果还是没有，尝试从环境变量读取
+        if (string.IsNullOrEmpty(_apiKey))
+        {
+            _apiKey = Environment.GetEnvironmentVariable("DASHSCOPE_API_KEY");
+        }
+
+        // 更新HTTP客户端的Authorization头
+        _httpClient.DefaultRequestHeaders.Remove("Authorization");
         if (!string.IsNullOrEmpty(_apiKey))
         {
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
+            _logger.LogInformation("API密钥已加载");
+        }
+        else
+        {
+            _logger.LogWarning("未找到API密钥，请在设置中配置");
         }
     }
+
+    /// <summary>
+    /// 检查API密钥是否已配置
+    /// </summary>
+    public bool HasApiKey => !string.IsNullOrEmpty(_apiKey);
 
     /// <summary>
     /// 批量翻译
