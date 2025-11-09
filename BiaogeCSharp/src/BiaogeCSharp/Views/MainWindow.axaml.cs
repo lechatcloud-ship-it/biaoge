@@ -12,18 +12,13 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        InitializeNavigation();
+        _mainNavigation = this.FindControl<NavigationView>("MainNavigation")!;
     }
 
     public MainWindow(MainWindowViewModel viewModel) : this()
     {
         DataContext = viewModel;
-
-        // 将ViewModel设置到所有页面
-        if (_mainNavigation != null)
-        {
-            SetViewModelToPages(viewModel);
-        }
+        InitializeNavigation(viewModel);
     }
 
     private void InitializeComponent()
@@ -31,23 +26,21 @@ public partial class MainWindow : Window
         AvaloniaXamlLoader.Load(this);
     }
 
-    private void InitializeNavigation()
+    private void InitializeNavigation(MainWindowViewModel viewModel)
     {
-        _mainNavigation = this.FindControl<NavigationView>("MainNavigation")!;
+        // 创建页面并设置DataContext
+        var homePage = new HomePage { DataContext = viewModel };
+        var translationPage = new TranslationPage { DataContext = viewModel.TranslationViewModel };
+        var calculationPage = new CalculationPage { DataContext = viewModel.CalculationViewModel };
+        var exportPage = new ExportPage { DataContext = viewModel.ExportViewModel };
 
         // 添加顶部导航项
-        _mainNavigation.AddTopNavigationItem("主页", "🏠", new HomePage());
-        _mainNavigation.AddTopNavigationItem("翻译", "🌐", new TranslationPage());
-        _mainNavigation.AddTopNavigationItem("算量", "📊", new CalculationPage());
-        _mainNavigation.AddTopNavigationItem("导出", "📤", new ExportPage());
+        _mainNavigation.AddTopNavigationItem("主页", "🏠", homePage);
+        _mainNavigation.AddTopNavigationItem("翻译", "🌐", translationPage);
+        _mainNavigation.AddTopNavigationItem("算量", "📊", calculationPage);
+        _mainNavigation.AddTopNavigationItem("导出", "📤", exportPage);
 
         // 添加底部导航项
         // _mainNavigation.AddBottomNavigationItem("设置", "⚙", new SettingsPage());
-    }
-
-    private void SetViewModelToPages(MainWindowViewModel viewModel)
-    {
-        // 这里可以设置页面的DataContext
-        // 每个页面会继承主窗口的ViewModel或有自己的ViewModel
     }
 }

@@ -26,8 +26,7 @@
                       FontSize="18"
                       FontWeight="SemiBold"
                       Foreground="White"
-                      Margin="0,0,0,15"
-                      IsVisible="{Binding !#TitleTextBlock.Text, Converter={x:Static StringConverters.IsNullOrEmpty}, ConverterParameter=True}"/>
+                      Margin="0,0,0,15"/>
 
             <!-- 内容区域 -->
             <ContentControl Name="ContentArea"/>

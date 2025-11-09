@@ -2,8 +2,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:BiaogeCSharp.ViewModels"
              xmlns:controls="using:BiaogeCSharp.Controls"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+             x:DataType="vm:CalculationViewModel"
              x:Class="BiaogeCSharp.Views.CalculationPage">
 
     <Grid Background="#1E1E1E" RowDefinitions="Auto,*,Auto">
@@ -29,6 +31,7 @@
 
                     <Button Grid.Column="2"
                             Content="开始识别"
+                            Command="{Binding StartRecognitionCommand}"
                             FontSize="14"
                             Height="36"
                             Padding="20,0"
@@ -56,6 +59,7 @@
         <!-- 中间：结果表格 -->
         <Border Grid.Row="1" Margin="20">
             <DataGrid Name="ResultsDataGrid"
+                     ItemsSource="{Binding Results}"
                      Background="#2D2D30"
                      GridLinesVisibility="All"
                      BorderBrush="#3E3E42"
@@ -112,23 +116,24 @@
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="30">
                     <StackPanel Orientation="Horizontal" Spacing="5">
                         <TextBlock Text="总构件数:" Foreground="#CCCCCC" FontSize="14"/>
-                        <TextBlock Text="0" Foreground="White" FontSize="14" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding TotalComponents}" Foreground="White" FontSize="14" FontWeight="SemiBold"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Spacing="5">
                         <TextBlock Text="有效构件:" Foreground="#CCCCCC" FontSize="14"/>
-                        <TextBlock Text="0" Foreground="#0F7B0F" FontSize="14" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding ValidComponents}" Foreground="#0F7B0F" FontSize="14" FontWeight="SemiBold"/>
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Spacing="5">
                         <TextBlock Text="总费用:" Foreground="#CCCCCC" FontSize="14"/>
-                        <TextBlock Text="¥0.00" Foreground="#0078D4" FontSize="14" FontWeight="SemiBold"/>
+                        <TextBlock Text="{Binding TotalCost, StringFormat='¥{0:F2}'}" Foreground="#0078D4" FontSize="14" FontWeight="SemiBold"/>
                     </StackPanel>
                 </StackPanel>
 
                 <!-- 右侧操作按钮 -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
                     <Button Content="生成报告"
+                            Command="{Binding GenerateReportCommand}"
                             FontSize="14"
                             Height="36"
                             Padding="20,0"
@@ -144,6 +149,7 @@
                     </Button>
 
                     <Button Content="导出Excel"
+                            Command="{Binding ExportToExcelCommand}"
                             FontSize="14"
                             Height="36"
                             Padding="20,0"

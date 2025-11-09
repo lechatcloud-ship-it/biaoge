@@ -67,6 +67,8 @@ public partial class App : Application
         // ViewModels
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<TranslationViewModel>();
+        services.AddTransient<CalculationViewModel>();
+        services.AddTransient<ExportViewModel>();
 
         // Views
         services.AddTransient<MainWindow>();

@@ -31,14 +31,20 @@ public partial class MainWindowViewModel : ViewModelBase
     private ObservableCollection<LayerInfo> _layers = new();
 
     public TranslationViewModel TranslationViewModel { get; }
+    public CalculationViewModel CalculationViewModel { get; }
+    public ExportViewModel ExportViewModel { get; }
 
     public MainWindowViewModel(
         AsposeDwgParser dwgParser,
         TranslationViewModel translationViewModel,
+        CalculationViewModel calculationViewModel,
+        ExportViewModel exportViewModel,
         ILogger<MainWindowViewModel> logger)
     {
         _dwgParser = dwgParser;
         TranslationViewModel = translationViewModel;
+        CalculationViewModel = calculationViewModel;
+        ExportViewModel = exportViewModel;
         _logger = logger;
     }
 
