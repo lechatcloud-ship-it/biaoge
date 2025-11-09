@@ -13,6 +13,7 @@ namespace BiaogeCSharp.ViewModels;
 public partial class MainWindowViewModel : ViewModelBase
 {
     private readonly AsposeDwgParser _dwgParser;
+    private readonly DocumentService _documentService;
     private readonly ILogger<MainWindowViewModel> _logger;
 
     [ObservableProperty]
@@ -36,12 +37,14 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public MainWindowViewModel(
         AsposeDwgParser dwgParser,
+        DocumentService documentService,
         TranslationViewModel translationViewModel,
         CalculationViewModel calculationViewModel,
         ExportViewModel exportViewModel,
         ILogger<MainWindowViewModel> logger)
     {
         _dwgParser = dwgParser;
+        _documentService = documentService;
         TranslationViewModel = translationViewModel;
         CalculationViewModel = calculationViewModel;
         ExportViewModel = exportViewModel;
@@ -90,6 +93,9 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             // 异步加载
             CurrentDocument = await Task.Run(() => _dwgParser.Parse(filePath));
+
+            // 更新DocumentService
+            _documentService.CurrentDocument = CurrentDocument;
 
             // 更新图层列表
             Layers.Clear();

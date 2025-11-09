@@ -21,6 +21,8 @@ public class DwgCanvas : Control
     private DwgDocument? _document;
     private float _zoom = 1.0f;
     private SKPoint _offset = SKPoint.Empty;
+    private SKPoint _lastMousePos = SKPoint.Empty;
+    private bool _isPanning = false;
 
     public static readonly StyledProperty<DwgDocument?> DocumentProperty =
         AvaloniaProperty.Register<DwgCanvas, DwgDocument?>(nameof(Document));
@@ -281,6 +283,38 @@ public class DwgCanvas : Control
     protected override void OnPointerPressed(Avalonia.Input.PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
-        // TODO: 实现拖动逻辑
+
+        var point = e.GetPosition(this);
+        _lastMousePos = new SKPoint((float)point.X, (float)point.Y);
+        _isPanning = true;
+        e.Pointer.Capture(this);
+    }
+
+    protected override void OnPointerMoved(Avalonia.Input.PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+
+        if (!_isPanning) return;
+
+        var point = e.GetPosition(this);
+        var currentPos = new SKPoint((float)point.X, (float)point.Y);
+
+        var delta = new SKPoint(
+            currentPos.X - _lastMousePos.X,
+            currentPos.Y - _lastMousePos.Y
+        );
+
+        _offset = new SKPoint(_offset.X + delta.X, _offset.Y + delta.Y);
+        _lastMousePos = currentPos;
+
+        InvalidateVisual();
+    }
+
+    protected override void OnPointerReleased(Avalonia.Input.PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+
+        _isPanning = false;
+        e.Pointer.Capture(null);
     }
 }

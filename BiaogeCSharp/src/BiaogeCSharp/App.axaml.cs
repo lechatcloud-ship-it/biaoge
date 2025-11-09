@@ -63,6 +63,12 @@ public partial class App : Application
         services.AddSingleton<CacheService>();
         services.AddSingleton<TranslationEngine>();
         services.AddSingleton<ConfigManager>();
+        services.AddSingleton<DocumentService>();
+
+        // 导出服务
+        services.AddSingleton<DwgExporter>();
+        services.AddSingleton<PdfExporter>();
+        services.AddSingleton<ExcelExporter>();
 
         // ViewModels
         services.AddTransient<MainWindowViewModel>();

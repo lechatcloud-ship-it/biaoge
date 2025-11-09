@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
+using BiaogeCSharp.Services;
 using System;
 using System.Threading.Tasks;
 
@@ -12,6 +13,10 @@ namespace BiaogeCSharp.ViewModels;
 public partial class ExportViewModel : ViewModelBase
 {
     private readonly ILogger<ExportViewModel> _logger;
+    private readonly DocumentService _documentService;
+    private readonly DwgExporter _dwgExporter;
+    private readonly PdfExporter _pdfExporter;
+    private readonly ExcelExporter _excelExporter;
 
     [ObservableProperty]
     private string _dwgFormat = "DWG R2024";
@@ -52,9 +57,18 @@ public partial class ExportViewModel : ViewModelBase
     [ObservableProperty]
     private bool _excelIncludeCost;
 
-    public ExportViewModel(ILogger<ExportViewModel> logger)
+    public ExportViewModel(
+        ILogger<ExportViewModel> logger,
+        DocumentService documentService,
+        DwgExporter dwgExporter,
+        PdfExporter pdfExporter,
+        ExcelExporter excelExporter)
     {
         _logger = logger;
+        _documentService = documentService;
+        _dwgExporter = dwgExporter;
+        _pdfExporter = pdfExporter;
+        _excelExporter = excelExporter;
     }
 
     [RelayCommand]
@@ -62,9 +76,33 @@ public partial class ExportViewModel : ViewModelBase
     {
         try
         {
+            if (_documentService.CurrentDocument == null)
+            {
+                _logger.LogWarning("没有打开的文档");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(DwgOutputPath))
+            {
+                _logger.LogWarning("请选择输出路径");
+                return;
+            }
+
             _logger.LogInformation("导出DWG: 格式={Format}, 编码={Encoding}", DwgFormat, DwgEncoding);
-            // TODO: 实现DWG导出逻辑
-            await Task.Delay(500);
+
+            // 解析版本号
+            var version = DwgFormat.Contains("R2024") ? "R2024" :
+                         DwgFormat.Contains("R2018") ? "R2018" :
+                         DwgFormat.Contains("R2013") ? "R2013" : "R2010";
+
+            // 执行导出
+            await _dwgExporter.ExportDwgAsync(
+                _documentService.CurrentDocument,
+                DwgOutputPath,
+                version
+            );
+
+            _logger.LogInformation("DWG导出成功");
         }
         catch (Exception ex)
         {
@@ -77,9 +115,40 @@ public partial class ExportViewModel : ViewModelBase
     {
         try
         {
+            if (_documentService.CurrentDocument == null)
+            {
+                _logger.LogWarning("没有打开的文档");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(PdfOutputPath))
+            {
+                _logger.LogWarning("请选择输出路径");
+                return;
+            }
+
             _logger.LogInformation("导出PDF: 纸张={Paper}, 质量={Quality}", PdfPaperSize, PdfQuality);
-            // TODO: 实现PDF导出逻辑
-            await Task.Delay(500);
+
+            // 解析纸张大小
+            var pageSize = PdfPaperSize.Contains("A0") ? "A0" :
+                          PdfPaperSize.Contains("A1") ? "A1" :
+                          PdfPaperSize.Contains("A2") ? "A2" :
+                          PdfPaperSize.Contains("A3") ? "A3" : "A4";
+
+            // 解析DPI
+            var dpi = PdfQuality.Contains("300") ? 300 :
+                     PdfQuality.Contains("150") ? 150 : 72;
+
+            // 执行导出
+            await _pdfExporter.ExportAsync(
+                _documentService.CurrentDocument,
+                PdfOutputPath,
+                pageSize,
+                dpi,
+                PdfEmbedFonts
+            );
+
+            _logger.LogInformation("PDF导出成功");
         }
         catch (Exception ex)
         {
@@ -92,9 +161,29 @@ public partial class ExportViewModel : ViewModelBase
     {
         try
         {
+            if (string.IsNullOrEmpty(ExcelOutputPath))
+            {
+                _logger.LogWarning("请选择输出路径");
+                return;
+            }
+
             _logger.LogInformation("导出Excel: 模板={Template}", ExcelTemplate);
-            // TODO: 实现Excel导出逻辑
-            await Task.Delay(500);
+
+            // 这里需要从CalculationViewModel获取结果
+            // 暂时使用空列表
+            var results = new System.Collections.Generic.List<BiaogeCSharp.Models.ComponentRecognitionResult>();
+
+            // 执行导出
+            await _excelExporter.ExportAsync(
+                results,
+                ExcelOutputPath,
+                ExcelIncludeDetails,
+                ExcelIncludeConfidence,
+                ExcelIncludeMaterials,
+                ExcelIncludeCost
+            );
+
+            _logger.LogInformation("Excel导出成功");
         }
         catch (Exception ex)
         {
@@ -105,24 +194,103 @@ public partial class ExportViewModel : ViewModelBase
     [RelayCommand]
     private async Task BrowseDwgOutputAsync()
     {
-        // TODO: 实现文件选择对话框
-        _logger.LogInformation("浏览DWG输出路径");
-        await Task.CompletedTask;
+        try
+        {
+            var mainWindow = App.Current.MainWindow;
+            if (mainWindow == null) return;
+
+            var storageProvider = mainWindow.StorageProvider;
+            var file = await storageProvider.SaveFilePickerAsync(new Avalonia.Platform.Storage.FilePickerSaveOptions
+            {
+                Title = "保存DWG文件",
+                DefaultExtension = "dwg",
+                FileTypeChoices = new[]
+                {
+                    new Avalonia.Platform.Storage.FilePickerFileType("DWG文件")
+                    {
+                        Patterns = new[] { "*.dwg" }
+                    },
+                    new Avalonia.Platform.Storage.FilePickerFileType("DXF文件")
+                    {
+                        Patterns = new[] { "*.dxf" }
+                    }
+                }
+            });
+
+            if (file != null)
+            {
+                DwgOutputPath = file.Path.LocalPath;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "选择DWG输出路径失败");
+        }
     }
 
     [RelayCommand]
     private async Task BrowsePdfOutputAsync()
     {
-        // TODO: 实现文件选择对话框
-        _logger.LogInformation("浏览PDF输出路径");
-        await Task.CompletedTask;
+        try
+        {
+            var mainWindow = App.Current.MainWindow;
+            if (mainWindow == null) return;
+
+            var storageProvider = mainWindow.StorageProvider;
+            var file = await storageProvider.SaveFilePickerAsync(new Avalonia.Platform.Storage.FilePickerSaveOptions
+            {
+                Title = "保存PDF文件",
+                DefaultExtension = "pdf",
+                FileTypeChoices = new[]
+                {
+                    new Avalonia.Platform.Storage.FilePickerFileType("PDF文件")
+                    {
+                        Patterns = new[] { "*.pdf" }
+                    }
+                }
+            });
+
+            if (file != null)
+            {
+                PdfOutputPath = file.Path.LocalPath;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "选择PDF输出路径失败");
+        }
     }
 
     [RelayCommand]
     private async Task BrowseExcelOutputAsync()
     {
-        // TODO: 实现文件选择对话框
-        _logger.LogInformation("浏览Excel输出路径");
-        await Task.CompletedTask;
+        try
+        {
+            var mainWindow = App.Current.MainWindow;
+            if (mainWindow == null) return;
+
+            var storageProvider = mainWindow.StorageProvider;
+            var file = await storageProvider.SaveFilePickerAsync(new Avalonia.Platform.Storage.FilePickerSaveOptions
+            {
+                Title = "保存Excel文件",
+                DefaultExtension = "xlsx",
+                FileTypeChoices = new[]
+                {
+                    new Avalonia.Platform.Storage.FilePickerFileType("Excel文件")
+                    {
+                        Patterns = new[] { "*.xlsx" }
+                    }
+                }
+            });
+
+            if (file != null)
+            {
+                ExcelOutputPath = file.Path.LocalPath;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "选择Excel输出路径失败");
+        }
     }
 }
