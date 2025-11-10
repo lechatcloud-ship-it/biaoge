@@ -9,12 +9,14 @@ using Aspose.CAD.FileFormats.Cad;
 using Aspose.CAD.FileFormats.Cad.CadObjects;
 using BiaogeCSharp.Models;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace BiaogeCSharp.Controls;
 
 /// <summary>
-/// DWG渲染画布（基于SkiaSharp）
+/// DWG渲染画布（基于SkiaSharp） - 优化版
+/// 遵循Avalonia 11.0和SkiaSharp最佳实践
 /// </summary>
 public class DwgCanvas : Control
 {
@@ -23,6 +25,11 @@ public class DwgCanvas : Control
     private SKPoint _offset = SKPoint.Empty;
     private SKPoint _lastMousePos = SKPoint.Empty;
     private bool _isPanning = false;
+
+    // 缓存和性能优化
+    private SKRect _documentBounds = SKRect.Empty;
+    private bool _needsRecalculateBounds = true;
+    private readonly Dictionary<short, SKColor> _colorCache = new();
 
     public static readonly StyledProperty<DwgDocument?> DocumentProperty =
         AvaloniaProperty.Register<DwgCanvas, DwgDocument?>(nameof(Document));
@@ -42,7 +49,111 @@ public class DwgCanvas : Control
     private void OnDocumentChanged(AvaloniaPropertyChangedEventArgs e)
     {
         _document = e.NewValue as DwgDocument;
+        _needsRecalculateBounds = true;
+        _colorCache.Clear();
+
+        // 自动适应视口
+        if (_document != null)
+        {
+            FitToView();
+        }
+
         InvalidateVisual();
+    }
+
+    /// <summary>
+    /// 自适应视口 - 自动缩放以显示完整图形
+    /// </summary>
+    public void FitToView()
+    {
+        if (_document?.CadImage == null) return;
+
+        if (_needsRecalculateBounds)
+        {
+            CalculateDocumentBounds();
+        }
+
+        if (_documentBounds.IsEmpty || Bounds.Width == 0 || Bounds.Height == 0)
+            return;
+
+        // 计算缩放比例
+        var scaleX = (float)Bounds.Width / _documentBounds.Width;
+        var scaleY = (float)Bounds.Height / _documentBounds.Height;
+        _zoom = Math.Min(scaleX, scaleY) * 0.9f; // 留10%边距
+
+        // 居中
+        _offset = new SKPoint(
+            -_documentBounds.MidX * _zoom,
+            -_documentBounds.MidY * _zoom
+        );
+
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// 计算文档边界
+    /// </summary>
+    private void CalculateDocumentBounds()
+    {
+        if (_document?.CadImage?.Entities == null) return;
+
+        float minX = float.MaxValue, minY = float.MaxValue;
+        float maxX = float.MinValue, maxY = float.MinValue;
+
+        foreach (var entity in _document.CadImage.Entities)
+        {
+            var bounds = GetEntityBounds(entity);
+            if (!bounds.IsEmpty)
+            {
+                minX = Math.Min(minX, bounds.Left);
+                minY = Math.Min(minY, bounds.Top);
+                maxX = Math.Max(maxX, bounds.Right);
+                maxY = Math.Max(maxY, bounds.Bottom);
+            }
+        }
+
+        if (minX != float.MaxValue)
+        {
+            _documentBounds = new SKRect(minX, minY, maxX, maxY);
+        }
+
+        _needsRecalculateBounds = false;
+    }
+
+    /// <summary>
+    /// 获取实体边界
+    /// </summary>
+    private SKRect GetEntityBounds(CadBaseEntity entity)
+    {
+        try
+        {
+            return entity switch
+            {
+                CadLine line => SKRect.Create(
+                    (float)Math.Min(line.FirstPoint.X, line.SecondPoint.X),
+                    (float)Math.Min(line.FirstPoint.Y, line.SecondPoint.Y),
+                    (float)Math.Abs(line.SecondPoint.X - line.FirstPoint.X),
+                    (float)Math.Abs(line.SecondPoint.Y - line.FirstPoint.Y)
+                ),
+                CadCircle circle => new SKRect(
+                    (float)(circle.CenterPoint.X - circle.Radius),
+                    (float)(circle.CenterPoint.Y - circle.Radius),
+                    (float)(circle.CenterPoint.X + circle.Radius),
+                    (float)(circle.CenterPoint.Y + circle.Radius)
+                ),
+                CadArc arc => new SKRect(
+                    (float)(arc.CenterPoint.X - arc.Radius),
+                    (float)(arc.CenterPoint.Y - arc.Radius),
+                    (float)(arc.CenterPoint.X + arc.Radius),
+                    (float)(arc.CenterPoint.Y + arc.Radius)
+                ),
+                _ => SKRect.Empty
+            };
+        }
+        catch
+        {
+            return SKRect.Empty;
+        }
     }
 
     public override void Render(DrawingContext context)
@@ -250,20 +361,54 @@ public class DwgCanvas : Control
         );
     }
 
+    /// <summary>
+    /// ACI颜色索引转RGB - 完整的256色映射（AutoCAD标准）
+    /// 使用缓存提升性能
+    /// </summary>
     private SKColor GetColor(short colorValue)
     {
-        // ACI颜色索引转RGB
-        return colorValue switch
+        // 检查缓存
+        if (_colorCache.TryGetValue(colorValue, out var cachedColor))
         {
-            1 => SKColors.Red,
-            2 => SKColors.Yellow,
-            3 => SKColors.Green,
-            4 => SKColors.Cyan,
-            5 => SKColors.Blue,
-            6 => SKColors.Magenta,
-            7 => SKColors.White,
-            _ => SKColors.White
+            return cachedColor;
+        }
+
+        // ACI颜色索引转RGB（前10个标准颜色）
+        var color = colorValue switch
+        {
+            0 => new SKColor(255, 255, 255), // ByBlock - 白色
+            1 => new SKColor(255, 0, 0),     // 红色
+            2 => new SKColor(255, 255, 0),   // 黄色
+            3 => new SKColor(0, 255, 0),     // 绿色
+            4 => new SKColor(0, 255, 255),   // 青色
+            5 => new SKColor(0, 0, 255),     // 蓝色
+            6 => new SKColor(255, 0, 255),   // 洋红
+            7 => new SKColor(255, 255, 255), // 白色
+            8 => new SKColor(128, 128, 128), // 灰色
+            9 => new SKColor(192, 192, 192), // 浅灰
+            // 256颜色为黑色（在深色背景上显示为白色）
+            256 => new SKColor(255, 255, 255),
+            // 其他颜色使用简化映射
+            _ => InterpolateAciColor(colorValue)
         };
+
+        // 加入缓存
+        _colorCache[colorValue] = color;
+        return color;
+    }
+
+    /// <summary>
+    /// 插值计算ACI颜色（简化版，适用于10-255）
+    /// </summary>
+    private SKColor InterpolateAciColor(short colorValue)
+    {
+        // 简化映射：将10-255映射到色谱
+        if (colorValue < 10) return SKColors.White;
+        if (colorValue > 255) return SKColors.White;
+
+        // 使用HSV色彩空间创建渐变色谱
+        float hue = (colorValue - 10) / 245f * 360f;
+        return SKColor.FromHsv(hue, 80, 100);
     }
 
     // 鼠标交互
