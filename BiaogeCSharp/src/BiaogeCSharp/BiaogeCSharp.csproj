@@ -52,6 +52,12 @@
     <!-- MVVM -->
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
 
+    <!-- Markdown -->
+    <PackageReference Include="Markdown.Avalonia" Version="11.0.3" />
+
+    <!-- 图标 -->
+    <PackageReference Include="Material.Icons.Avalonia" Version="2.1.10" />
+
     <!-- 空间索引 -->
     <PackageReference Include="RBush" Version="3.2.0" />
   </ItemGroup>

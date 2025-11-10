@@ -1,15 +1,19 @@
 using Aspose.CAD;
 using Aspose.CAD.FileFormats.Cad;
+using Aspose.CAD.FileFormats.Cad.CadObjects;
+using Aspose.CAD.FileFormats.Cad.CadConsts;
 using BiaogeCSharp.Models;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
 namespace BiaogeCSharp.Services;
 
 /// <summary>
-/// Aspose.CAD DWG解析器
+/// Aspose.CAD DWG解析器 - 使用官方最佳实践
+/// 核心功能：解析DWG文件，提取文本，修改文本，保存文件
 /// </summary>
 public class AsposeDwgParser
 {
@@ -112,39 +116,54 @@ public class AsposeDwgParser
     }
 
     /// <summary>
-    /// 从CAD实体提取文本
+    /// 从CAD实体提取文本 - 使用TypeName和强类型转换（官方推荐）
     /// </summary>
     private string ExtractTextFromEntity(object entity)
     {
         try
         {
-            var type = entity.GetType();
+            if (!(entity is CadBaseEntity cadEntity))
+                return string.Empty;
 
-            // 尝试获取Text属性（适用于CadText, CadMText等）
-            var textProperty = type.GetProperty("Text") ?? type.GetProperty("DefaultValue");
-            if (textProperty != null)
+            // 使用TypeName属性检查实体类型（官方推荐方式）
+            switch (cadEntity.TypeName)
             {
-                var text = textProperty.GetValue(entity)?.ToString();
-                if (!string.IsNullOrWhiteSpace(text))
-                {
-                    return text.Trim();
-                }
-            }
+                case CadEntityTypeName.TEXT:
+                    // CadText使用DefaultValue属性
+                    if (entity is CadText cadText && !string.IsNullOrWhiteSpace(cadText.DefaultValue))
+                    {
+                        return cadText.DefaultValue.Trim();
+                    }
+                    break;
 
-            // 尝试获取TextValue属性
-            var textValueProperty = type.GetProperty("TextValue");
-            if (textValueProperty != null)
-            {
-                var text = textValueProperty.GetValue(entity)?.ToString();
-                if (!string.IsNullOrWhiteSpace(text))
-                {
-                    return text.Trim();
-                }
+                case CadEntityTypeName.MTEXT:
+                    // CadMText使用Text属性
+                    if (entity is CadMText cadMText && !string.IsNullOrWhiteSpace(cadMText.Text))
+                    {
+                        return cadMText.Text.Trim();
+                    }
+                    break;
+
+                case CadEntityTypeName.ATTRIB:
+                    // CadAttrib（属性）也可能包含文本
+                    if (entity is CadAttrib cadAttrib && !string.IsNullOrWhiteSpace(cadAttrib.DefaultValue))
+                    {
+                        return cadAttrib.DefaultValue.Trim();
+                    }
+                    break;
+
+                case CadEntityTypeName.ATTDEF:
+                    // CadAttDef（属性定义）
+                    if (entity is CadAttDef cadAttDef && !string.IsNullOrWhiteSpace(cadAttDef.DefaultValue))
+                    {
+                        return cadAttDef.DefaultValue.Trim();
+                    }
+                    break;
             }
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "无法从实体提取文本: {EntityType}", entity.GetType().Name);
+            _logger.LogDebug(ex, "无法从实体提取文本");
         }
 
         return string.Empty;
@@ -193,18 +212,15 @@ public class AsposeDwgParser
     }
 
     /// <summary>
-    /// 获取实体的图层名
+    /// 获取实体的图层名 - 使用LayerName属性
     /// </summary>
     private string? GetEntityLayerName(object entity)
     {
         try
         {
-            var type = entity.GetType();
-            var layerProperty = type.GetProperty("LayerName") ?? type.GetProperty("Layer");
-
-            if (layerProperty != null)
+            if (entity is CadBaseEntity cadEntity)
             {
-                return layerProperty.GetValue(entity)?.ToString();
+                return cadEntity.LayerName ?? "0";
             }
         }
         catch (Exception ex)
@@ -213,6 +229,122 @@ public class AsposeDwgParser
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// 修改DWG文档中的文本（用于翻译） - 核心功能
+    /// </summary>
+    /// <param name="document">DWG文档</param>
+    /// <param name="translations">翻译映射表（原文→译文）</param>
+    /// <returns>修改的实体数量</returns>
+    public int ApplyTranslations(DwgDocument document, Dictionary<string, string> translations)
+    {
+        _logger.LogInformation("开始应用翻译: {Count}条", translations.Count);
+
+        int modifiedCount = 0;
+
+        try
+        {
+            var cadImage = document.CadImage;
+
+            foreach (var entity in cadImage.Entities)
+            {
+                if (!(entity is CadBaseEntity cadEntity))
+                    continue;
+
+                var originalText = ExtractTextFromEntity(entity);
+                if (string.IsNullOrWhiteSpace(originalText))
+                    continue;
+
+                // 查找翻译
+                if (!translations.TryGetValue(originalText, out var translatedText))
+                    continue;
+
+                // 应用翻译到对应的实体类型
+                bool modified = false;
+
+                switch (cadEntity.TypeName)
+                {
+                    case CadEntityTypeName.TEXT:
+                        if (entity is CadText cadText)
+                        {
+                            cadText.DefaultValue = translatedText;
+                            modified = true;
+                        }
+                        break;
+
+                    case CadEntityTypeName.MTEXT:
+                        if (entity is CadMText cadMText)
+                        {
+                            cadMText.Text = translatedText;
+                            modified = true;
+                        }
+                        break;
+
+                    case CadEntityTypeName.ATTRIB:
+                        if (entity is CadAttrib cadAttrib)
+                        {
+                            cadAttrib.DefaultValue = translatedText;
+                            modified = true;
+                        }
+                        break;
+
+                    case CadEntityTypeName.ATTDEF:
+                        if (entity is CadAttDef cadAttDef)
+                        {
+                            cadAttDef.DefaultValue = translatedText;
+                            modified = true;
+                        }
+                        break;
+                }
+
+                if (modified)
+                {
+                    modifiedCount++;
+                    _logger.LogDebug("文本已翻译: \"{Original}\" → \"{Translated}\"",
+                        originalText, translatedText);
+                }
+            }
+
+            _logger.LogInformation("翻译应用完成: {Count}个实体已修改", modifiedCount);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "应用翻译失败");
+            throw new Exception($"应用翻译失败: {ex.Message}", ex);
+        }
+
+        return modifiedCount;
+    }
+
+    /// <summary>
+    /// 保存DWG文档（翻译后）
+    /// </summary>
+    /// <param name="document">DWG文档</param>
+    /// <param name="outputPath">输出路径</param>
+    public void SaveDocument(DwgDocument document, string outputPath)
+    {
+        _logger.LogInformation("保存DWG文档: {OutputPath}", outputPath);
+
+        try
+        {
+            // 确保输出目录存在
+            var directory = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            // 保存文件
+            document.CadImage.Save(outputPath);
+
+            _logger.LogInformation("DWG文档保存成功");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "保存DWG文档失败");
+            throw new Exception($"保存DWG文档失败: {ex.Message}", ex);
+        }
     }
 
     /// <summary>
