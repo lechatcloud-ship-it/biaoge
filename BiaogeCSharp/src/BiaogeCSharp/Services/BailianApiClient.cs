@@ -144,6 +144,59 @@ public class BailianApiClient
     }
 
     /// <summary>
+    /// 单文本翻译
+    /// </summary>
+    public async Task<string> TranslateAsync(
+        string text,
+        string targetLanguage,
+        string model = "qwen-mt-plus",
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var request = new
+            {
+                model = model,
+                input = new
+                {
+                    source_language = "zh",
+                    target_language = targetLanguage,
+                    source_text = text
+                }
+            };
+
+            var response = await _httpClient.PostAsJsonAsync(
+                "/api/v1/services/translation/translate",
+                request,
+                cancellationToken
+            );
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<BailianTranslateResponse>(
+                    cancellationToken: cancellationToken
+                );
+
+                if (result?.Output?.Translation != null)
+                {
+                    return result.Output.Translation;
+                }
+            }
+            else
+            {
+                _logger.LogWarning("翻译失败: {StatusCode}", response.StatusCode);
+            }
+
+            return text; // 失败时返回原文
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "翻译异常");
+            return text;
+        }
+    }
+
+    /// <summary>
     /// 测试连接
     /// </summary>
     public async Task<bool> TestConnectionAsync(CancellationToken cancellationToken = default)
@@ -183,6 +236,15 @@ public record BailianBatchResponse(
 
 public record BailianOutput(
     List<string> Translations
+);
+
+public record BailianTranslateResponse(
+    BailianTranslateOutput Output,
+    BailianUsage Usage
+);
+
+public record BailianTranslateOutput(
+    string Translation
 );
 
 public record BailianUsage(

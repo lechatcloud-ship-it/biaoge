@@ -27,6 +27,38 @@ public class TranslationEngine
     }
 
     /// <summary>
+    /// 单文本翻译（带缓存）
+    /// </summary>
+    public async Task<string> TranslateWithCacheAsync(
+        string text,
+        string targetLanguage,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return text;
+
+        // 检查缓存
+        var cached = await _cacheService.GetTranslationAsync(text, targetLanguage);
+        if (cached != null)
+        {
+            _logger.LogDebug("缓存命中: {Text}", text);
+            return cached;
+        }
+
+        // 调用API翻译
+        var translated = await _apiClient.TranslateAsync(
+            text,
+            targetLanguage,
+            cancellationToken: cancellationToken
+        );
+
+        // 写入缓存
+        await _cacheService.SetTranslationAsync(text, targetLanguage, translated);
+
+        return translated;
+    }
+
+    /// <summary>
     /// 批量翻译（带缓存）
     /// </summary>
     public async Task<List<string>> TranslateBatchWithCacheAsync(

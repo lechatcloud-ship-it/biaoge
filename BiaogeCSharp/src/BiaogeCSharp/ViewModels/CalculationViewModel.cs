@@ -1,9 +1,11 @@
 using BiaogeCSharp.Models;
+using BiaogeCSharp.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace BiaogeCSharp.ViewModels;
@@ -14,6 +16,9 @@ namespace BiaogeCSharp.ViewModels;
 public partial class CalculationViewModel : ViewModelBase
 {
     private readonly ILogger<CalculationViewModel> _logger;
+    private readonly ComponentRecognizer _componentRecognizer;
+    private readonly ExcelExporter _excelExporter;
+    private readonly DocumentService _documentService;
 
     [ObservableProperty]
     private ObservableCollection<ComponentRecognitionResult> _results = new();
@@ -42,8 +47,15 @@ public partial class CalculationViewModel : ViewModelBase
     [ObservableProperty]
     private bool _showValidationErrors;
 
-    public CalculationViewModel(ILogger<CalculationViewModel> logger)
+    public CalculationViewModel(
+        ComponentRecognizer componentRecognizer,
+        ExcelExporter excelExporter,
+        DocumentService documentService,
+        ILogger<CalculationViewModel> logger)
     {
+        _componentRecognizer = componentRecognizer;
+        _excelExporter = excelExporter;
+        _documentService = documentService;
         _logger = logger;
     }
 
@@ -54,25 +66,34 @@ public partial class CalculationViewModel : ViewModelBase
 
         try
         {
-            // TODO: 实现构件识别逻辑
             _logger.LogInformation("开始构件识别: 模式={Mode}", RecognitionMode);
 
-            // 模拟识别结果
-            await Task.Delay(1000);
-
-            Results.Clear();
-            Results.Add(new ComponentRecognitionResult
+            var currentDocument = _documentService.CurrentDocument;
+            if (currentDocument == null)
             {
-                Type = "C30混凝土柱",
-                Quantity = 12,
-                Volume = 8.64,
-                Area = 0,
-                Cost = 4320.00m,
-                Status = "有效",
-                Confidence = 0.999999
-            });
+                _logger.LogWarning("没有打开的DWG文档");
+                return;
+            }
+
+            // 使用AI验证取决于识别模式
+            bool useAiVerification = RecognitionMode.Contains("超高精度");
+
+            // 执行构件识别
+            var recognitionResults = await _componentRecognizer.RecognizeFromDocumentAsync(
+                currentDocument,
+                useAiVerification
+            );
+
+            // 更新结果
+            Results.Clear();
+            foreach (var result in recognitionResults)
+            {
+                Results.Add(result);
+            }
 
             UpdateStatistics();
+
+            _logger.LogInformation("识别完成: {Count}个构件", Results.Count);
         }
         catch (Exception ex)
         {
@@ -87,17 +108,60 @@ public partial class CalculationViewModel : ViewModelBase
     [RelayCommand]
     private async Task GenerateReportAsync()
     {
-        // TODO: 实现生成报告逻辑
         _logger.LogInformation("生成算量报告");
+
+        try
+        {
+            if (!Results.Any())
+            {
+                _logger.LogWarning("没有识别结果可生成报告");
+                return;
+            }
+
+            // TODO: 实现报告生成（可以是PDF或其他格式）
+            _logger.LogInformation("报告生成功能待实现");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "生成报告失败");
+        }
+
         await Task.CompletedTask;
     }
 
     [RelayCommand]
     private async Task ExportToExcelAsync()
     {
-        // TODO: 实现导出Excel逻辑
         _logger.LogInformation("导出到Excel");
-        await Task.CompletedTask;
+
+        try
+        {
+            if (!Results.Any())
+            {
+                _logger.LogWarning("没有识别结果可导出");
+                return;
+            }
+
+            // 生成默认文件名
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var outputPath = $"工程量清单_{timestamp}.xlsx";
+
+            // 导出Excel
+            await _excelExporter.ExportAsync(
+                Results.ToList(),
+                outputPath,
+                includeDetails: true,
+                includeConfidence: true,
+                includeMaterials: true,
+                includeCost: true
+            );
+
+            _logger.LogInformation("Excel导出完成: {Path}", outputPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "导出Excel失败");
+        }
     }
 
     private void UpdateStatistics()

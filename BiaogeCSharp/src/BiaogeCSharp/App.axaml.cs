@@ -64,6 +64,14 @@ public partial class App : Application
         services.AddSingleton<TranslationEngine>();
         services.AddSingleton<ConfigManager>();
         services.AddSingleton<DocumentService>();
+        services.AddSingleton<ComponentRecognizer>();
+
+        // AI服务
+        services.AddSingleton<AIContextManager>();
+        services.AddSingleton<AIAssistant>();
+
+        // 性能监控
+        services.AddSingleton<PerformanceMonitor>();
 
         // 导出服务
         services.AddSingleton<DwgExporter>();
