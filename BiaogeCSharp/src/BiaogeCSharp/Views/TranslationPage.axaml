@@ -19,18 +19,11 @@
                                   FontSize="14"
                                   Margin="0,0,0,8"/>
                         <ComboBox Classes="modern"
-                                 SelectedIndex="0"
+                                 ItemsSource="{Binding TargetLanguages}"
+                                 SelectedItem="{Binding SelectedTargetLanguage}"
+                                 DisplayMemberBinding="{Binding Name}"
                                  MinWidth="200"
-                                 FontSize="14">
-                            <ComboBoxItem Content="英语" Tag="en"/>
-                            <ComboBoxItem Content="日语" Tag="ja"/>
-                            <ComboBoxItem Content="韩语" Tag="ko"/>
-                            <ComboBoxItem Content="法语" Tag="fr"/>
-                            <ComboBoxItem Content="德语" Tag="de"/>
-                            <ComboBoxItem Content="西班牙语" Tag="es"/>
-                            <ComboBoxItem Content="俄语" Tag="ru"/>
-                            <ComboBoxItem Content="阿拉伯语" Tag="ar"/>
-                        </ComboBox>
+                                 FontSize="14"/>
 
                         <TextBlock Text="翻译模式"
                                   Foreground="{DynamicResource BrushTextSecondary}"
@@ -96,7 +89,7 @@
                                       Foreground="{DynamicResource BrushTextSecondary}"
                                       FontSize="14"/>
                             <TextBlock Grid.Column="1"
-                                      Text="0"
+                                      Text="{Binding TotalTexts}"
                                       Foreground="{DynamicResource BrushTextPrimary}"
                                       FontSize="14"
                                       FontWeight="SemiBold"/>
@@ -109,7 +102,7 @@
                                       Foreground="{DynamicResource BrushTextSecondary}"
                                       FontSize="14"/>
                             <TextBlock Grid.Column="1"
-                                      Text="0"
+                                      Text="{Binding TranslatedTexts}"
                                       Foreground="{DynamicResource BrushSuccess}"
                                       FontSize="14"
                                       FontWeight="SemiBold"/>
@@ -122,7 +115,7 @@
                                       Foreground="{DynamicResource BrushTextSecondary}"
                                       FontSize="14"/>
                             <TextBlock Grid.Column="1"
-                                      Text="0"
+                                      Text="{Binding CacheHits}"
                                       Foreground="{DynamicResource BrushInfo}"
                                       FontSize="14"
                                       FontWeight="SemiBold"/>
@@ -135,21 +128,21 @@
                                       Foreground="{DynamicResource BrushTextSecondary}"
                                       FontSize="14"/>
                             <TextBlock Grid.Column="1"
-                                      Text="0"
+                                      Text="{Binding SkippedTexts}"
                                       Foreground="{DynamicResource BrushWarning}"
                                       FontSize="14"
                                       FontWeight="SemiBold"/>
                         </Grid>
 
-                        <!-- 失败的 -->
+                        <!-- 耗时 -->
                         <Grid Grid.Row="4" ColumnDefinitions="*,Auto">
                             <TextBlock Grid.Column="0"
-                                      Text="失败的"
+                                      Text="耗时"
                                       Foreground="{DynamicResource BrushTextSecondary}"
                                       FontSize="14"/>
                             <TextBlock Grid.Column="1"
-                                      Text="0"
-                                      Foreground="{DynamicResource BrushError}"
+                                      Text="{Binding ElapsedTime}"
+                                      Foreground="{DynamicResource BrushInfo}"
                                       FontSize="14"
                                       FontWeight="SemiBold"/>
                         </Grid>
