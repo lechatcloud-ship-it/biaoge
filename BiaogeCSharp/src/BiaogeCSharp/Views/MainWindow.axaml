@@ -25,7 +25,6 @@
             <DockPanel Height="56">
                 <!-- 左侧：标题和图标 -->
                 <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Margin="20,0" VerticalAlignment="Center" Spacing="12">
-                    <TextBlock Text="📐" FontSize="24"/>
                     <TextBlock Text="表哥 - 建筑工程CAD翻译工具"
                               FontSize="16"
                               FontWeight="SemiBold"
@@ -36,14 +35,13 @@
                 <!-- 右侧：顶部操作按钮 -->
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="20,0" VerticalAlignment="Center" Spacing="8">
                     <Button Name="SettingsButton"
-                            Content="⚙"
-                            FontSize="18"
-                            Width="40"
-                            Height="40"
-                            Padding="0"
+                            Content="设置"
+                            FontSize="14"
+                            Padding="12,8"
                             Background="Transparent"
                             Foreground="{DynamicResource BrushTextSecondary}"
-                            BorderThickness="0"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource BrushBorder}"
                             CornerRadius="8"
                             ToolTip.Tip="设置">
                         <Button.Styles>
@@ -55,14 +53,13 @@
                     </Button>
 
                     <Button Name="AboutButton"
-                            Content="ℹ"
-                            FontSize="18"
-                            Width="40"
-                            Height="40"
-                            Padding="0"
+                            Content="关于"
+                            FontSize="14"
+                            Padding="12,8"
                             Background="Transparent"
                             Foreground="{DynamicResource BrushTextSecondary}"
-                            BorderThickness="0"
+                            BorderThickness="1"
+                            BorderBrush="{DynamicResource BrushBorder}"
                             CornerRadius="8"
                             ToolTip.Tip="关于">
                         <Button.Styles>

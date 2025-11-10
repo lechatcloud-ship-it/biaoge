@@ -57,6 +57,7 @@ public partial class App : Application
 
         // HTTP客户端
         services.AddHttpClient<BailianApiClient>();
+        services.AddHttpClient<AIAssistant>();
 
         // 业务服务
         services.AddSingleton<AsposeDwgParser>();
@@ -85,9 +86,11 @@ public partial class App : Application
         services.AddTransient<CalculationViewModel>();
         services.AddTransient<ExportViewModel>();
         services.AddTransient<SettingsViewModel>();
+        services.AddTransient<ChatViewModel>();
 
         // Views
         services.AddTransient<MainWindow>();
         services.AddTransient<SettingsDialog>();
+        services.AddTransient<ChatPage>();
     }
 }

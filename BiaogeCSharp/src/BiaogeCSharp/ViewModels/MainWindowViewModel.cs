@@ -34,6 +34,7 @@ public partial class MainWindowViewModel : ViewModelBase
     public TranslationViewModel TranslationViewModel { get; }
     public CalculationViewModel CalculationViewModel { get; }
     public ExportViewModel ExportViewModel { get; }
+    public ChatViewModel ChatViewModel { get; }
 
     public MainWindowViewModel(
         AsposeDwgParser dwgParser,
@@ -41,6 +42,7 @@ public partial class MainWindowViewModel : ViewModelBase
         TranslationViewModel translationViewModel,
         CalculationViewModel calculationViewModel,
         ExportViewModel exportViewModel,
+        ChatViewModel chatViewModel,
         ILogger<MainWindowViewModel> logger)
     {
         _dwgParser = dwgParser;
@@ -48,6 +50,7 @@ public partial class MainWindowViewModel : ViewModelBase
         TranslationViewModel = translationViewModel;
         CalculationViewModel = calculationViewModel;
         ExportViewModel = exportViewModel;
+        ChatViewModel = chatViewModel;
         _logger = logger;
     }
 
