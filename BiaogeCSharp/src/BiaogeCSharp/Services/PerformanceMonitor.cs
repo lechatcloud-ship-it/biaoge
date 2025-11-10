@@ -12,6 +12,8 @@ namespace BiaogeCSharp.Services;
 public class PerformanceMonitor : IDisposable
 {
     private readonly ILogger<PerformanceMonitor> _logger;
+    // 注意：Process.GetCurrentProcess()返回的Process对象不应该被Dispose
+    // 因为它是一个特殊的单例对象，Dispose会导致其他地方无法使用
     private readonly Process _currentProcess;
     private Timer? _monitorTimer;
     private bool _disposed;
@@ -172,7 +174,8 @@ public class PerformanceMonitor : IDisposable
             return;
 
         Stop();
-        _currentProcess?.Dispose();
+        // 注意：不要Dispose Process.GetCurrentProcess()返回的对象
+        // 这是.NET的特殊单例对象，Dispose会影响其他地方的使用
         _disposed = true;
 
         _logger.LogInformation("性能监控器已释放");

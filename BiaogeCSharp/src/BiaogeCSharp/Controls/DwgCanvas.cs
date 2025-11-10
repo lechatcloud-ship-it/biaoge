@@ -30,6 +30,10 @@ public class DwgCanvas : Control
     private SKRect _documentBounds = SKRect.Empty;
     private bool _needsRecalculateBounds = true;
     private readonly Dictionary<short, SKColor> _colorCache = new();
+    private const int MaxColorCacheSize = 512; // 限制颜色缓存大小（CAD标准256色+余量）
+
+    // 复用SKPaint对象以提升性能
+    private SKPaint? _reusablePaint;
 
     public static readonly StyledProperty<DwgDocument?> DocumentProperty =
         AvaloniaProperty.Register<DwgCanvas, DwgDocument?>(nameof(Document));
@@ -51,6 +55,10 @@ public class DwgCanvas : Control
         _document = e.NewValue as DwgDocument;
         _needsRecalculateBounds = true;
         _colorCache.Clear();
+
+        // 释放旧的SKPaint对象
+        _reusablePaint?.Dispose();
+        _reusablePaint = null;
 
         // 自动适应视口
         if (_document != null)
@@ -150,8 +158,10 @@ public class DwgCanvas : Control
                 _ => SKRect.Empty
             };
         }
-        catch
+        catch (Exception ex)
         {
+            // 记录错误而不是静默失败
+            System.Diagnostics.Debug.WriteLine($"获取实体边界失败: {ex.Message}");
             return SKRect.Empty;
         }
     }
@@ -225,21 +235,19 @@ public class DwgCanvas : Control
                     break;
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // 忽略渲染错误
+            // 记录渲染错误但继续处理其他实体
+            System.Diagnostics.Debug.WriteLine($"渲染实体失败: {entity.TypeName}, {ex.Message}");
         }
     }
 
     private void DrawLine(SKCanvas canvas, CadLine line)
     {
-        using var paint = new SKPaint
-        {
-            Color = GetColor(line.ColorValue),
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = 1.0f / _zoom,
-            IsAntialias = true
-        };
+        var paint = GetReusablePaint();
+        paint.Color = GetColor(line.ColorValue);
+        paint.Style = SKPaintStyle.Stroke;
+        paint.StrokeWidth = 1.0f / _zoom;
 
         canvas.DrawLine(
             (float)line.FirstPoint.X,
@@ -252,13 +260,10 @@ public class DwgCanvas : Control
 
     private void DrawCircle(SKCanvas canvas, CadCircle circle)
     {
-        using var paint = new SKPaint
-        {
-            Color = GetColor(circle.ColorValue),
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = 1.0f / _zoom,
-            IsAntialias = true
-        };
+        var paint = GetReusablePaint();
+        paint.Color = GetColor(circle.ColorValue);
+        paint.Style = SKPaintStyle.Stroke;
+        paint.StrokeWidth = 1.0f / _zoom;
 
         canvas.DrawCircle(
             (float)circle.CenterPoint.X,
@@ -270,12 +275,10 @@ public class DwgCanvas : Control
 
     private void DrawText(SKCanvas canvas, CadText text)
     {
-        using var paint = new SKPaint
-        {
-            Color = GetColor(text.ColorValue),
-            TextSize = (float)text.Height,
-            IsAntialias = true
-        };
+        var paint = GetReusablePaint();
+        paint.Color = GetColor(text.ColorValue);
+        paint.Style = SKPaintStyle.Fill;
+        paint.TextSize = (float)text.Height;
 
         var textContent = text.DefaultValue ?? string.Empty;
 
@@ -289,13 +292,10 @@ public class DwgCanvas : Control
 
     private void DrawMText(SKCanvas canvas, CadMText mtext)
     {
-        // 简化实现
-        using var paint = new SKPaint
-        {
-            Color = GetColor(mtext.ColorValue),
-            TextSize = (float)mtext.Height,
-            IsAntialias = true
-        };
+        var paint = GetReusablePaint();
+        paint.Color = GetColor(mtext.ColorValue);
+        paint.Style = SKPaintStyle.Fill;
+        paint.TextSize = (float)mtext.Height;
 
         var textContent = mtext.Text ?? string.Empty;
 
@@ -310,20 +310,19 @@ public class DwgCanvas : Control
     {
         if (polyline.Vertices == null || polyline.Vertices.Count < 2) return;
 
-        using var paint = new SKPaint
-        {
-            Color = GetColor(polyline.ColorValue),
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = 1.0f / _zoom,
-            IsAntialias = true
-        };
+        var paint = GetReusablePaint();
+        paint.Color = GetColor(polyline.ColorValue);
+        paint.Style = SKPaintStyle.Stroke;
+        paint.StrokeWidth = 1.0f / _zoom;
 
         using var path = new SKPath();
         var firstVertex = polyline.Vertices[0];
         path.MoveTo((float)firstVertex.X, (float)firstVertex.Y);
 
-        foreach (var vertex in polyline.Vertices.Skip(1))
+        // 使用for循环代替Skip(1)以提升性能
+        for (int i = 1; i < polyline.Vertices.Count; i++)
         {
+            var vertex = polyline.Vertices[i];
             path.LineTo((float)vertex.X, (float)vertex.Y);
         }
 
@@ -337,13 +336,10 @@ public class DwgCanvas : Control
 
     private void DrawArc(SKCanvas canvas, CadArc arc)
     {
-        using var paint = new SKPaint
-        {
-            Color = GetColor(arc.ColorValue),
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = 1.0f / _zoom,
-            IsAntialias = true
-        };
+        var paint = GetReusablePaint();
+        paint.Color = GetColor(arc.ColorValue);
+        paint.Style = SKPaintStyle.Stroke;
+        paint.StrokeWidth = 1.0f / _zoom;
 
         var rect = new SKRect(
             (float)(arc.CenterPoint.X - arc.Radius),
@@ -392,9 +388,28 @@ public class DwgCanvas : Control
             _ => InterpolateAciColor(colorValue)
         };
 
-        // 加入缓存
-        _colorCache[colorValue] = color;
+        // 限制缓存大小，防止内存泄漏
+        if (_colorCache.Count < MaxColorCacheSize)
+        {
+            _colorCache[colorValue] = color;
+        }
+
         return color;
+    }
+
+    /// <summary>
+    /// 获取可复用的SKPaint对象以提升性能
+    /// </summary>
+    private SKPaint GetReusablePaint()
+    {
+        if (_reusablePaint == null)
+        {
+            _reusablePaint = new SKPaint
+            {
+                IsAntialias = true
+            };
+        }
+        return _reusablePaint;
     }
 
     /// <summary>

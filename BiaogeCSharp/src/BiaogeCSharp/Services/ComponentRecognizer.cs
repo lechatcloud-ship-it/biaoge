@@ -332,6 +332,11 @@ public class ComponentRecognizer
         DwgDocument document,
         bool useAiVerification = true)
     {
+        if (document == null)
+        {
+            throw new ArgumentNullException(nameof(document));
+        }
+
         _logger.LogInformation("从DWG文档提取文本进行构件识别");
 
         var texts = new List<string>();
