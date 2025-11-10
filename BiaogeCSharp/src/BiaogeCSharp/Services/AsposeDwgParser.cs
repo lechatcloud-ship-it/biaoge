@@ -239,6 +239,16 @@ public class AsposeDwgParser
     /// <returns>修改的实体数量</returns>
     public int ApplyTranslations(DwgDocument document, Dictionary<string, string> translations)
     {
+        if (document == null)
+        {
+            throw new ArgumentNullException(nameof(document));
+        }
+
+        if (translations == null)
+        {
+            throw new ArgumentNullException(nameof(translations));
+        }
+
         _logger.LogInformation("开始应用翻译: {Count}条", translations.Count);
 
         int modifiedCount = 0;
@@ -246,6 +256,12 @@ public class AsposeDwgParser
         try
         {
             var cadImage = document.CadImage;
+
+            if (cadImage?.Entities == null)
+            {
+                _logger.LogWarning("DWG文档中没有实体");
+                return 0;
+            }
 
             foreach (var entity in cadImage.Entities)
             {
@@ -324,6 +340,16 @@ public class AsposeDwgParser
     /// <param name="outputPath">输出路径</param>
     public void SaveDocument(DwgDocument document, string outputPath)
     {
+        if (document == null)
+        {
+            throw new ArgumentNullException(nameof(document));
+        }
+
+        if (string.IsNullOrWhiteSpace(outputPath))
+        {
+            throw new ArgumentException("输出路径不能为空", nameof(outputPath));
+        }
+
         _logger.LogInformation("保存DWG文档: {OutputPath}", outputPath);
 
         try

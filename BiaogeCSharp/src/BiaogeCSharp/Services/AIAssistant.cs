@@ -26,6 +26,9 @@ public class AIAssistant
     private readonly List<ChatMessage> _conversationHistory = new();
     private string? _apiKey;
 
+    // 最大历史记录数，防止内存泄漏
+    private const int MaxHistorySize = 100;
+
     public AIAssistant(
         HttpClient httpClient,
         AIContextManager contextManager,
@@ -85,6 +88,12 @@ public class AIAssistant
                 Role = "user",
                 Content = userMessage
             });
+
+            // 限制历史记录大小，防止内存泄漏
+            if (_conversationHistory.Count > MaxHistorySize)
+            {
+                _conversationHistory.RemoveRange(0, _conversationHistory.Count - MaxHistorySize);
+            }
         }
 
         try
@@ -106,6 +115,12 @@ public class AIAssistant
                     Role = "assistant",
                     Content = response
                 });
+
+                // 限制历史记录大小，防止内存泄漏
+                if (_conversationHistory.Count > MaxHistorySize)
+                {
+                    _conversationHistory.RemoveRange(0, _conversationHistory.Count - MaxHistorySize);
+                }
             }
 
             _logger.LogInformation("AI回复: {Response}", response);
@@ -247,6 +262,12 @@ public class AIAssistant
                 Role = "user",
                 Content = userMessage
             });
+
+            // 限制历史记录大小，防止内存泄漏
+            if (_conversationHistory.Count > MaxHistorySize)
+            {
+                _conversationHistory.RemoveRange(0, _conversationHistory.Count - MaxHistorySize);
+            }
         }
 
         if (string.IsNullOrEmpty(_apiKey))
@@ -350,6 +371,12 @@ public class AIAssistant
                         Role = "assistant",
                         Content = finalResponse
                     });
+
+                    // 限制历史记录大小，防止内存泄漏
+                    if (_conversationHistory.Count > MaxHistorySize)
+                    {
+                        _conversationHistory.RemoveRange(0, _conversationHistory.Count - MaxHistorySize);
+                    }
                 }
             }
         }
