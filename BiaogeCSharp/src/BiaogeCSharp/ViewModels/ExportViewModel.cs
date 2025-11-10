@@ -17,6 +17,7 @@ public partial class ExportViewModel : ViewModelBase
     private readonly DwgExporter _dwgExporter;
     private readonly PdfExporter _pdfExporter;
     private readonly ExcelExporter _excelExporter;
+    private readonly CalculationResultService _calculationResultService;
 
     [ObservableProperty]
     private string _dwgFormat = "DWG R2024";
@@ -62,13 +63,15 @@ public partial class ExportViewModel : ViewModelBase
         DocumentService documentService,
         DwgExporter dwgExporter,
         PdfExporter pdfExporter,
-        ExcelExporter excelExporter)
+        ExcelExporter excelExporter,
+        CalculationResultService calculationResultService)
     {
         _logger = logger;
         _documentService = documentService;
         _dwgExporter = dwgExporter;
         _pdfExporter = pdfExporter;
         _excelExporter = excelExporter;
+        _calculationResultService = calculationResultService;
     }
 
     [RelayCommand]
@@ -167,11 +170,18 @@ public partial class ExportViewModel : ViewModelBase
                 return;
             }
 
-            _logger.LogInformation("导出Excel: 模板={Template}", ExcelTemplate);
+            // 检查是否有计算结果
+            if (!_calculationResultService.HasResults)
+            {
+                _logger.LogWarning("没有可导出的算量结果，请先进行构件识别");
+                return;
+            }
 
-            // 这里需要从CalculationViewModel获取结果
-            // 暂时使用空列表
-            var results = new System.Collections.Generic.List<BiaogeCSharp.Models.ComponentRecognitionResult>();
+            _logger.LogInformation("导出Excel: 模板={Template}, 构件数={Count}",
+                ExcelTemplate, _calculationResultService.LatestResults.Count);
+
+            // 从结果服务获取最新的计算结果
+            var results = _calculationResultService.LatestResults.ToList();
 
             // 执行导出
             await _excelExporter.ExportAsync(
@@ -183,7 +193,7 @@ public partial class ExportViewModel : ViewModelBase
                 ExcelIncludeCost
             );
 
-            _logger.LogInformation("Excel导出成功");
+            _logger.LogInformation("Excel导出成功: {Path}", ExcelOutputPath);
         }
         catch (Exception ex)
         {
