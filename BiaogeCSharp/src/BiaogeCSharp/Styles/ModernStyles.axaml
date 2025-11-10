@@ -1,0 +1,274 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 现代化颜色系统 2.0 -->
+
+    <!-- 主色调 - 深色背景 -->
+    <Color x:Key="ColorBgPrimary">#0D0D0D</Color>
+    <Color x:Key="ColorBgSecondary">#1A1A1A</Color>
+    <Color x:Key="ColorBgTertiary">#2D2D30</Color>
+    <Color x:Key="ColorBgElevated">#1E1E1E</Color>
+
+    <!-- 品牌色 -->
+    <Color x:Key="ColorBrandPrimary">#0078D4</Color>
+    <Color x:Key="ColorBrandHover">#1E88E5</Color>
+    <Color x:Key="ColorBrandActive">#0063B1</Color>
+
+    <!-- 语义色 -->
+    <Color x:Key="ColorSuccess">#00D47E</Color>
+    <Color x:Key="ColorWarning">#FFB900</Color>
+    <Color x:Key="ColorError">#E81123</Color>
+    <Color x:Key="ColorInfo">#00B4D8</Color>
+
+    <!-- 文本颜色 -->
+    <Color x:Key="ColorTextPrimary">#FFFFFF</Color>
+    <Color x:Key="ColorTextSecondary">#B8B8B8</Color>
+    <Color x:Key="ColorTextTertiary">#888888</Color>
+    <Color x:Key="ColorTextDisabled">#555555</Color>
+
+    <!-- 边框颜色 -->
+    <Color x:Key="ColorBorder">#3F3F46</Color>
+    <Color x:Key="ColorBorderHover">#52525B</Color>
+    <Color x:Key="ColorBorderFocus">#0078D4</Color>
+
+    <!-- Acrylic 毛玻璃效果颜色 (带透明度) -->
+    <Color x:Key="ColorAcrylicBase">#F01E1E1E</Color>
+    <Color x:Key="ColorAcrylicCard">#E02D2D30</Color>
+    <Color x:Key="ColorAcrylicDialog">#F5252529</Color>
+
+    <!-- 画刷资源 -->
+    <SolidColorBrush x:Key="BrushBgPrimary" Color="{StaticResource ColorBgPrimary}"/>
+    <SolidColorBrush x:Key="BrushBgSecondary" Color="{StaticResource ColorBgSecondary}"/>
+    <SolidColorBrush x:Key="BrushBgTertiary" Color="{StaticResource ColorBgTertiary}"/>
+    <SolidColorBrush x:Key="BrushBgElevated" Color="{StaticResource ColorBgElevated}"/>
+
+    <SolidColorBrush x:Key="BrushBrandPrimary" Color="{StaticResource ColorBrandPrimary}"/>
+    <SolidColorBrush x:Key="BrushBrandHover" Color="{StaticResource ColorBrandHover}"/>
+    <SolidColorBrush x:Key="BrushBrandActive" Color="{StaticResource ColorBrandActive}"/>
+
+    <SolidColorBrush x:Key="BrushSuccess" Color="{StaticResource ColorSuccess}"/>
+    <SolidColorBrush x:Key="BrushWarning" Color="{StaticResource ColorWarning}"/>
+    <SolidColorBrush x:Key="BrushError" Color="{StaticResource ColorError}"/>
+    <SolidColorBrush x:Key="BrushInfo" Color="{StaticResource ColorInfo}"/>
+
+    <SolidColorBrush x:Key="BrushTextPrimary" Color="{StaticResource ColorTextPrimary}"/>
+    <SolidColorBrush x:Key="BrushTextSecondary" Color="{StaticResource ColorTextSecondary}"/>
+    <SolidColorBrush x:Key="BrushTextTertiary" Color="{StaticResource ColorTextTertiary}"/>
+    <SolidColorBrush x:Key="BrushTextDisabled" Color="{StaticResource ColorTextDisabled}"/>
+
+    <SolidColorBrush x:Key="BrushBorder" Color="{StaticResource ColorBorder}"/>
+    <SolidColorBrush x:Key="BrushBorderHover" Color="{StaticResource ColorBorderHover}"/>
+    <SolidColorBrush x:Key="BrushBorderFocus" Color="{StaticResource ColorBorderFocus}"/>
+
+    <SolidColorBrush x:Key="BrushAcrylicBase" Color="{StaticResource ColorAcrylicBase}"/>
+    <SolidColorBrush x:Key="BrushAcrylicCard" Color="{StaticResource ColorAcrylicCard}"/>
+    <SolidColorBrush x:Key="BrushAcrylicDialog" Color="{StaticResource ColorAcrylicDialog}"/>
+
+    <!-- 阴影效果定义 -->
+    <DropShadowEffect x:Key="ShadowXS" Color="#000000" Opacity="0.15" BlurRadius="4" OffsetY="1"/>
+    <DropShadowEffect x:Key="ShadowSM" Color="#000000" Opacity="0.2" BlurRadius="8" OffsetY="2"/>
+    <DropShadowEffect x:Key="ShadowMD" Color="#000000" Opacity="0.25" BlurRadius="12" OffsetY="4"/>
+    <DropShadowEffect x:Key="ShadowLG" Color="#000000" Opacity="0.3" BlurRadius="16" OffsetY="6"/>
+    <DropShadowEffect x:Key="ShadowXL" Color="#000000" Opacity="0.35" BlurRadius="24" OffsetY="8"/>
+    <DropShadowEffect x:Key="Shadow2XL" Color="#000000" Opacity="0.4" BlurRadius="32" OffsetY="12"/>
+
+    <!-- 品牌色阴影 -->
+    <DropShadowEffect x:Key="ShadowBrand" Color="#0078D4" Opacity="0.4" BlurRadius="16" OffsetY="4"/>
+
+    <!-- 动画持续时间 -->
+    <sys:Double xmlns:sys="clr-namespace:System;assembly=mscorlib" x:Key="DurationFast">150</sys:Double>
+    <sys:Double xmlns:sys="clr-namespace:System;assembly=mscorlib" x:Key="DurationNormal">250</sys:Double>
+    <sys:Double xmlns:sys="clr-namespace:System;assembly=mscorlib" x:Key="DurationSlow">400</sys:Double>
+
+    <!-- 现代化按钮样式 -->
+    <Style x:Key="ModernButton" Selector="Button">
+        <Setter Property="Background" Value="{StaticResource BrushBrandPrimary}"/>
+        <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="20,10"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Effect" Value="{StaticResource ShadowSM}"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15"/>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Button.modern:pointerover">
+        <Setter Property="Background" Value="{StaticResource BrushBrandHover}"/>
+        <Setter Property="RenderTransform" Value="scale(1.02)"/>
+        <Setter Property="Effect" Value="{StaticResource ShadowMD}"/>
+    </Style>
+
+    <Style Selector="Button.modern:pressed">
+        <Setter Property="Background" Value="{StaticResource BrushBrandActive}"/>
+        <Setter Property="RenderTransform" Value="scale(0.98)"/>
+        <Setter Property="Effect" Value="{StaticResource ShadowXS}"/>
+    </Style>
+
+    <!-- 次要按钮样式 -->
+    <Style Selector="Button.secondary">
+        <Setter Property="Background" Value="{StaticResource BrushBgTertiary}"/>
+        <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BrushBorder}"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="20,10"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <Style Selector="Button.secondary:pointerover">
+        <Setter Property="BorderBrush" Value="{StaticResource BrushBorderHover}"/>
+        <Setter Property="RenderTransform" Value="scale(1.02)"/>
+    </Style>
+
+    <!-- 文本按钮样式 -->
+    <Style Selector="Button.text">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{StaticResource BrushBrandPrimary}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="12,8"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <Style Selector="Button.text:pointerover">
+        <Setter Property="Foreground" Value="{StaticResource BrushBrandHover}"/>
+    </Style>
+
+    <!-- 现代化卡片样式 -->
+    <Style x:Key="ModernCard" Selector="Border.card">
+        <Setter Property="Background" Value="{StaticResource BrushAcrylicCard}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BrushBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="Padding" Value="24"/>
+        <Setter Property="Effect" Value="{StaticResource ShadowMD}"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.25"/>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.25"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="Border.card:pointerover">
+        <Setter Property="Effect" Value="{StaticResource ShadowLG}"/>
+        <Setter Property="RenderTransform" Value="translateY(-2)"/>
+    </Style>
+
+    <!-- 输入框样式 -->
+    <Style Selector="TextBox.modern">
+        <Setter Property="Background" Value="{StaticResource BrushBgSecondary}"/>
+        <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BrushBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="TextBox.modern:focus">
+        <Setter Property="BorderBrush" Value="{StaticResource BrushBorderFocus}"/>
+        <Setter Property="BorderThickness" Value="2"/>
+    </Style>
+
+    <Style Selector="TextBox.modern:pointerover /template/ Border#PART_BorderElement">
+        <Setter Property="BorderBrush" Value="{StaticResource BrushBorderHover}"/>
+    </Style>
+
+    <!-- 下拉框样式 -->
+    <Style Selector="ComboBox.modern">
+        <Setter Property="Background" Value="{StaticResource BrushBgSecondary}"/>
+        <Setter Property="Foreground" Value="{StaticResource BrushTextPrimary}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BrushBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="FontSize" Value="14"/>
+    </Style>
+
+    <Style Selector="ComboBox.modern:pointerover /template/ Border#Background">
+        <Setter Property="BorderBrush" Value="{StaticResource BrushBorderHover}"/>
+    </Style>
+
+    <Style Selector="ComboBox.modern:focus /template/ Border#Background">
+        <Setter Property="BorderBrush" Value="{StaticResource BrushBorderFocus}"/>
+        <Setter Property="BorderThickness" Value="2"/>
+    </Style>
+
+    <!-- 滚动条样式 -->
+    <Style Selector="ScrollBar">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+    <Style Selector="ScrollBar /template/ Thumb">
+        <Setter Property="Background" Value="{StaticResource BrushBgTertiary}"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="ScrollBar /template/ Thumb:pointerover">
+        <Setter Property="Background" Value="{StaticResource BrushBorder}"/>
+    </Style>
+
+    <!-- DataGrid 样式 -->
+    <Style Selector="DataGrid">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="RowBackground" Value="{StaticResource BrushBgSecondary}"/>
+        <Setter Property="AlternatingRowBackground" Value="{StaticResource BrushBgTertiary}"/>
+        <Setter Property="GridLinesVisibility" Value="None"/>
+        <Setter Property="HeadersVisibility" Value="Column"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="FontSize" Value="14"/>
+    </Style>
+
+    <Style Selector="DataGridColumnHeader">
+        <Setter Property="Background" Value="{StaticResource BrushBgTertiary}"/>
+        <Setter Property="Foreground" Value="{StaticResource BrushTextSecondary}"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="Height" Value="44"/>
+    </Style>
+
+    <Style Selector="DataGridRow">
+        <Setter Property="Height" Value="48"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
+            </Transitions>
+        </Setter>
+    </Style>
+
+    <Style Selector="DataGridRow:pointerover /template/ Rectangle#BackgroundRectangle">
+        <Setter Property="Fill" Value="{StaticResource BrushBorder}"/>
+    </Style>
+
+    <!-- 进度条样式 -->
+    <Style Selector="ProgressBar.modern">
+        <Setter Property="Background" Value="{StaticResource BrushBgTertiary}"/>
+        <Setter Property="Foreground" Value="{StaticResource BrushBrandPrimary}"/>
+        <Setter Property="Height" Value="8"/>
+        <Setter Property="CornerRadius" Value="4"/>
+    </Style>
+
+    <Style Selector="ProgressBar.modern /template/ Border#PART_Indicator">
+        <Setter Property="CornerRadius" Value="4"/>
+    </Style>
+
+</ResourceDictionary>

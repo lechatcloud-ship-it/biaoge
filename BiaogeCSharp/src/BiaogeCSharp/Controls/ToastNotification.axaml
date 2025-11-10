@@ -1,0 +1,74 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="100"
+             x:Class="BiaogeCSharp.Controls.ToastNotification">
+
+    <Border Name="ToastBorder"
+            Background="{DynamicResource BrushAcrylicDialog}"
+            BorderBrush="{DynamicResource BrushBorder}"
+            BorderThickness="1"
+            CornerRadius="12"
+            Padding="20,16"
+            MinWidth="320"
+            MaxWidth="480"
+            Effect="{DynamicResource ShadowLG}">
+
+        <Border.Transitions>
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.25"/>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.25"/>
+            </Transitions>
+        </Border.Transitions>
+
+        <Grid ColumnDefinitions="Auto,*,Auto">
+            <!-- 图标 -->
+            <Border Name="IconBorder"
+                    Grid.Column="0"
+                    Width="40"
+                    Height="40"
+                    CornerRadius="20"
+                    Margin="0,0,16,0"
+                    VerticalAlignment="Center">
+                <TextBlock Name="IconText"
+                          FontSize="20"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center"/>
+            </Border>
+
+            <!-- 内容 -->
+            <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                <TextBlock Name="TitleText"
+                          FontSize="15"
+                          FontWeight="SemiBold"
+                          Foreground="{DynamicResource BrushTextPrimary}"/>
+                <TextBlock Name="MessageText"
+                          FontSize="13"
+                          Foreground="{DynamicResource BrushTextSecondary}"
+                          TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <!-- 关闭按钮 -->
+            <Button Name="CloseButton"
+                    Grid.Column="2"
+                    Content="×"
+                    FontSize="20"
+                    Width="32"
+                    Height="32"
+                    Padding="0"
+                    Background="Transparent"
+                    Foreground="{DynamicResource BrushTextSecondary}"
+                    BorderThickness="0"
+                    CornerRadius="16"
+                    VerticalAlignment="Top"
+                    Margin="12,0,0,0">
+                <Button.Styles>
+                    <Style Selector="Button:pointerover">
+                        <Setter Property="Background" Value="{DynamicResource BrushBgTertiary}"/>
+                    </Style>
+                </Button.Styles>
+            </Button>
+        </Grid>
+    </Border>
+</UserControl>

@@ -1,0 +1,116 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:BiaogeCSharp.ViewModels"
+        xmlns:controls="using:BiaogeCSharp.Controls"
+        x:DataType="vm:MainWindowViewModel"
+        x:Class="BiaogeCSharp.Views.MainWindow"
+        Title="表哥 - 建筑工程CAD翻译工具 (C# Edition)"
+        Width="1400" Height="900"
+        Icon="/Assets/avalonia-logo.ico"
+        Background="{DynamicResource BrushBgPrimary}"
+        TransparencyLevelHint="AcrylicBlur">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Grid>
+        <DockPanel>
+            <!-- 顶部标题栏和菜单栏 -->
+            <Border DockPanel.Dock="Top"
+                Background="{DynamicResource BrushBgElevated}"
+                BorderBrush="{DynamicResource BrushBorder}"
+                BorderThickness="0,0,0,1"
+                Effect="{DynamicResource ShadowSM}">
+            <DockPanel Height="56">
+                <!-- 左侧：标题和图标 -->
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Margin="20,0" VerticalAlignment="Center" Spacing="12">
+                    <TextBlock Text="📐" FontSize="24"/>
+                    <TextBlock Text="表哥 - 建筑工程CAD翻译工具"
+                              FontSize="16"
+                              FontWeight="SemiBold"
+                              Foreground="{DynamicResource BrushTextPrimary}"
+                              VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- 右侧：顶部操作按钮 -->
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="20,0" VerticalAlignment="Center" Spacing="8">
+                    <Button Name="SettingsButton"
+                            Content="⚙"
+                            FontSize="18"
+                            Width="40"
+                            Height="40"
+                            Padding="0"
+                            Background="Transparent"
+                            Foreground="{DynamicResource BrushTextSecondary}"
+                            BorderThickness="0"
+                            CornerRadius="8"
+                            ToolTip.Tip="设置">
+                        <Button.Styles>
+                            <Style Selector="Button:pointerover">
+                                <Setter Property="Background" Value="{DynamicResource BrushBgTertiary}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+                            </Style>
+                        </Button.Styles>
+                    </Button>
+
+                    <Button Name="AboutButton"
+                            Content="ℹ"
+                            FontSize="18"
+                            Width="40"
+                            Height="40"
+                            Padding="0"
+                            Background="Transparent"
+                            Foreground="{DynamicResource BrushTextSecondary}"
+                            BorderThickness="0"
+                            CornerRadius="8"
+                            ToolTip.Tip="关于">
+                        <Button.Styles>
+                            <Style Selector="Button:pointerover">
+                                <Setter Property="Background" Value="{DynamicResource BrushBgTertiary}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource BrushTextPrimary}"/>
+                            </Style>
+                        </Button.Styles>
+                    </Button>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- 底部状态栏 -->
+        <Border DockPanel.Dock="Bottom"
+                Background="{DynamicResource BrushBgElevated}"
+                Height="32"
+                BorderBrush="{DynamicResource BrushBorder}"
+                BorderThickness="0,1,0,0">
+            <DockPanel>
+                <TextBlock Text="{Binding StatusText}"
+                          Foreground="{DynamicResource BrushTextSecondary}"
+                          VerticalAlignment="Center"
+                          Margin="16,0"
+                          FontSize="12"/>
+                <ProgressBar Classes="modern"
+                            IsIndeterminate="True"
+                            IsVisible="{Binding IsBusy}"
+                            Width="120"
+                            Height="6"
+                            Margin="16,0"
+                            DockPanel.Dock="Right"
+                            VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+
+            <!-- 主内容区：使用NavigationView -->
+            <controls:NavigationView Name="MainNavigation"/>
+        </DockPanel>
+
+        <!-- Toast通知容器 (覆盖在最上层) -->
+        <StackPanel Name="ToastContainer"
+                    VerticalAlignment="Top"
+                    HorizontalAlignment="Right"
+                    Margin="24"
+                    Spacing="12"
+                    IsHitTestVisible="False">
+            <!-- Toast通知会动态添加到这里 -->
+        </StackPanel>
+    </Grid>
+</Window>

@@ -1,0 +1,320 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Media;
+using Avalonia.Platform;
+using Avalonia.Rendering.SceneGraph;
+using Avalonia.Skia;
+using SkiaSharp;
+using Aspose.CAD.FileFormats.Cad;
+using Aspose.CAD.FileFormats.Cad.CadObjects;
+using BiaogeCSharp.Models;
+using System;
+using System.Linq;
+
+namespace BiaogeCSharp.Controls;
+
+/// <summary>
+/// DWG渲染画布（基于SkiaSharp）
+/// </summary>
+public class DwgCanvas : Control
+{
+    private DwgDocument? _document;
+    private float _zoom = 1.0f;
+    private SKPoint _offset = SKPoint.Empty;
+    private SKPoint _lastMousePos = SKPoint.Empty;
+    private bool _isPanning = false;
+
+    public static readonly StyledProperty<DwgDocument?> DocumentProperty =
+        AvaloniaProperty.Register<DwgCanvas, DwgDocument?>(nameof(Document));
+
+    public DwgDocument? Document
+    {
+        get => GetValue(DocumentProperty);
+        set => SetValue(DocumentProperty, value);
+    }
+
+    static DwgCanvas()
+    {
+        AffectsRender<DwgCanvas>(DocumentProperty);
+        DocumentProperty.Changed.AddClassHandler<DwgCanvas>((x, e) => x.OnDocumentChanged(e));
+    }
+
+    private void OnDocumentChanged(AvaloniaPropertyChangedEventArgs e)
+    {
+        _document = e.NewValue as DwgDocument;
+        InvalidateVisual();
+    }
+
+    public override void Render(DrawingContext context)
+    {
+        base.Render(context);
+
+        if (_document?.CadImage == null) return;
+
+        var leaseFeature = context.TryGetFeature<ISkiaSharpApiLeaseFeature>();
+        if (leaseFeature == null) return;
+
+        using var lease = leaseFeature.Lease();
+        var canvas = lease.SkCanvas;
+
+        RenderDwg(canvas, _document.CadImage);
+    }
+
+    private void RenderDwg(SKCanvas canvas, CadImage cadImage)
+    {
+        canvas.Clear(new SKColor(33, 33, 33)); // 深色背景
+
+        canvas.Save();
+
+        // 应用视口变换
+        canvas.Translate((float)Bounds.Width / 2, (float)Bounds.Height / 2);
+        canvas.Translate(_offset);
+        canvas.Scale(_zoom, -_zoom); // Y轴翻转（CAD坐标系）
+
+        // 遍历所有实体 - 强类型渲染
+        if (cadImage.Entities != null)
+        {
+            foreach (var entity in cadImage.Entities)
+            {
+                DrawEntity(canvas, entity);
+            }
+        }
+
+        canvas.Restore();
+    }
+
+    private void DrawEntity(SKCanvas canvas, CadBaseEntity entity)
+    {
+        try
+        {
+            switch (entity)
+            {
+                case CadLine line:
+                    DrawLine(canvas, line);
+                    break;
+
+                case CadCircle circle:
+                    DrawCircle(canvas, circle);
+                    break;
+
+                case CadText text:
+                    DrawText(canvas, text);
+                    break;
+
+                case CadMText mtext:
+                    DrawMText(canvas, mtext);
+                    break;
+
+                case CadLwPolyline polyline:
+                    DrawPolyline(canvas, polyline);
+                    break;
+
+                case CadArc arc:
+                    DrawArc(canvas, arc);
+                    break;
+            }
+        }
+        catch
+        {
+            // 忽略渲染错误
+        }
+    }
+
+    private void DrawLine(SKCanvas canvas, CadLine line)
+    {
+        using var paint = new SKPaint
+        {
+            Color = GetColor(line.ColorValue),
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 1.0f / _zoom,
+            IsAntialias = true
+        };
+
+        canvas.DrawLine(
+            (float)line.FirstPoint.X,
+            (float)line.FirstPoint.Y,
+            (float)line.SecondPoint.X,
+            (float)line.SecondPoint.Y,
+            paint
+        );
+    }
+
+    private void DrawCircle(SKCanvas canvas, CadCircle circle)
+    {
+        using var paint = new SKPaint
+        {
+            Color = GetColor(circle.ColorValue),
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 1.0f / _zoom,
+            IsAntialias = true
+        };
+
+        canvas.DrawCircle(
+            (float)circle.CenterPoint.X,
+            (float)circle.CenterPoint.Y,
+            (float)circle.Radius,
+            paint
+        );
+    }
+
+    private void DrawText(SKCanvas canvas, CadText text)
+    {
+        using var paint = new SKPaint
+        {
+            Color = GetColor(text.ColorValue),
+            TextSize = (float)text.Height,
+            IsAntialias = true
+        };
+
+        var textContent = text.DefaultValue ?? string.Empty;
+
+        canvas.Save();
+        canvas.Translate((float)text.FirstAlignmentPoint.X, (float)text.FirstAlignmentPoint.Y);
+        canvas.RotateDegrees((float)text.Rotation);
+        canvas.Scale(1, -1); // Y轴翻转回来
+        canvas.DrawText(textContent, 0, 0, paint);
+        canvas.Restore();
+    }
+
+    private void DrawMText(SKCanvas canvas, CadMText mtext)
+    {
+        // 简化实现
+        using var paint = new SKPaint
+        {
+            Color = GetColor(mtext.ColorValue),
+            TextSize = (float)mtext.Height,
+            IsAntialias = true
+        };
+
+        var textContent = mtext.Text ?? string.Empty;
+
+        canvas.Save();
+        canvas.Translate((float)mtext.InsertionPoint.X, (float)mtext.InsertionPoint.Y);
+        canvas.Scale(1, -1);
+        canvas.DrawText(textContent, 0, 0, paint);
+        canvas.Restore();
+    }
+
+    private void DrawPolyline(SKCanvas canvas, CadLwPolyline polyline)
+    {
+        if (polyline.Vertices == null || polyline.Vertices.Count < 2) return;
+
+        using var paint = new SKPaint
+        {
+            Color = GetColor(polyline.ColorValue),
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 1.0f / _zoom,
+            IsAntialias = true
+        };
+
+        using var path = new SKPath();
+        var firstVertex = polyline.Vertices[0];
+        path.MoveTo((float)firstVertex.X, (float)firstVertex.Y);
+
+        foreach (var vertex in polyline.Vertices.Skip(1))
+        {
+            path.LineTo((float)vertex.X, (float)vertex.Y);
+        }
+
+        if (polyline.Flag.HasFlag(CadPolylineFlag.Closed))
+        {
+            path.Close();
+        }
+
+        canvas.DrawPath(path, paint);
+    }
+
+    private void DrawArc(SKCanvas canvas, CadArc arc)
+    {
+        using var paint = new SKPaint
+        {
+            Color = GetColor(arc.ColorValue),
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 1.0f / _zoom,
+            IsAntialias = true
+        };
+
+        var rect = new SKRect(
+            (float)(arc.CenterPoint.X - arc.Radius),
+            (float)(arc.CenterPoint.Y - arc.Radius),
+            (float)(arc.CenterPoint.X + arc.Radius),
+            (float)(arc.CenterPoint.Y + arc.Radius)
+        );
+
+        canvas.DrawArc(
+            rect,
+            (float)arc.StartAngle,
+            (float)(arc.EndAngle - arc.StartAngle),
+            false,
+            paint
+        );
+    }
+
+    private SKColor GetColor(short colorValue)
+    {
+        // ACI颜色索引转RGB
+        return colorValue switch
+        {
+            1 => SKColors.Red,
+            2 => SKColors.Yellow,
+            3 => SKColors.Green,
+            4 => SKColors.Cyan,
+            5 => SKColors.Blue,
+            6 => SKColors.Magenta,
+            7 => SKColors.White,
+            _ => SKColors.White
+        };
+    }
+
+    // 鼠标交互
+    protected override void OnPointerWheelChanged(Avalonia.Input.PointerWheelEventArgs e)
+    {
+        base.OnPointerWheelChanged(e);
+
+        var delta = e.Delta.Y;
+        var factor = delta > 0 ? 1.15f : 1 / 1.15f;
+
+        _zoom *= factor;
+        _zoom = Math.Clamp(_zoom, 0.01f, 100.0f);
+
+        InvalidateVisual();
+    }
+
+    protected override void OnPointerPressed(Avalonia.Input.PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+
+        var point = e.GetPosition(this);
+        _lastMousePos = new SKPoint((float)point.X, (float)point.Y);
+        _isPanning = true;
+        e.Pointer.Capture(this);
+    }
+
+    protected override void OnPointerMoved(Avalonia.Input.PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+
+        if (!_isPanning) return;
+
+        var point = e.GetPosition(this);
+        var currentPos = new SKPoint((float)point.X, (float)point.Y);
+
+        var delta = new SKPoint(
+            currentPos.X - _lastMousePos.X,
+            currentPos.Y - _lastMousePos.Y
+        );
+
+        _offset = new SKPoint(_offset.X + delta.X, _offset.Y + delta.Y);
+        _lastMousePos = currentPos;
+
+        InvalidateVisual();
+    }
+
+    protected override void OnPointerReleased(Avalonia.Input.PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+
+        _isPanning = false;
+        e.Pointer.Capture(null);
+    }
+}

@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="BiaogeCSharp.Controls.CardWidget">
+
+    <Border Classes="card"
+            Background="{DynamicResource BrushAcrylicCard}"
+            CornerRadius="12"
+            Padding="24"
+            Margin="12"
+            BorderBrush="{DynamicResource BrushBorder}"
+            BorderThickness="1"
+            Effect="{DynamicResource ShadowMD}">
+
+        <StackPanel>
+            <!-- 标题 -->
+            <TextBlock Name="TitleTextBlock"
+                      FontSize="20"
+                      FontWeight="SemiBold"
+                      Foreground="{DynamicResource BrushTextPrimary}"
+                      Margin="0,0,0,16"/>
+
+            <!-- 内容区域 -->
+            <ContentControl Name="ContentArea"/>
+        </StackPanel>
+    </Border>
+</UserControl>
