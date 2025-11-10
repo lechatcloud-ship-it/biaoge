@@ -17,6 +17,7 @@ namespace BiaogeCSharp.Services;
 /// </summary>
 public class AIAssistant
 {
+    private readonly object _historyLock = new();
     private readonly HttpClient _httpClient;
     private readonly AIContextManager _contextManager;
     private readonly ConfigManager _configManager;
@@ -77,11 +78,14 @@ public class AIAssistant
         _logger.LogInformation("用户消息: {Message}", userMessage);
 
         // 添加用户消息到历史
-        _conversationHistory.Add(new ChatMessage
+        lock (_historyLock)
         {
-            Role = "user",
-            Content = userMessage
-        });
+            _conversationHistory.Add(new ChatMessage
+            {
+                Role = "user",
+                Content = userMessage
+            });
+        }
 
         try
         {
@@ -95,11 +99,14 @@ public class AIAssistant
             var response = await CallAIModelAsync(systemPrompt, userMessage, cancellationToken);
 
             // 添加助手回复到历史
-            _conversationHistory.Add(new ChatMessage
+            lock (_historyLock)
             {
-                Role = "assistant",
-                Content = response
-            });
+                _conversationHistory.Add(new ChatMessage
+                {
+                    Role = "assistant",
+                    Content = response
+                });
+            }
 
             _logger.LogInformation("AI回复: {Response}", response);
 
@@ -156,7 +163,12 @@ public class AIAssistant
             };
 
             // 添加历史对话（最近5轮）
-            var recentHistory = _conversationHistory.TakeLast(10).ToList();
+            List<ChatMessage> recentHistory;
+            lock (_historyLock)
+            {
+                recentHistory = _conversationHistory.TakeLast(10).ToList();
+            }
+
             foreach (var msg in recentHistory)
             {
                 messages.Add(new { role = msg.Role, content = msg.Content });
@@ -228,11 +240,14 @@ public class AIAssistant
         _logger.LogInformation("流式用户消息: {Message}", userMessage);
 
         // 添加用户消息到历史
-        _conversationHistory.Add(new ChatMessage
+        lock (_historyLock)
         {
-            Role = "user",
-            Content = userMessage
-        });
+            _conversationHistory.Add(new ChatMessage
+            {
+                Role = "user",
+                Content = userMessage
+            });
+        }
 
         if (string.IsNullOrEmpty(_apiKey))
         {
@@ -252,7 +267,12 @@ public class AIAssistant
                 new { role = "system", content = systemPrompt }
             };
 
-            var recentHistory = _conversationHistory.TakeLast(10).Where(m => m.Role != "user" || m.Content != userMessage).ToList();
+            List<ChatMessage> recentHistory;
+            lock (_historyLock)
+            {
+                recentHistory = _conversationHistory.TakeLast(10).Where(m => m.Role != "user" || m.Content != userMessage).ToList();
+            }
+
             foreach (var msg in recentHistory)
             {
                 messages.Add(new { role = msg.Role, content = msg.Content });
@@ -323,11 +343,14 @@ public class AIAssistant
             var finalResponse = fullResponse.ToString();
             if (!string.IsNullOrWhiteSpace(finalResponse))
             {
-                _conversationHistory.Add(new ChatMessage
+                lock (_historyLock)
                 {
-                    Role = "assistant",
-                    Content = finalResponse
-                });
+                    _conversationHistory.Add(new ChatMessage
+                    {
+                        Role = "assistant",
+                        Content = finalResponse
+                    });
+                }
             }
         }
         catch (Exception ex)
@@ -342,7 +365,10 @@ public class AIAssistant
     /// </summary>
     public void ClearHistory()
     {
-        _conversationHistory.Clear();
+        lock (_historyLock)
+        {
+            _conversationHistory.Clear();
+        }
         _logger.LogInformation("对话历史已清空");
     }
 
@@ -351,7 +377,10 @@ public class AIAssistant
     /// </summary>
     public List<ChatMessage> GetHistory()
     {
-        return new List<ChatMessage>(_conversationHistory);
+        lock (_historyLock)
+        {
+            return new List<ChatMessage>(_conversationHistory);
+        }
     }
 }
 
