@@ -80,6 +80,10 @@ public partial class App : Application
         services.AddSingleton<PdfExporter>();
         services.AddSingleton<ExcelExporter>();
 
+        // 报告生成和结果共享服务
+        services.AddSingleton<CalculationReportGenerator>();
+        services.AddSingleton<CalculationResultService>();
+
         // ViewModels
         services.AddTransient<MainWindowViewModel>();
         services.AddTransient<TranslationViewModel>();

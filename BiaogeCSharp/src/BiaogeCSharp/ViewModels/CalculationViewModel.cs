@@ -19,6 +19,8 @@ public partial class CalculationViewModel : ViewModelBase
     private readonly ComponentRecognizer _componentRecognizer;
     private readonly ExcelExporter _excelExporter;
     private readonly DocumentService _documentService;
+    private readonly CalculationReportGenerator _reportGenerator;
+    private readonly CalculationResultService _resultService;
 
     [ObservableProperty]
     private ObservableCollection<ComponentRecognitionResult> _results = new();
@@ -51,11 +53,15 @@ public partial class CalculationViewModel : ViewModelBase
         ComponentRecognizer componentRecognizer,
         ExcelExporter excelExporter,
         DocumentService documentService,
+        CalculationReportGenerator reportGenerator,
+        CalculationResultService resultService,
         ILogger<CalculationViewModel> logger)
     {
         _componentRecognizer = componentRecognizer;
         _excelExporter = excelExporter;
         _documentService = documentService;
+        _reportGenerator = reportGenerator;
+        _resultService = resultService;
         _logger = logger;
     }
 
@@ -91,6 +97,9 @@ public partial class CalculationViewModel : ViewModelBase
                 Results.Add(result);
             }
 
+            // 更新共享结果服务
+            _resultService.UpdateResults(Results);
+
             UpdateStatistics();
 
             _logger.LogInformation("识别完成: {Count}个构件", Results.Count);
@@ -118,15 +127,26 @@ public partial class CalculationViewModel : ViewModelBase
                 return;
             }
 
-            // TODO: 实现报告生成（可以是PDF或其他格式）
-            _logger.LogInformation("报告生成功能待实现");
+            // 生成默认文件名
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var projectName = _documentService.CurrentDocument?.FilePath != null
+                ? System.IO.Path.GetFileNameWithoutExtension(_documentService.CurrentDocument.FilePath)
+                : "工程项目";
+            var outputPath = $"算量报告_{projectName}_{timestamp}.pdf";
+
+            // 生成PDF报告
+            await _reportGenerator.GenerateReportAsync(
+                Results.ToList(),
+                outputPath,
+                projectName
+            );
+
+            _logger.LogInformation("报告生成成功: {Path}", outputPath);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "生成报告失败");
         }
-
-        await Task.CompletedTask;
     }
 
     [RelayCommand]
