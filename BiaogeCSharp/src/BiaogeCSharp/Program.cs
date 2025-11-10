@@ -22,7 +22,7 @@ class Program
                 .WriteTo.File("logs/biaoge-.log", rollingInterval: Serilog.RollingInterval.Day)
                 .CreateLogger();
 
-            Log.Information("表哥应用程序启动");
+            Log.Information("CAD翻译算量工具应用程序启动");
 
             BuildAvaloniaApp()
                 .StartWithClassicDesktopLifetime(args);

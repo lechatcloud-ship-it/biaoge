@@ -9,24 +9,46 @@ namespace BiaogeCSharp.Services;
 /// </summary>
 public class CalculationResultService
 {
+    private readonly object _resultsLock = new();
     private List<ComponentRecognitionResult> _latestResults = new();
 
     /// <summary>
     /// 获取最新的计算结果
     /// </summary>
-    public IReadOnlyList<ComponentRecognitionResult> LatestResults => _latestResults.AsReadOnly();
+    public IReadOnlyList<ComponentRecognitionResult> LatestResults
+    {
+        get
+        {
+            lock (_resultsLock)
+            {
+                return _latestResults.AsReadOnly();
+            }
+        }
+    }
 
     /// <summary>
     /// 是否有计算结果
     /// </summary>
-    public bool HasResults => _latestResults.Any();
+    public bool HasResults
+    {
+        get
+        {
+            lock (_resultsLock)
+            {
+                return _latestResults.Any();
+            }
+        }
+    }
 
     /// <summary>
     /// 更新计算结果
     /// </summary>
     public void UpdateResults(IEnumerable<ComponentRecognitionResult> results)
     {
-        _latestResults = new List<ComponentRecognitionResult>(results);
+        lock (_resultsLock)
+        {
+            _latestResults = new List<ComponentRecognitionResult>(results);
+        }
     }
 
     /// <summary>
@@ -34,7 +56,10 @@ public class CalculationResultService
     /// </summary>
     public void ClearResults()
     {
-        _latestResults.Clear();
+        lock (_resultsLock)
+        {
+            _latestResults.Clear();
+        }
     }
 
     /// <summary>
@@ -42,14 +67,17 @@ public class CalculationResultService
     /// </summary>
     public CalculationStatistics GetStatistics()
     {
-        return new CalculationStatistics
+        lock (_resultsLock)
         {
-            TotalComponents = _latestResults.Count,
-            ValidComponents = _latestResults.Count(r => r.Status == "有效"),
-            TotalQuantity = _latestResults.Sum(r => r.Quantity),
-            TotalCost = _latestResults.Sum(r => r.Cost),
-            AverageConfidence = _latestResults.Any() ? _latestResults.Average(r => r.Confidence) : 0
-        };
+            return new CalculationStatistics
+            {
+                TotalComponents = _latestResults.Count,
+                ValidComponents = _latestResults.Count(r => r.Status == "有效"),
+                TotalQuantity = _latestResults.Sum(r => r.Quantity),
+                TotalCost = _latestResults.Sum(r => r.Cost),
+                AverageConfidence = _latestResults.Any() ? _latestResults.Average(r => r.Confidence) : 0
+            };
+        }
     }
 
     /// <summary>
@@ -57,9 +85,12 @@ public class CalculationResultService
     /// </summary>
     public Dictionary<string, List<ComponentRecognitionResult>> GroupByType()
     {
-        return _latestResults
-            .GroupBy(r => r.ComponentType)
-            .ToDictionary(g => g.Key, g => g.ToList());
+        lock (_resultsLock)
+        {
+            return _latestResults
+                .GroupBy(r => r.ComponentType)
+                .ToDictionary(g => g.Key, g => g.ToList());
+        }
     }
 
     /// <summary>
@@ -67,27 +98,30 @@ public class CalculationResultService
     /// </summary>
     public Dictionary<string, decimal> GetMaterialSummary()
     {
-        var summary = new Dictionary<string, decimal>();
-
-        foreach (var result in _latestResults)
+        lock (_resultsLock)
         {
-            if (result.Materials != null)
+            var summary = new Dictionary<string, decimal>();
+
+            foreach (var result in _latestResults)
             {
-                foreach (var material in result.Materials)
+                if (result.Materials != null)
                 {
-                    if (summary.ContainsKey(material.Key))
+                    foreach (var material in result.Materials)
                     {
-                        summary[material.Key] += material.Value;
-                    }
-                    else
-                    {
-                        summary[material.Key] = material.Value;
+                        if (summary.ContainsKey(material.Key))
+                        {
+                            summary[material.Key] += material.Value;
+                        }
+                        else
+                        {
+                            summary[material.Key] = material.Value;
+                        }
                     }
                 }
             }
-        }
 
-        return summary;
+            return summary;
+        }
     }
 }
 

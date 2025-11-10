@@ -4,7 +4,7 @@
         xmlns:controls="using:BiaogeCSharp.Controls"
         x:DataType="vm:MainWindowViewModel"
         x:Class="BiaogeCSharp.Views.MainWindow"
-        Title="表哥 - 建筑工程CAD翻译工具 (C# Edition)"
+        Title="CAD翻译算量工具 (C# Edition)"
         Width="1400" Height="900"
         Icon="/Assets/avalonia-logo.ico"
         Background="{DynamicResource BrushBgPrimary}"
@@ -25,7 +25,7 @@
             <DockPanel Height="56">
                 <!-- 左侧：标题和图标 -->
                 <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Margin="20,0" VerticalAlignment="Center" Spacing="12">
-                    <TextBlock Text="表哥 - 建筑工程CAD翻译工具"
+                    <TextBlock Text="CAD翻译算量工具"
                               FontSize="16"
                               FontWeight="SemiBold"
                               Foreground="{DynamicResource BrushTextPrimary}"

@@ -454,7 +454,7 @@ public class CalculationReportGenerator
         footer.Format.Font.Size = 8;
         footer.Format.Font.Color = Colors.Gray;
         footer.Format.Alignment = ParagraphAlignment.Center;
-        footer.AddText($"\n--- 报告结束 ---\n由表哥算量工具自动生成 © {DateTime.Now.Year}");
+        footer.AddText($"\n--- 报告结束 ---\n由CAD翻译算量工具自动生成 © {DateTime.Now.Year}");
     }
 
     /// <summary>

@@ -16,65 +16,69 @@ public class ComponentRecognizer
     private readonly BailianApiClient _apiClient;
     private readonly ILogger<ComponentRecognizer> _logger;
 
-    // 构件识别规则
-    private readonly Dictionary<string, List<Regex>> _componentPatterns = new()
+    // 静态正则表达式 - 使用Compiled选项提升性能
+    // 数量提取正则
+    private static readonly Regex QuantityRegex = new(@"(\d+(?:\.\d+)?)\s*(?:个|根|块|片|扇|樘)?",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    // 尺寸提取正则 (长x宽x高 或 直径)
+    private static readonly Regex DimensionRegex = new(@"(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(?:[x×]\s*(\d+(?:\.\d+)?))?",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex DiameterRegex = new(@"[ΦφØ]?\s*(\d+(?:\.\d+)?)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    // 构件识别规则 - 静态编译正则提升性能
+    private static readonly Dictionary<string, List<Regex>> ComponentPatterns = new()
     {
         // 混凝土构件
         ["C30混凝土柱"] = new List<Regex>
         {
-            new Regex(@"C30.*柱", RegexOptions.IgnoreCase),
-            new Regex(@"混凝土柱.*C30", RegexOptions.IgnoreCase)
+            new Regex(@"C30.*柱", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"混凝土柱.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
         ["C35混凝土梁"] = new List<Regex>
         {
-            new Regex(@"C35.*梁", RegexOptions.IgnoreCase),
-            new Regex(@"混凝土梁.*C35", RegexOptions.IgnoreCase)
+            new Regex(@"C35.*梁", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"混凝土梁.*C35", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
         ["C30混凝土板"] = new List<Regex>
         {
-            new Regex(@"C30.*板", RegexOptions.IgnoreCase),
-            new Regex(@"混凝土板.*C30", RegexOptions.IgnoreCase)
+            new Regex(@"C30.*板", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"混凝土板.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
         // 钢筋
         ["HRB400钢筋"] = new List<Regex>
         {
-            new Regex(@"HRB400", RegexOptions.IgnoreCase),
-            new Regex(@"Φ\d+.*HRB400", RegexOptions.IgnoreCase)
+            new Regex(@"HRB400", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"Φ\d+.*HRB400", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
         ["HPB300钢筋"] = new List<Regex>
         {
-            new Regex(@"HPB300", RegexOptions.IgnoreCase),
-            new Regex(@"Φ\d+.*HPB300", RegexOptions.IgnoreCase)
+            new Regex(@"HPB300", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"Φ\d+.*HPB300", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
         // 砌体
         ["MU10砖墙"] = new List<Regex>
         {
-            new Regex(@"MU10.*墙", RegexOptions.IgnoreCase),
-            new Regex(@"砖墙.*MU10", RegexOptions.IgnoreCase)
+            new Regex(@"MU10.*墙", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"砖墙.*MU10", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
         ["MU15砌块"] = new List<Regex>
         {
-            new Regex(@"MU15.*砌块", RegexOptions.IgnoreCase)
+            new Regex(@"MU15.*砌块", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
         // 门窗
         ["M1门"] = new List<Regex>
         {
-            new Regex(@"M1", RegexOptions.IgnoreCase),
-            new Regex(@"门.*M1", RegexOptions.IgnoreCase)
+            new Regex(@"M1", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"门.*M1", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
         ["C1窗"] = new List<Regex>
         {
-            new Regex(@"C1", RegexOptions.IgnoreCase),
-            new Regex(@"窗.*C1", RegexOptions.IgnoreCase)
+            new Regex(@"C1", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"窗.*C1", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         }
     };
-
-    // 数量提取正则
-    private readonly Regex _quantityRegex = new Regex(@"(\d+(?:\.\d+)?)\s*(?:个|根|块|片|扇|樘)?", RegexOptions.IgnoreCase);
-
-    // 尺寸提取正则 (长x宽x高 或 直径)
-    private readonly Regex _dimensionRegex = new Regex(@"(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(?:[x×]\s*(\d+(?:\.\d+)?))?", RegexOptions.IgnoreCase);
-    private readonly Regex _diameterRegex = new Regex(@"[ΦφØ]?\s*(\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
 
     public ComponentRecognizer(
         BailianApiClient apiClient,
@@ -136,7 +140,7 @@ public class ComponentRecognizer
     /// </summary>
     private ComponentRecognitionResult? RecognizeByRegex(string text)
     {
-        foreach (var (type, patterns) in _componentPatterns)
+        foreach (var (type, patterns) in ComponentPatterns)
         {
             foreach (var pattern in patterns)
             {
@@ -162,7 +166,7 @@ public class ComponentRecognizer
     private void ExtractQuantityAndDimensions(string text, ComponentRecognitionResult result)
     {
         // 提取数量
-        var quantityMatch = _quantityRegex.Match(text);
+        var quantityMatch = QuantityRegex.Match(text);
         if (quantityMatch.Success)
         {
             if (int.TryParse(quantityMatch.Groups[1].Value, out var quantity))
@@ -173,7 +177,7 @@ public class ComponentRecognizer
         }
 
         // 提取尺寸
-        var dimensionMatch = _dimensionRegex.Match(text);
+        var dimensionMatch = DimensionRegex.Match(text);
         if (dimensionMatch.Success)
         {
             if (double.TryParse(dimensionMatch.Groups[1].Value, out var length))
@@ -195,7 +199,7 @@ public class ComponentRecognizer
         }
 
         // 提取直径（用于钢筋等）
-        var diameterMatch = _diameterRegex.Match(text);
+        var diameterMatch = DiameterRegex.Match(text);
         if (diameterMatch.Success && double.TryParse(diameterMatch.Groups[1].Value, out var diameter))
         {
             result.Diameter = diameter / 1000.0; // 转换为米
