@@ -62,6 +62,7 @@ public partial class App : Application
         services.AddSingleton<AsposeDwgParser>();
         services.AddSingleton<CacheService>();
         services.AddSingleton<TranslationEngine>();
+        services.AddSingleton<DwgTranslationService>();  // 核心翻译服务
         services.AddSingleton<ConfigManager>();
         services.AddSingleton<DocumentService>();
         services.AddSingleton<ComponentRecognizer>();
