@@ -117,7 +117,7 @@ public class AIAssistant
     /// </summary>
     private string BuildSystemPrompt(string context)
     {
-        return $@"你是表哥建筑CAD助手，专门帮助用户处理DWG图纸、翻译和算量任务。
+        return $@"你是CAD翻译算量工具的AI助手，专门帮助用户处理DWG图纸、翻译和算量任务。
 
 当前上下文信息：
 {context}

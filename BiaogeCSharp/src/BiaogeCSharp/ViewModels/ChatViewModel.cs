@@ -46,7 +46,7 @@ public partial class ChatViewModel : ViewModelBase
         Messages.Add(new ChatMessageItem
         {
             Role = "assistant",
-            Content = "你好！我是表哥建筑CAD助手，专门帮助您处理DWG图纸、翻译和算量任务。有什么我可以帮您的吗？",
+            Content = "你好！我是CAD翻译算量工具的AI助手，专门帮助您处理DWG图纸、翻译和算量任务。有什么我可以帮您的吗？",
             Timestamp = DateTime.Now
         });
     }

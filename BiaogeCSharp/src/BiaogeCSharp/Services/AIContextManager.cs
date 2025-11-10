@@ -9,10 +9,12 @@ namespace BiaogeCSharp.Services;
 
 /// <summary>
 /// AI上下文管理器 - 管理图纸、翻译、算量的全局状态
+/// 线程安全的上下文管理
 /// </summary>
 public class AIContextManager
 {
     private readonly ILogger<AIContextManager> _logger;
+    private readonly object _lock = new(); // 线程安全锁
 
     // 上下文数据
     private DwgDocument? _currentDocument;
@@ -26,46 +28,60 @@ public class AIContextManager
     }
 
     /// <summary>
-    /// 设置当前DWG文档
+    /// 设置当前DWG文档（线程安全）
     /// </summary>
     public void SetCurrentDocument(DwgDocument document)
     {
-        _currentDocument = document;
-        _logger.LogInformation("上下文更新: DWG文档 - {FileName}", document.FileName);
+        lock (_lock)
+        {
+            _currentDocument = document;
+            _logger.LogInformation("上下文更新: DWG文档 - {FileName}", document.FileName);
+        }
     }
 
     /// <summary>
-    /// 设置识别结果
+    /// 设置识别结果（线程安全）
     /// </summary>
     public void SetRecognitionResults(List<ComponentRecognitionResult> results)
     {
-        _recognitionResults = results;
-        _logger.LogInformation("上下文更新: 识别结果 - {Count}个构件", results.Count);
+        lock (_lock)
+        {
+            _recognitionResults = results;
+            _logger.LogInformation("上下文更新: 识别结果 - {Count}个构件", results.Count);
+        }
     }
 
     /// <summary>
-    /// 设置翻译数据
+    /// 设置翻译数据（线程安全）
     /// </summary>
     public void SetTranslationData(Dictionary<string, string> translations)
     {
-        _translationData = translations;
-        _logger.LogInformation("上下文更新: 翻译数据 - {Count}条", translations.Count);
+        lock (_lock)
+        {
+            _translationData = translations;
+            _logger.LogInformation("上下文更新: 翻译数据 - {Count}条", translations.Count);
+        }
     }
 
     /// <summary>
-    /// 设置元数据
+    /// 设置元数据（线程安全）
     /// </summary>
     public void SetMetadata(string key, object value)
     {
-        _metadata[key] = value;
+        lock (_lock)
+        {
+            _metadata[key] = value;
+        }
     }
 
     /// <summary>
-    /// 构建上下文信息字符串
+    /// 构建上下文信息字符串（线程安全）
     /// </summary>
     public string BuildContext()
     {
-        var context = new StringBuilder();
+        lock (_lock)
+        {
+            var context = new StringBuilder();
 
         // 图纸上下文
         if (_currentDocument != null)
@@ -75,7 +91,7 @@ public class AIContextManager
             context.AppendLine($"实体数量: {_currentDocument.EntityCount}");
             context.AppendLine($"图层数量: {_currentDocument.Layers.Count}");
 
-            if (_currentDocument.Metadata.Any())
+            if (_currentDocument.Metadata?.Any() == true)
             {
                 context.AppendLine("### 元数据");
                 foreach (var (key, value) in _currentDocument.Metadata)
@@ -142,39 +158,61 @@ public class AIContextManager
             context.AppendLine();
         }
 
-        // 如果没有任何上下文
-        if (context.Length == 0)
-        {
-            context.AppendLine("当前没有加载图纸或数据。");
-        }
+            // 如果没有任何上下文
+            if (context.Length == 0)
+            {
+                context.AppendLine("当前没有加载图纸或数据。");
+            }
 
-        return context.ToString();
+            return context.ToString();
+        } // lock结束
     }
 
     /// <summary>
-    /// 获取当前文档
+    /// 获取当前文档（线程安全）
     /// </summary>
-    public DwgDocument? GetCurrentDocument() => _currentDocument;
+    public DwgDocument? GetCurrentDocument()
+    {
+        lock (_lock)
+        {
+            return _currentDocument;
+        }
+    }
 
     /// <summary>
-    /// 获取识别结果
+    /// 获取识别结果（线程安全）
     /// </summary>
-    public List<ComponentRecognitionResult>? GetRecognitionResults() => _recognitionResults;
+    public List<ComponentRecognitionResult>? GetRecognitionResults()
+    {
+        lock (_lock)
+        {
+            return _recognitionResults;
+        }
+    }
 
     /// <summary>
-    /// 获取翻译数据
+    /// 获取翻译数据（线程安全）
     /// </summary>
-    public Dictionary<string, string>? GetTranslationData() => _translationData;
+    public Dictionary<string, string>? GetTranslationData()
+    {
+        lock (_lock)
+        {
+            return _translationData;
+        }
+    }
 
     /// <summary>
-    /// 清空上下文
+    /// 清空上下文（线程安全）
     /// </summary>
     public void Clear()
     {
-        _currentDocument = null;
-        _recognitionResults = null;
-        _translationData = null;
-        _metadata.Clear();
-        _logger.LogInformation("上下文已清空");
+        lock (_lock)
+        {
+            _currentDocument = null;
+            _recognitionResults = null;
+            _translationData = null;
+            _metadata.Clear();
+            _logger.LogInformation("上下文已清空");
+        }
     }
 }
