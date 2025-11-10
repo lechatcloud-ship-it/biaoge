@@ -20,6 +20,9 @@ public partial class ChatViewModel : ViewModelBase
     private readonly ILogger<ChatViewModel> _logger;
     private CancellationTokenSource? _cancellationTokenSource;
 
+    // 最大消息数量，防止内存无限增长
+    private const int MaxMessageCount = 100;
+
     [ObservableProperty]
     private string _inputText = string.Empty;
 
@@ -80,6 +83,9 @@ public partial class ChatViewModel : ViewModelBase
             IsStreaming = true
         };
         Messages.Add(aiMessage);
+
+        // 限制消息数量，防止内存泄漏（保留欢迎消息）
+        TrimMessages();
 
         IsSending = true;
         IsStreaming = true;
@@ -198,6 +204,27 @@ public partial class ChatViewModel : ViewModelBase
         {
             _logger.LogError(ex, "复制消息失败");
             StatusText = "复制失败";
+        }
+    }
+
+    /// <summary>
+    /// 限制消息数量，防止内存无限增长
+    /// </summary>
+    private void TrimMessages()
+    {
+        if (Messages.Count > MaxMessageCount)
+        {
+            // 保留第一条欢迎消息，删除中间的旧消息
+            var toRemove = Messages.Count - MaxMessageCount;
+            for (int i = 0; i < toRemove; i++)
+            {
+                // 从索引1开始删除（跳过欢迎消息）
+                if (Messages.Count > 1)
+                {
+                    Messages.RemoveAt(1);
+                }
+            }
+            _logger.LogInformation("消息列表已修剪，移除了{Count}条旧消息", toRemove);
         }
     }
 }
