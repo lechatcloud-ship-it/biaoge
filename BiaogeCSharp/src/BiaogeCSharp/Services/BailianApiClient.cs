@@ -61,17 +61,25 @@ public class BailianApiClient
                 _apiKey = Environment.GetEnvironmentVariable("DASHSCOPE_API_KEY");
             }
 
-            // 更新HTTP客户端的Authorization头
-            _httpClient.DefaultRequestHeaders.Remove("Authorization");
             if (!string.IsNullOrEmpty(_apiKey))
             {
-                _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
                 _logger.LogInformation("API密钥已加载");
             }
             else
             {
                 _logger.LogWarning("未找到API密钥，请在设置中配置");
             }
+        }
+    }
+
+    /// <summary>
+    /// 获取当前API密钥（线程安全）
+    /// </summary>
+    private string? GetApiKey()
+    {
+        lock (_apiKeyLock)
+        {
+            return _apiKey;
         }
     }
 
@@ -121,11 +129,18 @@ public class BailianApiClient
                     }
                 };
 
-                var response = await _httpClient.PostAsJsonAsync(
-                    "/api/v1/services/translation/batch-translate",
-                    request,
-                    cancellationToken
-                );
+                // 创建带Authorization头的请求（线程安全）
+                var apiKey = GetApiKey();
+                var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/services/translation/batch-translate")
+                {
+                    Content = JsonContent.Create(request)
+                };
+                if (!string.IsNullOrEmpty(apiKey))
+                {
+                    httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
+                }
+
+                var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -178,11 +193,18 @@ public class BailianApiClient
                 }
             };
 
-            var response = await _httpClient.PostAsJsonAsync(
-                "/api/v1/services/translation/translate",
-                request,
-                cancellationToken
-            );
+            // 创建带Authorization头的请求（线程安全）
+            var apiKey = GetApiKey();
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/services/translation/translate")
+            {
+                Content = JsonContent.Create(request)
+            };
+            if (!string.IsNullOrEmpty(apiKey))
+            {
+                httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
+            }
+
+            var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
@@ -227,11 +249,18 @@ public class BailianApiClient
                 }
             };
 
-            var response = await _httpClient.PostAsJsonAsync(
-                "/api/v1/services/translation/translate",
-                request,
-                cancellationToken
-            );
+            // 创建带Authorization头的请求（线程安全）
+            var apiKey = GetApiKey();
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/services/translation/translate")
+            {
+                Content = JsonContent.Create(request)
+            };
+            if (!string.IsNullOrEmpty(apiKey))
+            {
+                httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
+            }
+
+            var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
 
             return response.IsSuccessStatusCode;
         }
