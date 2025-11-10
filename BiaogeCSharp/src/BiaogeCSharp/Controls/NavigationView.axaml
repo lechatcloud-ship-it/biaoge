@@ -1,5 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:local="using:BiaogeCSharp.Controls"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
@@ -52,6 +54,16 @@
                          BorderThickness="0"
                          SelectionMode="Single"
                          SelectionChanged="OnNavigationSelectionChanged">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="local:NavigationItem">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <materialIcons:MaterialIcon Kind="{Binding IconKind}"
+                                                           Width="20"
+                                                           Height="20"/>
+                                <TextBlock Text="{Binding Text}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
                 </ListBox>
 
                 <!-- 底部导航项 -->
@@ -61,6 +73,16 @@
                          BorderThickness="0"
                          SelectionMode="Single"
                          SelectionChanged="OnNavigationSelectionChanged">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="local:NavigationItem">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <materialIcons:MaterialIcon Kind="{Binding IconKind}"
+                                                           Width="20"
+                                                           Height="20"/>
+                                <TextBlock Text="{Binding Text}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
                 </ListBox>
             </DockPanel>
         </Border>

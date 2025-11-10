@@ -4,6 +4,8 @@ using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Material.Icons;
+using Material.Icons.Avalonia;
 using System;
 
 namespace BiaogeCSharp.Controls;
@@ -15,7 +17,7 @@ namespace BiaogeCSharp.Controls;
 public partial class InfoBar : UserControl
 {
     private Border _rootBorder;
-    private TextBlock _iconTextBlock;
+    private MaterialIcon _iconControl;
     private TextBlock _titleTextBlock;
     private TextBlock _messageTextBlock;
     private Button _closeButton;
@@ -80,7 +82,7 @@ public partial class InfoBar : UserControl
     private void InitializeControls()
     {
         _rootBorder = this.FindControl<Border>("RootBorder")!;
-        _iconTextBlock = this.FindControl<TextBlock>("IconTextBlock")!;
+        _iconControl = this.FindControl<MaterialIcon>("IconControl")!;
         _titleTextBlock = this.FindControl<TextBlock>("TitleTextBlock")!;
         _messageTextBlock = this.FindControl<TextBlock>("MessageTextBlock")!;
         _closeButton = this.FindControl<Button>("CloseButton")!;
@@ -93,21 +95,21 @@ public partial class InfoBar : UserControl
 
     private void UpdateSeverityStyle(InfoBarSeverity severity)
     {
-        var (background, border, foreground, icon) = severity switch
+        var (background, border, foreground, iconKind) = severity switch
         {
-            InfoBarSeverity.Success => ("#0F7B0F", "#107C10", "#FFFFFF", "✓"),
-            InfoBarSeverity.Warning => ("#9D5D00", "#FDE300", "#FFFFFF", "⚠"),
-            InfoBarSeverity.Error => ("#C42B1C", "#E81123", "#FFFFFF", "✕"),
-            _ => ("#005A9E", "#0078D4", "#FFFFFF", "ℹ")
+            InfoBarSeverity.Success => ("#0F7B0F", "#107C10", "#FFFFFF", MaterialIconKind.CheckCircle),
+            InfoBarSeverity.Warning => ("#9D5D00", "#FDE300", "#FFFFFF", MaterialIconKind.Alert),
+            InfoBarSeverity.Error => ("#C42B1C", "#E81123", "#FFFFFF", MaterialIconKind.CloseCircle),
+            _ => ("#005A9E", "#0078D4", "#FFFFFF", MaterialIconKind.Information)
         };
 
         _rootBorder.Background = Brush.Parse(background);
         _rootBorder.BorderBrush = Brush.Parse(border);
-        _iconTextBlock.Foreground = Brush.Parse(foreground);
+        _iconControl.Foreground = Brush.Parse(foreground);
         _titleTextBlock.Foreground = Brush.Parse(foreground);
         _messageTextBlock.Foreground = Brush.Parse(foreground);
         _closeButton.Foreground = Brush.Parse(foreground);
-        _iconTextBlock.Text = icon;
+        _iconControl.Kind = iconKind;
     }
 
     private void StartAutoCloseTimer(int duration)

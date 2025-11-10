@@ -2,6 +2,7 @@ using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
 using BiaogeCSharp.Controls;
 using BiaogeCSharp.ViewModels;
+using Material.Icons;
 using Microsoft.Extensions.DependencyInjection;
 using System;
 
@@ -45,14 +46,14 @@ public partial class MainWindow : Window
         var chatPage = new ChatPage { DataContext = viewModel.ChatViewModel };
 
         // 添加顶部导航项
-        _mainNavigation.AddTopNavigationItem("主页", "■", homePage);
-        _mainNavigation.AddTopNavigationItem("翻译", "▶", translationPage);
-        _mainNavigation.AddTopNavigationItem("算量", "▣", calculationPage);
-        _mainNavigation.AddTopNavigationItem("导出", "▲", exportPage);
-        _mainNavigation.AddTopNavigationItem("AI助手", "●", chatPage);
+        _mainNavigation.AddTopNavigationItem("主页", MaterialIconKind.Home, homePage);
+        _mainNavigation.AddTopNavigationItem("翻译", MaterialIconKind.Translate, translationPage);
+        _mainNavigation.AddTopNavigationItem("算量", MaterialIconKind.Calculator, calculationPage);
+        _mainNavigation.AddTopNavigationItem("导出", MaterialIconKind.Export, exportPage);
+        _mainNavigation.AddTopNavigationItem("AI助手", MaterialIconKind.RobotOutline, chatPage);
 
         // 添加底部导航项
-        // _mainNavigation.AddBottomNavigationItem("设置", "⚙", new SettingsPage());
+        // _mainNavigation.AddBottomNavigationItem("设置", MaterialIconKind.Cog, new SettingsPage());
     }
 
     private async void OnSettingsClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)

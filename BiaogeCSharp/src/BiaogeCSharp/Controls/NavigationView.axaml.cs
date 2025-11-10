@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Material.Icons;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -41,12 +42,12 @@ public partial class NavigationView : UserControl
     /// <summary>
     /// 添加顶部导航项
     /// </summary>
-    public void AddTopNavigationItem(string text, string icon, Control content)
+    public void AddTopNavigationItem(string text, MaterialIconKind iconKind, Control content)
     {
         var item = new NavigationItem
         {
             Text = text,
-            Icon = icon,
+            IconKind = iconKind,
             Content = content
         };
         _topItems.Add(item);
@@ -62,12 +63,12 @@ public partial class NavigationView : UserControl
     /// <summary>
     /// 添加底部导航项
     /// </summary>
-    public void AddBottomNavigationItem(string text, string icon, Control content)
+    public void AddBottomNavigationItem(string text, MaterialIconKind iconKind, Control content)
     {
         var item = new NavigationItem
         {
             Text = text,
-            Icon = icon,
+            IconKind = iconKind,
             Content = content
         };
         _bottomItems.Add(item);
@@ -99,8 +100,6 @@ public partial class NavigationView : UserControl
 public class NavigationItem
 {
     public string Text { get; set; } = string.Empty;
-    public string Icon { get; set; } = string.Empty;
+    public MaterialIconKind IconKind { get; set; } = MaterialIconKind.CircleOutline;
     public Control? Content { get; set; }
-
-    public override string ToString() => $"  {Icon}  {Text}";
 }
