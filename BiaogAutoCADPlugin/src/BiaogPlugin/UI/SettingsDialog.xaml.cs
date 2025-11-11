@@ -39,15 +39,12 @@ namespace BiaogPlugin.UI
                     ApiKeyPasswordBox.Password = apiKey;
                 }
 
-                // 加载翻译模型
-                var translationModel = _configManager.GetString("Bailian:TextTranslationModel", "qwen-mt-plus");
-                var modelItem = TranslationModelComboBox.Items
-                    .Cast<ComboBoxItem>()
-                    .FirstOrDefault(item => item.Tag?.ToString() == translationModel);
-                if (modelItem != null)
-                {
-                    TranslationModelComboBox.SelectedItem = modelItem;
-                }
+                // 加载模型配置
+                LoadModelSelection("Bailian:TextTranslationModel", TranslationModelComboBox, BailianModelSelector.Models.QwenMT);
+                LoadModelSelection("Bailian:ConversationModel", ConversationModelComboBox, BailianModelSelector.Models.QwenPlus);
+                LoadModelSelection("Bailian:DeepThinkingModel", DeepThinkingModelComboBox, BailianModelSelector.Models.QwQMaxPreview);
+                LoadModelSelection("Bailian:RecognitionModel", RecognitionModelComboBox, BailianModelSelector.Models.QwenPlus);
+                LoadModelSelection("Bailian:ToolCallingModel", ToolCallingModelComboBox, BailianModelSelector.Models.Qwen3CoderPlus);
 
                 // 加载翻译设置
                 UseCacheCheckBox.IsChecked = _configManager.GetBool("Translation:UseCache", true);
@@ -72,6 +69,18 @@ namespace BiaogPlugin.UI
             }
         }
 
+        private void LoadModelSelection(string configKey, ComboBox comboBox, string defaultModel)
+        {
+            var selectedModel = _configManager.GetString(configKey, defaultModel);
+            var modelItem = comboBox.Items
+                .Cast<ComboBoxItem>()
+                .FirstOrDefault(item => item.Tag?.ToString() == selectedModel);
+            if (modelItem != null)
+            {
+                comboBox.SelectedItem = modelItem;
+            }
+        }
+
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
             try
@@ -86,12 +95,12 @@ namespace BiaogPlugin.UI
                     _bailianClient.RefreshApiKey();
                 }
 
-                // 保存翻译模型
-                var selectedModel = (TranslationModelComboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString();
-                if (!string.IsNullOrEmpty(selectedModel))
-                {
-                    _configManager.SetConfig("Bailian:TextTranslationModel", selectedModel);
-                }
+                // 保存模型配置
+                SaveModelSelection("Bailian:TextTranslationModel", TranslationModelComboBox);
+                SaveModelSelection("Bailian:ConversationModel", ConversationModelComboBox);
+                SaveModelSelection("Bailian:DeepThinkingModel", DeepThinkingModelComboBox);
+                SaveModelSelection("Bailian:RecognitionModel", RecognitionModelComboBox);
+                SaveModelSelection("Bailian:ToolCallingModel", ToolCallingModelComboBox);
 
                 // 保存翻译设置
                 _configManager.SetConfig("Translation:UseCache", UseCacheCheckBox.IsChecked ?? true);
@@ -99,7 +108,7 @@ namespace BiaogPlugin.UI
                 _configManager.SetConfig("Translation:SkipShortText", SkipShortTextCheckBox.IsChecked ?? true);
 
                 Log.Information("设置已保存");
-                MessageBox.Show("设置保存成功！", "成功",
+                MessageBox.Show("设置保存成功！所有模型配置已更新。", "成功",
                     MessageBoxButton.OK, MessageBoxImage.Information);
 
                 DialogResult = true;
@@ -110,6 +119,16 @@ namespace BiaogPlugin.UI
                 Log.Error(ex, "保存设置失败");
                 MessageBox.Show($"保存设置失败: {ex.Message}", "错误",
                     MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void SaveModelSelection(string configKey, ComboBox comboBox)
+        {
+            var selectedModel = (comboBox.SelectedItem as ComboBoxItem)?.Tag?.ToString();
+            if (!string.IsNullOrEmpty(selectedModel))
+            {
+                _configManager.SetConfig(configKey, selectedModel);
+                Log.Debug($"保存模型配置: {configKey} = {selectedModel}");
             }
         }
 

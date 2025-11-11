@@ -165,10 +165,11 @@ namespace BiaogPlugin
                 ed.WriteMessage("\n");
                 ed.WriteMessage("\n正在分析当前图纸...");
 
-                // 初始化服务
+                // 初始化服务 - 使用统一的Bailian客户端
                 var configManager = ServiceLocator.GetService<ConfigManager>();
+                var bailianClient = ServiceLocator.GetService<BailianApiClient>();
                 var contextManager = new DrawingContextManager();
-                var aiService = new AIAssistantService(configManager!, contextManager);
+                var aiService = new AIAssistantService(bailianClient!, configManager!, contextManager);
 
                 ed.WriteMessage("\n图纸分析完成！您可以问我任何关于这张图纸的问题。");
                 ed.WriteMessage("\n");

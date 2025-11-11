@@ -12,30 +12,27 @@ namespace BiaogPlugin.Services
     /// <summary>
     /// 标哥AI助手服务 - 基于阿里云百炼大模型
     /// 支持流式输出、深度思考、Function Calling
+    /// 使用统一的BailianApiClient，一个API密钥调用所有模型
     /// </summary>
     public class AIAssistantService
     {
-        private readonly string _apiKey;
-        private readonly string _baseUrl;
-        private readonly HttpClient _httpClient;
+        private readonly BailianApiClient _bailianClient;
         private readonly ConfigManager _configManager;
         private readonly DrawingContextManager _contextManager;
 
         // 对话历史
-        private readonly List<ChatMessage> _chatHistory = new();
+        private readonly List<BiaogPlugin.Services.ChatMessage> _chatHistory = new();
 
-        public AIAssistantService(ConfigManager configManager, DrawingContextManager contextManager)
+        public AIAssistantService(
+            BailianApiClient bailianClient,
+            ConfigManager configManager,
+            DrawingContextManager contextManager)
         {
+            _bailianClient = bailianClient;
             _configManager = configManager;
             _contextManager = contextManager;
-            _apiKey = configManager.BailianApiKey;
-            _baseUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1";
 
-            _httpClient = new HttpClient();
-            _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
-            _httpClient.Timeout = TimeSpan.FromMinutes(5);
-
-            Log.Information("AI助手服务初始化完成");
+            Log.Information("AI助手服务初始化完成（使用统一Bailian客户端）");
         }
 
         /// <summary>
@@ -58,120 +55,52 @@ namespace BiaogPlugin.Services
                 var systemPrompt = BuildSystemPrompt(drawingContext);
 
                 // 3. 添加用户消息到历史
-                _chatHistory.Add(new ChatMessage
+                _chatHistory.Add(new BiaogPlugin.Services.ChatMessage
                 {
                     Role = "user",
                     Content = userMessage
                 });
 
-                // 4. 构建请求
-                var requestBody = new
-                {
-                    model = useDeepThinking ? "qwq-max-preview" : "qwen-max",
-                    messages = BuildMessages(systemPrompt),
-                    tools = GetAvailableTools(),
-                    stream = true,
-                    stream_options = new { include_usage = true },
-                    temperature = 0.7,
-                    top_p = 0.9,
-                    thinking_budget = useDeepThinking ? 10000 : (int?)null // 深度思考模式限制token
-                };
+                // 4. 构建消息列表（系统提示 + 历史）
+                var messages = BuildMessages(systemPrompt);
 
-                var jsonContent = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-                });
+                // 5. 选择最优模型
+                var model = useDeepThinking
+                    ? BailianModelSelector.GetOptimalModel(BailianModelSelector.TaskType.DeepThinking)
+                    : BailianModelSelector.GetOptimalModel(BailianModelSelector.TaskType.Conversation, highPerformance: true);
 
-                var request = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/chat/completions")
-                {
-                    Content = new StringContent(jsonContent, Encoding.UTF8, "application/json")
-                };
+                Log.Information($"使用模型: {model} (深度思考: {useDeepThinking})");
 
-                // 5. 发送流式请求
-                var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
-                response.EnsureSuccessStatusCode();
-
-                // 6. 处理流式响应
-                var fullResponse = new StringBuilder();
-                var toolCalls = new List<ToolCall>();
-
-                await using (var stream = await response.Content.ReadAsStreamAsync())
-                {
-                    using (var reader = new System.IO.StreamReader(stream))
-                    {
-                        while (!reader.EndOfStream)
-                        {
-                            var line = await reader.ReadLineAsync();
-                            if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data: "))
-                                continue;
-
-                            var data = line.Substring(6).Trim();
-                            if (data == "[DONE]")
-                                break;
-
-                            try
-                            {
-                                var chunk = JsonSerializer.Deserialize<JsonElement>(data);
-                                var choices = chunk.GetProperty("choices");
-                                if (choices.GetArrayLength() == 0)
-                                    continue;
-
-                                var delta = choices[0].GetProperty("delta");
-
-                                // 处理普通文本内容
-                                if (delta.TryGetProperty("content", out var content))
-                                {
-                                    var text = content.GetString();
-                                    if (!string.IsNullOrEmpty(text))
-                                    {
-                                        fullResponse.Append(text);
-                                        onStreamChunk?.Invoke(text);
-                                    }
-                                }
-
-                                // 处理深度思考内容
-                                if (delta.TryGetProperty("reasoning_content", out var reasoning))
-                                {
-                                    var thinkingText = reasoning.GetString();
-                                    if (!string.IsNullOrEmpty(thinkingText))
-                                    {
-                                        // 深度思考内容以特殊格式显示
-                                        onStreamChunk?.Invoke($"\n[思考中: {thinkingText}]\n");
-                                    }
-                                }
-
-                                // 处理Function Calling
-                                if (delta.TryGetProperty("tool_calls", out var tools))
-                                {
-                                    // 解析工具调用（简化处理）
-                                    Log.Information("AI请求调用工具");
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Log.Warning(ex, $"解析流式响应失败: {data}");
-                            }
-                        }
-                    }
-                }
-
-                var assistantMessage = fullResponse.ToString();
+                // 6. 使用统一客户端调用API - 支持流式输出和深度思考
+                var result = await _bailianClient.ChatCompletionStreamAsync(
+                    messages: messages,
+                    model: model,
+                    tools: GetAvailableTools(),
+                    onStreamChunk: onStreamChunk,
+                    onReasoningChunk: reasoning => onStreamChunk?.Invoke($"\n[思考中: {reasoning}]\n"),
+                    temperature: 0.7,
+                    topP: 0.9,
+                    thinkingBudget: useDeepThinking ? 10000 : null
+                );
 
                 // 7. 添加AI回复到历史
-                _chatHistory.Add(new ChatMessage
+                _chatHistory.Add(new BiaogPlugin.Services.ChatMessage
                 {
                     Role = "assistant",
-                    Content = assistantMessage
+                    Content = result.Content
                 });
 
-                Log.Information($"AI助手回复完成: {assistantMessage.Length} 字符");
+                Log.Information($"AI助手回复完成: {result.Content.Length} 字符, 使用模型: {result.Model}");
 
                 return new AssistantResponse
                 {
                     Success = true,
-                    Message = assistantMessage,
-                    ToolCalls = toolCalls
+                    Message = result.Content,
+                    ToolCalls = result.ToolCalls.Select(tc => new AssistantToolCall
+                    {
+                        Name = tc.Name,
+                        Arguments = tc.Arguments
+                    }).ToList()
                 };
             }
             catch (Exception ex)
@@ -225,19 +154,16 @@ namespace BiaogPlugin.Services
         /// <summary>
         /// 构建消息列表
         /// </summary>
-        private List<object> BuildMessages(string systemPrompt)
+        private List<BiaogPlugin.Services.ChatMessage> BuildMessages(string systemPrompt)
         {
-            var messages = new List<object>
+            var messages = new List<BiaogPlugin.Services.ChatMessage>
             {
-                new { role = "system", content = systemPrompt }
+                new BiaogPlugin.Services.ChatMessage { Role = "system", Content = systemPrompt }
             };
 
             // 只保留最近10轮对话
             var recentHistory = _chatHistory.TakeLast(20).ToList();
-            foreach (var msg in recentHistory)
-            {
-                messages.Add(new { role = msg.Role, content = msg.Content });
-            }
+            messages.AddRange(recentHistory);
 
             return messages;
         }
@@ -333,19 +259,10 @@ namespace BiaogPlugin.Services
         /// <summary>
         /// 获取对话历史
         /// </summary>
-        public List<ChatMessage> GetHistory()
+        public List<BiaogPlugin.Services.ChatMessage> GetHistory()
         {
             return _chatHistory.ToList();
         }
-    }
-
-    /// <summary>
-    /// 聊天消息
-    /// </summary>
-    public class ChatMessage
-    {
-        public string Role { get; set; } = ""; // "user", "assistant", "system"
-        public string Content { get; set; } = "";
     }
 
     /// <summary>
@@ -355,14 +272,14 @@ namespace BiaogPlugin.Services
     {
         public bool Success { get; set; }
         public string Message { get; set; } = "";
-        public List<ToolCall> ToolCalls { get; set; } = new();
+        public List<AssistantToolCall> ToolCalls { get; set; } = new();
         public string? Error { get; set; }
     }
 
     /// <summary>
-    /// 工具调用
+    /// 助手工具调用（用于UI显示）
     /// </summary>
-    public class ToolCall
+    public class AssistantToolCall
     {
         public string Name { get; set; } = "";
         public Dictionary<string, object> Arguments { get; set; } = new();
