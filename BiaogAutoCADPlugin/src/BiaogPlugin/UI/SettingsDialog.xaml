@@ -16,21 +16,66 @@
                                FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
 
                     <TextBlock Text="API密钥:" Foreground="#CCCCCC" Margin="0,0,0,5"/>
-                    <TextBox x:Name="ApiKeyTextBox" Height="30" Margin="0,0,0,15"/>
+                    <PasswordBox x:Name="ApiKeyPasswordBox" Height="30" Margin="0,0,0,10"/>
 
-                    <Button Content="测试连接" Width="120" Height="35"
-                            HorizontalAlignment="Left"/>
+                    <TextBlock Text="翻译模型:" Foreground="#CCCCCC" Margin="0,10,0,5"/>
+                    <ComboBox x:Name="TranslationModelComboBox" Height="30" Margin="0,0,0,15">
+                        <ComboBoxItem Content="qwen-mt-plus (推荐)" Tag="qwen-mt-plus" IsSelected="True"/>
+                        <ComboBoxItem Content="qwen-mt-turbo (快速)" Tag="qwen-mt-turbo"/>
+                        <ComboBoxItem Content="qwen-plus (高质量)" Tag="qwen-plus"/>
+                        <ComboBoxItem Content="qwen-max (最佳质量)" Tag="qwen-max"/>
+                    </ComboBox>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button x:Name="TestConnectionButton" Content="测试连接" Width="120" Height="35"
+                                Click="TestConnectionButton_Click"
+                                Background="#0078D4" Foreground="White" BorderThickness="0"/>
+                        <TextBlock x:Name="TestResultText" VerticalAlignment="Center"
+                                   Margin="15,0,0,0" Foreground="#CCCCCC"/>
+                    </StackPanel>
                 </StackPanel>
             </TabItem>
 
             <TabItem Header="翻译设置">
                 <StackPanel Margin="15">
-                    <TextBlock Text="翻译设置" FontSize="16" FontWeight="Bold"
+                    <TextBlock Text="翻译选项" FontSize="16" FontWeight="Bold"
                                Foreground="White" Margin="0,0,0,15"/>
-                    <CheckBox Content="启用缓存" IsChecked="True"
-                              Foreground="#CCCCCC" Margin="0,0,0,10"/>
-                    <CheckBox Content="跳过纯数字" IsChecked="True"
-                              Foreground="#CCCCCC"/>
+
+                    <CheckBox x:Name="UseCacheCheckBox" Content="启用翻译缓存（推荐）"
+                              IsChecked="True" Foreground="#CCCCCC" Margin="0,0,0,10"/>
+                    <TextBlock Text="缓存可大幅提高翻译速度并降低API成本"
+                               Foreground="#888" FontSize="11" Margin="20,0,0,15"/>
+
+                    <CheckBox x:Name="SkipNumbersCheckBox" Content="跳过纯数字文本"
+                              IsChecked="True" Foreground="#CCCCCC" Margin="0,0,0,10"/>
+                    <TextBlock Text="跳过尺寸标注、数字等不需要翻译的内容"
+                               Foreground="#888" FontSize="11" Margin="20,0,0,15"/>
+
+                    <CheckBox x:Name="SkipShortTextCheckBox" Content="跳过短文本（少于2字符）"
+                              IsChecked="True" Foreground="#CCCCCC" Margin="0,0,0,10"/>
+                </StackPanel>
+            </TabItem>
+
+            <TabItem Header="关于">
+                <StackPanel Margin="15" VerticalAlignment="Center">
+                    <TextBlock Text="表哥 - AutoCAD翻译插件" FontSize="18"
+                               FontWeight="Bold" Foreground="White"
+                               HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                    <TextBlock Text="版本 1.0.0" FontSize="14" Foreground="#CCCCCC"
+                               HorizontalAlignment="Center" Margin="0,0,0,20"/>
+
+                    <TextBlock Text="基于AutoCAD .NET API开发" Foreground="#CCCCCC"
+                               HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                    <TextBlock Text="100%准确的DWG文件处理" Foreground="#CCCCCC"
+                               HorizontalAlignment="Center" Margin="0,0,0,5"/>
+                    <TextBlock Text="阿里云百炼AI翻译引擎" Foreground="#CCCCCC"
+                               HorizontalAlignment="Center" Margin="0,0,0,20"/>
+
+                    <TextBlock Text="配置文件位置:" Foreground="#CCCCCC"
+                               HorizontalAlignment="Center" Margin="0,10,0,5"/>
+                    <TextBlock x:Name="ConfigPathText" Foreground="#888" FontSize="11"
+                               HorizontalAlignment="Center" TextWrapping="Wrap"
+                               MaxWidth="500"/>
                 </StackPanel>
             </TabItem>
         </TabControl>

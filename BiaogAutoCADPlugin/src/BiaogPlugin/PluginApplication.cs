@@ -26,6 +26,9 @@ namespace BiaogPlugin
 
                 Log.Information("表哥 - AutoCAD翻译插件正在初始化...");
 
+                // 初始化服务
+                InitializeServices();
+
                 // 获取当前文档
                 var doc = Application.DocumentManager.MdiActiveDocument;
                 if (doc != null)
@@ -120,6 +123,56 @@ namespace BiaogPlugin
                 )
                 .WriteTo.Console()
                 .CreateLogger();
+        }
+
+        /// <summary>
+        /// 初始化所有服务并注册到ServiceLocator
+        /// </summary>
+        private void InitializeServices()
+        {
+            Log.Information("初始化服务...");
+
+            try
+            {
+                // 1. 配置管理器
+                var configManager = new Services.ConfigManager();
+                Services.ServiceLocator.RegisterService(configManager);
+                Log.Debug("ConfigManager已注册");
+
+                // 2. 缓存服务
+                var cacheService = new Services.CacheService();
+                Services.ServiceLocator.RegisterService(cacheService);
+                Log.Debug("CacheService已注册");
+
+                // 3. HTTP客户端
+                var httpClient = new System.Net.Http.HttpClient();
+                httpClient.Timeout = TimeSpan.FromSeconds(60);
+                Services.ServiceLocator.RegisterService(httpClient);
+                Log.Debug("HttpClient已注册");
+
+                // 4. 百炼API客户端
+                var bailianClient = new Services.BailianApiClient(httpClient, configManager);
+                Services.ServiceLocator.RegisterService(bailianClient);
+                Log.Debug("BailianApiClient已注册");
+
+                // 5. 翻译引擎
+                var translationEngine = new Services.TranslationEngine(bailianClient, cacheService);
+                Services.ServiceLocator.RegisterService(translationEngine);
+                Log.Debug("TranslationEngine已注册");
+
+                Log.Information("所有服务初始化完成");
+
+                // 检查API密钥配置
+                if (!bailianClient.HasApiKey)
+                {
+                    Log.Warning("未配置百炼API密钥，请使用BIAOGE_SETTINGS命令配置");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "服务初始化失败");
+                throw;
+            }
         }
     }
 }

@@ -228,7 +228,7 @@ namespace BiaogPlugin
         /// 清除翻译缓存
         /// </summary>
         [CommandMethod("BIAOGE_CLEARCACHE", CommandFlags.Modal)]
-        public void ClearCache()
+        public async void ClearCache()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
             var ed = doc.Editor;
@@ -252,7 +252,10 @@ namespace BiaogPlugin
 
                 // 清除缓存
                 var cacheService = ServiceLocator.GetService<CacheService>();
-                cacheService?.ClearAll();
+                if (cacheService != null)
+                {
+                    await cacheService.ClearCacheAsync();
+                }
 
                 ed.WriteMessage("\n缓存已清除。");
                 Log.Information("用户清除了翻译缓存");
