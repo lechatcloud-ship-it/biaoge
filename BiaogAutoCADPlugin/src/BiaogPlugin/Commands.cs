@@ -43,12 +43,236 @@ namespace BiaogPlugin
         }
 
         /// <summary>
+        /// 快速翻译命令（直接翻译为简体中文）- 最常用
+        /// </summary>
+        [CommandMethod("BIAOGE_TRANSLATE_ZH", CommandFlags.Modal)]
+        public async void QuickTranslateToChinese()
+        {
+            await QuickTranslate("zh", "简体中文");
+        }
+
+        /// <summary>
         /// 快速翻译命令（直接翻译为英语）
         /// </summary>
         [CommandMethod("BIAOGE_TRANSLATE_EN", CommandFlags.Modal)]
         public async void QuickTranslateToEnglish()
         {
             await QuickTranslate("en", "英语");
+        }
+
+        /// <summary>
+        /// 框选翻译命令 - 仅翻译用户选中的文本实体
+        /// </summary>
+        [CommandMethod("BIAOGE_TRANSLATE_SELECTED", CommandFlags.Modal)]
+        public async void TranslateSelected()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+            var db = doc.Database;
+
+            try
+            {
+                Log.Information("执行框选翻译命令");
+
+                // 提示用户选择文本实体
+                ed.WriteMessage("\n请选择要翻译的文本实体...");
+
+                var selectionOptions = new PromptSelectionOptions
+                {
+                    MessageForAdding = "\n请选择文本实体: "
+                };
+
+                // 创建过滤器：只选择文本实体（DBText, MText, AttributeReference）
+                var filterList = new TypedValue[]
+                {
+                    new TypedValue((int)DxfCode.Operator, "<or"),
+                    new TypedValue((int)DxfCode.Start, "TEXT"),
+                    new TypedValue((int)DxfCode.Start, "MTEXT"),
+                    new TypedValue((int)DxfCode.Start, "ATTRIB"),
+                    new TypedValue((int)DxfCode.Operator, "or>")
+                };
+                var filter = new SelectionFilter(filterList);
+
+                var selectionResult = ed.GetSelection(selectionOptions, filter);
+
+                if (selectionResult.Status != PromptStatus.OK)
+                {
+                    ed.WriteMessage("\n操作已取消。");
+                    return;
+                }
+
+                var selectedIds = selectionResult.Value.GetObjectIds();
+                if (selectedIds.Length == 0)
+                {
+                    ed.WriteMessage("\n未选择任何文本实体。");
+                    return;
+                }
+
+                ed.WriteMessage($"\n已选择 {selectedIds.Length} 个文本实体");
+
+                // 提示用户选择目标语言（默认中文）
+                var languageOptions = new PromptKeywordOptions("\n选择目标语言")
+                {
+                    Keywords = { "中文", "英语", "日语", "韩语", "法语", "西班牙语", "德语", "俄语" },
+                    AllowNone = false
+                };
+                languageOptions.Keywords.Default = "中文";  // 默认中文，符合中国设计师习惯
+
+                var languageResult = ed.GetKeywords(languageOptions);
+                if (languageResult.Status != PromptStatus.OK)
+                {
+                    ed.WriteMessage("\n操作已取消。");
+                    return;
+                }
+
+                // 语言映射
+                var languageMap = new Dictionary<string, (string code, string name)>
+                {
+                    ["中文"] = ("zh", "简体中文"),
+                    ["英语"] = ("en", "英语"),
+                    ["日语"] = ("ja", "日语"),
+                    ["韩语"] = ("ko", "韩语"),
+                    ["法语"] = ("fr", "法语"),
+                    ["西班牙语"] = ("es", "西班牙语"),
+                    ["德语"] = ("de", "德语"),
+                    ["俄语"] = ("ru", "俄语")
+                };
+
+                var selectedLanguage = languageResult.StringResult;
+                var (targetLanguage, languageName) = languageMap[selectedLanguage];
+
+                ed.WriteMessage($"\n开始翻译为{languageName}...");
+
+                // 提取选中文本实体的内容
+                var textEntities = new List<DwgTextEntity>();
+                using (var tr = db.TransactionManager.StartTransaction())
+                {
+                    foreach (var objId in selectedIds)
+                    {
+                        var obj = tr.GetObject(objId, Autodesk.AutoCAD.DatabaseServices.OpenMode.ForRead);
+
+                        DwgTextEntity? textEntity = null;
+
+                        if (obj is Autodesk.AutoCAD.DatabaseServices.DBText dbText)
+                        {
+                            textEntity = new DwgTextEntity
+                            {
+                                ObjectId = objId,
+                                Content = dbText.TextString,
+                                Type = "DBText",
+                                Layer = dbText.Layer,
+                                Position = new System.Numerics.Vector3(
+                                    (float)dbText.Position.X,
+                                    (float)dbText.Position.Y,
+                                    (float)dbText.Position.Z
+                                )
+                            };
+                        }
+                        else if (obj is Autodesk.AutoCAD.DatabaseServices.MText mText)
+                        {
+                            textEntity = new DwgTextEntity
+                            {
+                                ObjectId = objId,
+                                Content = mText.Text,
+                                Type = "MText",
+                                Layer = mText.Layer,
+                                Position = new System.Numerics.Vector3(
+                                    (float)mText.Location.X,
+                                    (float)mText.Location.Y,
+                                    (float)mText.Location.Z
+                                )
+                            };
+                        }
+                        else if (obj is Autodesk.AutoCAD.DatabaseServices.AttributeReference attRef)
+                        {
+                            textEntity = new DwgTextEntity
+                            {
+                                ObjectId = objId,
+                                Content = attRef.TextString,
+                                Type = "AttributeReference",
+                                Layer = attRef.Layer,
+                                Position = new System.Numerics.Vector3(
+                                    (float)attRef.Position.X,
+                                    (float)attRef.Position.Y,
+                                    (float)attRef.Position.Z
+                                )
+                            };
+                        }
+
+                        if (textEntity != null && !string.IsNullOrWhiteSpace(textEntity.Content))
+                        {
+                            textEntities.Add(textEntity);
+                        }
+                    }
+
+                    tr.Commit();
+                }
+
+                if (textEntities.Count == 0)
+                {
+                    ed.WriteMessage("\n选中的文本实体为空或无效。");
+                    return;
+                }
+
+                ed.WriteMessage($"\n提取到 {textEntities.Count} 个有效文本");
+
+                // 翻译文本
+                var bailianClient = ServiceLocator.GetService<BailianApiClient>();
+                var configManager = ServiceLocator.GetService<ConfigManager>();
+                var cacheService = ServiceLocator.GetService<CacheService>();
+
+                var engine = new TranslationEngine(bailianClient!, configManager!, cacheService!);
+
+                int translatedCount = 0;
+                int skippedCount = 0;
+
+                var progress = new Progress<TranslationProgress>(p =>
+                {
+                    ed.WriteMessage($"\r{p.Stage}: {p.Percentage}%    ");
+                });
+
+                var translations = await engine.TranslateBatchWithCacheAsync(
+                    textEntities.Select(t => t.Content).ToList(),
+                    "auto",
+                    targetLanguage,
+                    progress
+                );
+
+                ed.WriteMessage("\n更新DWG文件...");
+
+                // 更新DWG文本
+                var updater = new DwgTextUpdater();
+                var updateMap = new Dictionary<Autodesk.AutoCAD.DatabaseServices.ObjectId, string>();
+
+                for (int i = 0; i < textEntities.Count; i++)
+                {
+                    if (i < translations.Count && !string.IsNullOrEmpty(translations[i]))
+                    {
+                        updateMap[textEntities[i].ObjectId] = translations[i];
+                        translatedCount++;
+                    }
+                    else
+                    {
+                        skippedCount++;
+                    }
+                }
+
+                updater.UpdateTexts(updateMap);
+
+                ed.WriteMessage($"\n\n框选翻译完成！");
+                ed.WriteMessage($"\n  已翻译: {translatedCount} 个文本");
+                if (skippedCount > 0)
+                {
+                    ed.WriteMessage($"\n  已跳过: {skippedCount} 个文本（空或无变化）");
+                }
+
+                Log.Information($"框选翻译完成: {translatedCount}/{textEntities.Count}");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "框选翻译失败");
+                ed.WriteMessage($"\n[错误] 框选翻译失败: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -160,8 +384,14 @@ namespace BiaogPlugin
                 Log.Information("启动AI助手");
 
                 ed.WriteMessage("\n╔══════════════════════════════════════════════════════════╗");
-                ed.WriteMessage("\n║  标哥AI助手 - 基于阿里云百炼大模型                    ║");
+                ed.WriteMessage("\n║  标哥AI助手 - 智能Agent架构（qwen3-max-preview）      ║");
                 ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝");
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n正在初始化Agent系统...");
+                ed.WriteMessage("\n  ✓ 核心Agent: qwen3-max-preview（思考模式融合）");
+                ed.WriteMessage("\n  ✓ 翻译工具: qwen-mt-flash（92语言，术语定制）");
+                ed.WriteMessage("\n  ✓ 代码工具: qwen3-coder-flash（仓库级别理解）");
+                ed.WriteMessage("\n  ✓ 视觉工具: qwen3-vl-flash（空间感知+2D/3D定位）");
                 ed.WriteMessage("\n");
                 ed.WriteMessage("\n正在分析当前图纸...");
 
@@ -171,13 +401,13 @@ namespace BiaogPlugin
                 var contextManager = new DrawingContextManager();
                 var aiService = new AIAssistantService(bailianClient!, configManager!, contextManager);
 
-                ed.WriteMessage("\n图纸分析完成！您可以问我任何关于这张图纸的问题。");
+                ed.WriteMessage("\n图纸分析完成！Agent已就绪，可智能调用专用模型完成任务。");
                 ed.WriteMessage("\n");
-                ed.WriteMessage("\n示例问题：");
-                ed.WriteMessage("\n  - 这张图纸有哪些图层？");
-                ed.WriteMessage("\n  - 统计一下文本实体的数量");
-                ed.WriteMessage("\n  - 帮我找到所有的梁构件");
-                ed.WriteMessage("\n  - 将图层0改名为结构层");
+                ed.WriteMessage("\n示例任务：");
+                ed.WriteMessage("\n  - 帮我翻译图纸中的\"外墙\"为英文（自动调用qwen-mt-flash）");
+                ed.WriteMessage("\n  - 将所有的\"C30\"修改为\"C35\"（自动调用qwen3-coder-flash）");
+                ed.WriteMessage("\n  - 识别图纸中的梁构件（自动调用qwen3-vl-flash）");
+                ed.WriteMessage("\n  - 这张图纸有哪些图层？（直接查询图纸上下文）");
                 ed.WriteMessage("\n");
                 ed.WriteMessage("\n输入 'exit' 退出，输入 'clear' 清除历史，输入 'deep' 启用深度思考");
                 ed.WriteMessage("\n" + new string('─', 60));
@@ -245,6 +475,133 @@ namespace BiaogPlugin
 
         #endregion
 
+        #region 快捷键管理命令
+
+        /// <summary>
+        /// 显示快捷键配置指南
+        /// </summary>
+        [CommandMethod("BIAOGE_KEYS", CommandFlags.Modal)]
+        public void ShowKeybindings()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                var guide = KeybindingsManager.GetKeybindingsGuide();
+                ed.WriteMessage("\n" + guide);
+
+                Log.Information("显示快捷键配置指南");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "显示快捷键指南失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 导出快捷键配置到桌面
+        /// </summary>
+        [CommandMethod("BIAOGE_EXPORT_KEYS", CommandFlags.Modal)]
+        public void ExportKeybindings()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                ed.WriteMessage("\n正在生成快捷键配置文件...");
+
+                var filePath = KeybindingsManager.SavePgpConfigToDesktop();
+
+                ed.WriteMessage($"\n\n快捷键配置已导出到:");
+                ed.WriteMessage($"\n  {filePath}");
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n【下一步】");
+                ed.WriteMessage("\n  1. 打开桌面上的 .pgp 文件");
+                ed.WriteMessage("\n  2. 复制内容到您的 acad.pgp 文件");
+                ed.WriteMessage("\n  3. 在AutoCAD中输入 REINIT 命令重新加载");
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n提示: 运行 BIAOGE_INSTALL_KEYS 可自动安装");
+
+                // 打开文件夹
+                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{filePath}\"");
+
+                Log.Information($"快捷键配置已导出: {filePath}");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "导出快捷键配置失败");
+                ed.WriteMessage($"\n[错误] 导出失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 自动安装快捷键到acad.pgp
+        /// </summary>
+        [CommandMethod("BIAOGE_INSTALL_KEYS", CommandFlags.Modal)]
+        public void InstallKeybindings()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                ed.WriteMessage("\n准备安装快捷键配置...");
+
+                // 提示用户确认
+                var options = new PromptKeywordOptions("\n是否自动安装快捷键到 acad.pgp? (会自动备份原文件) [是(Y)/否(N)]")
+                {
+                    Keywords = { "Y", "N" },
+                    AllowNone = false
+                };
+                options.Keywords.Default = "Y";
+
+                var result = ed.GetKeywords(options);
+                if (result.Status != PromptStatus.OK || result.StringResult != "Y")
+                {
+                    ed.WriteMessage("\n操作已取消。");
+                    return;
+                }
+
+                // 尝试自动安装
+                bool success = KeybindingsManager.TryInstallKeybindings(out string message);
+
+                if (success)
+                {
+                    ed.WriteMessage("\n\n✓ 快捷键安装成功！");
+                    ed.WriteMessage($"\n{message}");
+                    ed.WriteMessage("\n");
+                    ed.WriteMessage("\n【重新加载PGP文件】");
+                    ed.WriteMessage("\n  请在命令行输入: REINIT");
+                    ed.WriteMessage("\n  然后选择 'PGP file'，点击确定");
+                    ed.WriteMessage("\n  或者重启AutoCAD");
+                    ed.WriteMessage("\n");
+                    ed.WriteMessage("\n运行 BIAOGE_KEYS 查看所有快捷键");
+
+                    Log.Information("快捷键自动安装成功");
+                }
+                else
+                {
+                    ed.WriteMessage("\n\n✗ 自动安装失败");
+                    ed.WriteMessage($"\n{message}");
+                    ed.WriteMessage("\n");
+                    ed.WriteMessage("\n建议运行 BIAOGE_EXPORT_KEYS 手动安装");
+
+                    Log.Warning($"快捷键自动安装失败: {message}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "安装快捷键失败");
+                ed.WriteMessage($"\n[错误] 安装失败: {ex.Message}");
+                ed.WriteMessage("\n建议运行 BIAOGE_EXPORT_KEYS 手动安装");
+            }
+        }
+
+        #endregion
+
         #region 帮助和工具命令
 
         /// <summary>
@@ -261,8 +618,10 @@ namespace BiaogPlugin
             ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝");
             ed.WriteMessage("\n");
             ed.WriteMessage("\n【翻译功能】");
-            ed.WriteMessage("\n  BIAOGE_TRANSLATE      - 打开翻译面板");
-            ed.WriteMessage("\n  BIAOGE_TRANSLATE_EN   - 快速翻译为英语");
+            ed.WriteMessage("\n  BIAOGE_TRANSLATE           - 打开翻译面板（全图翻译）");
+            ed.WriteMessage("\n  BIAOGE_TRANSLATE_SELECTED  - 框选翻译（仅翻译选中文本）");
+            ed.WriteMessage("\n  BIAOGE_TRANSLATE_ZH        - 快速翻译为中文（推荐）");
+            ed.WriteMessage("\n  BIAOGE_TRANSLATE_EN        - 快速翻译为英语");
             ed.WriteMessage("\n");
             ed.WriteMessage("\n【算量功能】");
             ed.WriteMessage("\n  BIAOGE_CALCULATE      - 打开算量面板");
@@ -270,8 +629,10 @@ namespace BiaogPlugin
             ed.WriteMessage("\n  BIAOGE_QUICKCOUNT     - 快速统计构件数量");
             ed.WriteMessage("\n");
             ed.WriteMessage("\n【AI助手】");
-            ed.WriteMessage("\n  BIAOGE_AI             - 启动标哥AI助手（图纸问答+修改）");
-            ed.WriteMessage("\n                          支持深度思考、流式输出");
+            ed.WriteMessage("\n  BIAOGE_AI             - 启动标哥AI助手（智能Agent架构）");
+            ed.WriteMessage("\n                          核心: qwen3-max-preview（思考模式融合）");
+            ed.WriteMessage("\n                          智能调用: 翻译/代码/视觉专用模型");
+            ed.WriteMessage("\n                          支持: 深度思考、流式输出、工具调用");
             ed.WriteMessage("\n");
             ed.WriteMessage("\n【设置】");
             ed.WriteMessage("\n  BIAOGE_SETTINGS       - 打开设置对话框");
@@ -320,8 +681,9 @@ namespace BiaogPlugin
             ShowVersion();
 
             ed.WriteMessage("\n【核心功能】");
-            ed.WriteMessage("\n  ✓ AI智能翻译 (8种语言)");
-            ed.WriteMessage("\n  ✓ 构件识别算量 (超高精度)");
+            ed.WriteMessage("\n  ✓ 标哥AI助手 (Agent架构，智能调度专用模型)");
+            ed.WriteMessage("\n  ✓ AI智能翻译 (qwen-mt-flash，92语言)");
+            ed.WriteMessage("\n  ✓ 构件识别算量 (qwen3-vl-flash，超高精度)");
             ed.WriteMessage("\n  ✓ 多格式导出 (Excel/PDF)");
             ed.WriteMessage("\n  ✓ 智能缓存 (90%+命中率)");
             ed.WriteMessage("\n");

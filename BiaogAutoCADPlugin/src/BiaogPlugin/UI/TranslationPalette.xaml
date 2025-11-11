@@ -19,7 +19,8 @@
                                Foreground="White" Margin="0,0,0,10"/>
                     <ComboBox x:Name="LanguageComboBox" Height="36" Margin="0,0,0,0"
                               FontSize="13">
-                        <ComboBoxItem Content="英语 (English)" Tag="en" IsSelected="True"/>
+                        <ComboBoxItem Content="简体中文 (简体中文)" Tag="zh" IsSelected="True"/>
+                        <ComboBoxItem Content="英语 (English)" Tag="en"/>
                         <ComboBoxItem Content="日语 (日本語)" Tag="ja"/>
                         <ComboBoxItem Content="韩语 (한국어)" Tag="ko"/>
                         <ComboBoxItem Content="法语 (Français)" Tag="fr"/>
