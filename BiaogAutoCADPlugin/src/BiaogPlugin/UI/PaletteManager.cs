@@ -46,7 +46,7 @@ namespace BiaogPlugin.UI
         {
             if (_translationPaletteSet == null)
             {
-                _translationPaletteSet = new PaletteSet("表哥 - 翻译工具")
+                _translationPaletteSet = new PaletteSet("标哥 - 翻译工具")
                 {
                     Size = new System.Drawing.Size(380, 700),
                     MinimumSize = new System.Drawing.Size(350, 500),
@@ -115,7 +115,7 @@ namespace BiaogPlugin.UI
         {
             if (_calculationPaletteSet == null)
             {
-                _calculationPaletteSet = new PaletteSet("表哥 - 构件识别算量")
+                _calculationPaletteSet = new PaletteSet("标哥 - 构件识别算量")
                 {
                     Size = new System.Drawing.Size(400, 700),
                     MinimumSize = new System.Drawing.Size(350, 500),

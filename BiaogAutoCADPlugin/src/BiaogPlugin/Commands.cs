@@ -11,7 +11,7 @@ using BiaogPlugin.UI;
 namespace BiaogPlugin
 {
     /// <summary>
-    /// 表哥插件的AutoCAD命令集
+    /// 标哥插件的AutoCAD命令集
     /// </summary>
     public class Commands
     {
@@ -144,6 +144,106 @@ namespace BiaogPlugin
 
         #endregion
 
+        #region AI助手命令
+
+        /// <summary>
+        /// 启动标哥AI助手 - 支持图纸问答和修改
+        /// </summary>
+        [CommandMethod("BIAOGE_AI", CommandFlags.Modal)]
+        public async void StartAIAssistant()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                Log.Information("启动AI助手");
+
+                ed.WriteMessage("\n╔══════════════════════════════════════════════════════════╗");
+                ed.WriteMessage("\n║  标哥AI助手 - 基于阿里云百炼大模型                    ║");
+                ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝");
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n正在分析当前图纸...");
+
+                // 初始化服务
+                var configManager = ServiceLocator.GetService<ConfigManager>();
+                var contextManager = new DrawingContextManager();
+                var aiService = new AIAssistantService(configManager!, contextManager);
+
+                ed.WriteMessage("\n图纸分析完成！您可以问我任何关于这张图纸的问题。");
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n示例问题：");
+                ed.WriteMessage("\n  - 这张图纸有哪些图层？");
+                ed.WriteMessage("\n  - 统计一下文本实体的数量");
+                ed.WriteMessage("\n  - 帮我找到所有的梁构件");
+                ed.WriteMessage("\n  - 将图层0改名为结构层");
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n输入 'exit' 退出，输入 'clear' 清除历史，输入 'deep' 启用深度思考");
+                ed.WriteMessage("\n" + new string('─', 60));
+
+                bool deepThinking = false;
+
+                // 对话循环
+                while (true)
+                {
+                    ed.WriteMessage("\n\n您: ");
+                    var userInput = await Task.Run(() =>
+                    {
+                        var result = ed.GetString(new PromptStringOptions(""));
+                        return result.Status == PromptStatus.OK ? result.StringResult : null;
+                    });
+
+                    if (string.IsNullOrWhiteSpace(userInput))
+                        continue;
+
+                    // 处理命令
+                    if (userInput.ToLower() == "exit")
+                    {
+                        ed.WriteMessage("\n再见！感谢使用标哥AI助手。");
+                        break;
+                    }
+                    else if (userInput.ToLower() == "clear")
+                    {
+                        aiService.ClearHistory();
+                        ed.WriteMessage("\n对话历史已清除。");
+                        continue;
+                    }
+                    else if (userInput.ToLower() == "deep")
+                    {
+                        deepThinking = !deepThinking;
+                        ed.WriteMessage($"\n深度思考模式: {(deepThinking ? "已启用 🧠" : "已关闭")}");
+                        continue;
+                    }
+
+                    // AI回复
+                    ed.WriteMessage("\n\n标哥AI: ");
+
+                    var response = await aiService.ChatStreamAsync(
+                        userInput,
+                        deepThinking,
+                        chunk => ed.WriteMessage(chunk) // 流式输出到命令行
+                    );
+
+                    if (!response.Success)
+                    {
+                        ed.WriteMessage($"\n[错误] {response.Error}");
+                    }
+
+                    ed.WriteMessage("\n" + new string('─', 60));
+                }
+
+                Log.Information("AI助手会话结束");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "AI助手启动失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+                ed.WriteMessage("\n请确保已在设置中配置百炼API密钥（BIAOGE_SETTINGS）");
+            }
+        }
+
+        #endregion
+
         #region 帮助和工具命令
 
         /// <summary>
@@ -156,7 +256,7 @@ namespace BiaogPlugin
             var ed = doc.Editor;
 
             ed.WriteMessage("\n╔══════════════════════════════════════════════════════════╗");
-            ed.WriteMessage("\n║  表哥 - 建筑工程CAD翻译工具 v1.0 - 帮助                ║");
+            ed.WriteMessage("\n║  标哥 - 建筑工程CAD翻译工具 v1.0 - 帮助                ║");
             ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝");
             ed.WriteMessage("\n");
             ed.WriteMessage("\n【翻译功能】");
@@ -165,6 +265,12 @@ namespace BiaogPlugin
             ed.WriteMessage("\n");
             ed.WriteMessage("\n【算量功能】");
             ed.WriteMessage("\n  BIAOGE_CALCULATE      - 打开算量面板");
+            ed.WriteMessage("\n  BIAOGE_EXPORTEXCEL    - 快速导出Excel清单");
+            ed.WriteMessage("\n  BIAOGE_QUICKCOUNT     - 快速统计构件数量");
+            ed.WriteMessage("\n");
+            ed.WriteMessage("\n【AI助手】");
+            ed.WriteMessage("\n  BIAOGE_AI             - 启动标哥AI助手（图纸问答+修改）");
+            ed.WriteMessage("\n                          支持深度思考、流式输出");
             ed.WriteMessage("\n");
             ed.WriteMessage("\n【设置】");
             ed.WriteMessage("\n  BIAOGE_SETTINGS       - 打开设置对话框");
@@ -191,7 +297,7 @@ namespace BiaogPlugin
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
 
             ed.WriteMessage("\n╔══════════════════════════════════════════════════════════╗");
-            ed.WriteMessage("\n║  表哥 - 建筑工程CAD翻译工具                            ║");
+            ed.WriteMessage("\n║  标哥 - 建筑工程CAD翻译工具                            ║");
             ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝");
             ed.WriteMessage($"\n  版本: {version}");
             ed.WriteMessage("\n  技术: AutoCAD .NET API (100%准确的DWG处理)");

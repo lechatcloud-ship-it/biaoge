@@ -1,4 +1,4 @@
-# 表哥 - 专业建筑工程CAD翻译工具
+# 标哥 - 专业建筑工程CAD翻译工具
 
 <div align="center">
 
@@ -20,7 +20,7 @@
 
 ## 📖 项目说明
 
-**表哥 2.0** 是使用 C# 和 Avalonia UI 重写的全新版本，提供比 Python 版本更高的性能和更好的用户体验。
+**标哥 2.0** 是使用 C# 和 Avalonia UI 重写的全新版本，提供比 Python 版本更高的性能和更好的用户体验。
 
 ### 🆕 v2.0 主要改进
 
@@ -370,7 +370,7 @@ license.SetLicense("path/to/Aspose.CAD.lic");
 
 <div align="center">
 
-**表哥 2.0 - 专业建筑工程CAD工具的现代化实现**
+**标哥 2.0 - 专业建筑工程CAD工具的现代化实现**
 
 Made with ❤️ using .NET 8.0 + Avalonia UI
 

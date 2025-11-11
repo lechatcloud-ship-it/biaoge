@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目简介
 
-**表哥AutoCAD插件** - 专业的建筑工程CAD图纸AI智能翻译和工程量计算工具
+**标哥AutoCAD插件** - 专业的建筑工程CAD图纸AI智能翻译和工程量计算工具
 
 这是一个基于 **AutoCAD .NET API** 的AutoCAD插件（非独立软件），集成了AI智能翻译、构件识别算量和Excel导出功能。采用阿里云百炼大模型提供AI能力。
 

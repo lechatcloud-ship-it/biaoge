@@ -1,7 +1,7 @@
 <Window x:Class="BiaogPlugin.UI.SettingsDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="设置 - 表哥插件" Height="500" Width="600"
+        Title="设置 - 标哥插件" Height="500" Width="600"
         WindowStartupLocation="CenterOwner" Background="#1E1E1E">
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -58,7 +58,7 @@
 
             <TabItem Header="关于">
                 <StackPanel Margin="15" VerticalAlignment="Center">
-                    <TextBlock Text="表哥 - AutoCAD翻译插件" FontSize="18"
+                    <TextBlock Text="标哥 - AutoCAD翻译插件" FontSize="18"
                                FontWeight="Bold" Foreground="White"
                                HorizontalAlignment="Center" Margin="0,0,0,10"/>
                     <TextBlock Text="版本 1.0.0" FontSize="14" Foreground="#CCCCCC"

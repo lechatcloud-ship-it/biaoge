@@ -149,7 +149,7 @@ namespace BiaogPlugin
         public void Initialize()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
-            doc.Editor.WriteMessage("\n表哥 - 建筑CAD翻译插件 v1.0 已加载！");
+            doc.Editor.WriteMessage("\n标哥 - 建筑CAD翻译插件 v1.0 已加载！");
             doc.Editor.WriteMessage("\n命令: BIAOGE_TRANSLATE, BIAOGE_CALCULATE, BIAOGE_SETTINGS");
         }
 
@@ -796,7 +796,7 @@ public async void TranslateDrawing()
              Width="350" Background="#1E1E1E">
     <StackPanel Margin="15">
         <!-- 标题 -->
-        <TextBlock Text="表哥 - 翻译工具"
+        <TextBlock Text="标哥 - 翻译工具"
                    FontSize="18" FontWeight="Bold"
                    Foreground="White" Margin="0,0,0,20"/>
 
@@ -966,7 +966,7 @@ namespace BiaogPlugin.UI
         {
             if (_translationPaletteSet == null)
             {
-                _translationPaletteSet = new PaletteSet("表哥 - 翻译工具")
+                _translationPaletteSet = new PaletteSet("标哥 - 翻译工具")
                 {
                     Size = new System.Drawing.Size(370, 700),
                     DockEnabled = (DockSides)((int)DockSides.Left | (int)DockSides.Right)

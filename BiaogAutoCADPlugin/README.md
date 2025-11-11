@@ -1,4 +1,4 @@
-# 表哥 - AutoCAD .NET 插件版本
+# 标哥 - AutoCAD .NET 插件版本
 
 **专业的建筑工程CAD图纸翻译和算量工具 - AutoCAD插件**
 
@@ -392,7 +392,7 @@ A: AutoCAD .NET API可以访问已在AutoCAD中打开的DWG，因此：
 
 <div align="center">
 
-**表哥 - 专业建筑工程CAD工具的AutoCAD .NET实现**
+**标哥 - 专业建筑工程CAD工具的AutoCAD .NET实现**
 
 使用AutoCAD官方API实现100%准确的DWG处理
 
