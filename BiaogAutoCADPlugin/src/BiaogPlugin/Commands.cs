@@ -1502,5 +1502,511 @@ namespace BiaogPlugin
 #endif
 
         #endregion
+
+        #region 翻译历史记录命令
+
+        /// <summary>
+        /// 显示翻译历史记录
+        /// </summary>
+        [CommandMethod("BIAOGE_HISTORY", CommandFlags.Modal)]
+        public async void ShowTranslationHistory()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                Log.Information("显示翻译历史记录");
+
+                ed.WriteMessage("\n╔══════════════════════════════════════════════╗");
+                ed.WriteMessage("\n║  标哥插件 - 翻译历史记录                    ║");
+                ed.WriteMessage("\n╚══════════════════════════════════════════════╝");
+                ed.WriteMessage("\n");
+
+                var history = ServiceLocator.GetService<TranslationHistory>();
+                if (history == null)
+                {
+                    ed.WriteMessage("\n[错误] 翻译历史服务未初始化");
+                    return;
+                }
+
+                // 获取统计信息
+                var stats = await history.GetStatisticsAsync();
+
+                ed.WriteMessage("\n【统计信息】");
+                ed.WriteMessage($"\n  总记录数: {stats.GetValueOrDefault("TotalRecords", 0)}");
+                ed.WriteMessage($"\n  今日翻译: {stats.GetValueOrDefault("TodayRecords", 0)}");
+
+                if (stats.ContainsKey("FirstRecord"))
+                {
+                    var firstRecord = (DateTime)stats["FirstRecord"];
+                    ed.WriteMessage($"\n  最早记录: {firstRecord:yyyy-MM-dd HH:mm:ss}");
+                }
+
+                if (stats.ContainsKey("TopLanguagePairs"))
+                {
+                    var topPairs = (List<string>)stats["TopLanguagePairs"];
+                    if (topPairs.Count > 0)
+                    {
+                        ed.WriteMessage("\n  常用语言对:");
+                        foreach (var pair in topPairs)
+                        {
+                            ed.WriteMessage($"\n    - {pair}");
+                        }
+                    }
+                }
+
+                // 获取最近记录
+                ed.WriteMessage("\n\n【最近翻译记录（前20条）】");
+                ed.WriteMessage("\n" + new string('─', 70));
+                ed.WriteMessage("\n时间               原文                        译文");
+                ed.WriteMessage("\n" + new string('─', 70));
+
+                var records = await history.GetRecentRecordsAsync(20);
+                foreach (var record in records)
+                {
+                    var originalPreview = record.OriginalText.Length > 20
+                        ? record.OriginalText.Substring(0, 20) + "..."
+                        : record.OriginalText.PadRight(23);
+
+                    var translatedPreview = record.TranslatedText.Length > 20
+                        ? record.TranslatedText.Substring(0, 20) + "..."
+                        : record.TranslatedText;
+
+                    ed.WriteMessage($"\n{record.Timestamp:MM-dd HH:mm:ss}  {originalPreview}  {translatedPreview}");
+                }
+
+                ed.WriteMessage("\n" + new string('─', 70));
+                ed.WriteMessage("\n\n提示:");
+                ed.WriteMessage("\n  BIAOGE_UNDO_TRANSLATION  - 撤销最近的翻译");
+                ed.WriteMessage("\n  BIAOGE_CLEAR_HISTORY     - 清除所有历史记录");
+                ed.WriteMessage("\n");
+
+                Log.Information("翻译历史记录显示完成");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "显示翻译历史记录失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 撤销最近的翻译
+        /// </summary>
+        [CommandMethod("BIAOGE_UNDO_TRANSLATION", CommandFlags.Modal)]
+        public async void UndoLastTranslation()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+            var db = doc.Database;
+
+            try
+            {
+                Log.Information("撤销最近的翻译");
+
+                var history = ServiceLocator.GetService<TranslationHistory>();
+                if (history == null)
+                {
+                    ed.WriteMessage("\n[错误] 翻译历史服务未初始化");
+                    return;
+                }
+
+                // 获取最近的翻译记录（排除撤销操作）
+                var allRecords = await history.GetRecentRecordsAsync(100);
+                var translateRecords = allRecords.Where(r => r.Operation == "translate").ToList();
+
+                if (translateRecords.Count == 0)
+                {
+                    ed.WriteMessage("\n没有可撤销的翻译记录。");
+                    return;
+                }
+
+                // 显示最近的翻译记录供用户选择
+                ed.WriteMessage("\n最近的翻译记录:");
+                for (int i = 0; i < Math.Min(10, translateRecords.Count); i++)
+                {
+                    var record = translateRecords[i];
+                    ed.WriteMessage($"\n{i + 1}. {record.Timestamp:MM-dd HH:mm:ss} - {record.OriginalText} → {record.TranslatedText}");
+                }
+
+                var promptOptions = new PromptIntegerOptions("\n请输入要撤销的记录编号（0=取消）")
+                {
+                    DefaultValue = 1,
+                    AllowNone = false,
+                    LowerLimit = 0,
+                    UpperLimit = Math.Min(10, translateRecords.Count)
+                };
+
+                var promptResult = ed.GetInteger(promptOptions);
+                if (promptResult.Status != PromptStatus.OK || promptResult.Value == 0)
+                {
+                    ed.WriteMessage("\n操作已取消。");
+                    return;
+                }
+
+                var selectedRecord = translateRecords[promptResult.Value - 1];
+
+                // 执行撤销
+                using (var docLock = doc.LockDocument())
+                using (var tr = db.TransactionManager.StartTransaction())
+                {
+                    // 从Handle恢复ObjectId
+                    var handle = new Handle(Convert.ToInt64(selectedRecord.ObjectIdHandle, 16));
+                    var objId = db.GetObjectId(false, handle, 0);
+
+                    if (objId.IsNull || objId.IsErased)
+                    {
+                        ed.WriteMessage("\n[错误] 对象已被删除，无法撤销。");
+                        return;
+                    }
+
+                    var obj = tr.GetObject(objId, OpenMode.ForWrite);
+
+                    // 恢复原文
+                    bool success = false;
+                    if (obj is DBText dbText)
+                    {
+                        dbText.TextString = selectedRecord.OriginalText;
+                        success = true;
+                    }
+                    else if (obj is MText mText)
+                    {
+                        mText.Contents = selectedRecord.OriginalText;
+                        success = true;
+                    }
+                    else if (obj is AttributeReference attRef)
+                    {
+                        attRef.TextString = selectedRecord.OriginalText;
+                        success = true;
+                    }
+
+                    tr.Commit();
+
+                    if (success)
+                    {
+                        // 记录撤销操作
+                        await history.AddRecordAsync(new TranslationHistory.HistoryRecord
+                        {
+                            Timestamp = DateTime.Now,
+                            ObjectIdHandle = selectedRecord.ObjectIdHandle,
+                            OriginalText = selectedRecord.TranslatedText,
+                            TranslatedText = selectedRecord.OriginalText,
+                            SourceLanguage = selectedRecord.TargetLanguage,
+                            TargetLanguage = selectedRecord.SourceLanguage,
+                            EntityType = selectedRecord.EntityType,
+                            Layer = selectedRecord.Layer,
+                            Operation = "undo"
+                        });
+
+                        ed.WriteMessage($"\n✓ 已撤销翻译: {selectedRecord.TranslatedText} → {selectedRecord.OriginalText}");
+                        Log.Information($"撤销翻译成功: {selectedRecord.Id}");
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "撤销翻译失败");
+                ed.WriteMessage($"\n[错误] 撤销失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 清除翻译历史记录
+        /// </summary>
+        [CommandMethod("BIAOGE_CLEAR_HISTORY", CommandFlags.Modal)]
+        public async void ClearTranslationHistory()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                var history = ServiceLocator.GetService<TranslationHistory>();
+                if (history == null)
+                {
+                    ed.WriteMessage("\n[错误] 翻译历史服务未初始化");
+                    return;
+                }
+
+                // 确认
+                var confirmOptions = new PromptKeywordOptions("\n确认清除所有翻译历史记录？")
+                {
+                    Keywords = { "是", "否" },
+                    AllowNone = false
+                };
+                confirmOptions.Keywords.Default = "否";
+
+                var confirmResult = ed.GetKeywords(confirmOptions);
+                if (confirmResult.Status != PromptStatus.OK || confirmResult.StringResult != "是")
+                {
+                    ed.WriteMessage("\n操作已取消。");
+                    return;
+                }
+
+                await history.ClearAllAsync();
+                ed.WriteMessage("\n✓ 已清除所有翻译历史记录");
+                Log.Information("翻译历史记录已清除");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "清除翻译历史记录失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region 批量智能替换命令
+
+        /// <summary>
+        /// 批量智能替换文本
+        /// </summary>
+        [CommandMethod("BIAOGE_SMART_REPLACE", CommandFlags.Modal)]
+        public async void SmartReplace()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+            var db = doc.Database;
+
+            try
+            {
+                Log.Information("执行批量智能替换");
+
+                ed.WriteMessage("\n╔══════════════════════════════════════════════╗");
+                ed.WriteMessage("\n║  标哥插件 - 批量智能替换                    ║");
+                ed.WriteMessage("\n╚══════════════════════════════════════════════╝");
+                ed.WriteMessage("\n");
+
+                // 1. 获取查找文本
+                var findOptions = new PromptStringOptions("\n请输入要查找的文本:")
+                {
+                    AllowSpaces = true
+                };
+
+                var findResult = ed.GetString(findOptions);
+                if (findResult.Status != PromptStatus.OK || string.IsNullOrWhiteSpace(findResult.StringResult))
+                {
+                    ed.WriteMessage("\n操作已取消。");
+                    return;
+                }
+
+                var findText = findResult.StringResult.Trim();
+
+                // 2. 提取所有文本实体
+                var extractor = new DwgTextExtractor();
+                var allTextEntities = await Task.Run(() => extractor.ExtractAllText());
+
+                // 3. 查找匹配的文本
+                var matchedEntities = allTextEntities
+                    .Where(e => e.Content.Contains(findText, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                if (matchedEntities.Count == 0)
+                {
+                    ed.WriteMessage($"\n未找到包含 \"{findText}\" 的文本。");
+                    return;
+                }
+
+                ed.WriteMessage($"\n找到 {matchedEntities.Count} 个匹配项");
+
+                // 4. 询问是否使用AI建议
+                var useAIOptions = new PromptKeywordOptions("\n是否使用AI建议替换内容？")
+                {
+                    Keywords = { "是", "否", "手动" },
+                    AllowNone = false
+                };
+                useAIOptions.Keywords.Default = "手动";
+
+                var useAIResult = ed.GetKeywords(useAIOptions);
+                string replaceText = "";
+
+                if (useAIResult.Status == PromptStatus.OK && useAIResult.StringResult == "是")
+                {
+                    // 使用AI建议
+                    ed.WriteMessage("\n正在使用AI分析并建议替换内容...");
+
+                    var bailianClient = ServiceLocator.GetService<BailianApiClient>();
+                    if (bailianClient == null)
+                    {
+                        ed.WriteMessage("\n[错误] AI服务未初始化");
+                        return;
+                    }
+
+                    // 准备AI提示
+                    var sampleTexts = matchedEntities.Take(5).Select(e => e.Content).ToList();
+                    var prompt = $@"
+我在AutoCAD图纸中找到了包含 ""{findText}"" 的文本，需要批量替换。
+
+示例文本：
+{string.Join("\n", sampleTexts.Select((t, i) => $"{i + 1}. {t}"))}
+
+请分析这些文本的上下文，建议最合适的替换方式。
+只需要给出替换建议，不要解释。格式：原文 -> 建议替换为XXX
+";
+
+                    try
+                    {
+                        var aiResponse = await bailianClient.ChatAsync(prompt, "qwen3-max-preview");
+                        ed.WriteMessage($"\n\nAI建议:");
+                        ed.WriteMessage($"\n{aiResponse}");
+                        ed.WriteMessage("\n");
+
+                        // 让用户确认或输入自己的替换文本
+                        var confirmOptions = new PromptStringOptions("\n请输入替换文本（留空使用AI建议）:")
+                        {
+                            AllowSpaces = true
+                        };
+
+                        var confirmResult = ed.GetString(confirmOptions);
+                        if (confirmResult.Status == PromptStatus.OK)
+                        {
+                            replaceText = string.IsNullOrWhiteSpace(confirmResult.StringResult)
+                                ? ExtractReplacementFromAI(aiResponse, findText)
+                                : confirmResult.StringResult.Trim();
+                        }
+                        else
+                        {
+                            return;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "AI建议失败");
+                        ed.WriteMessage($"\n[警告] AI建议失败: {ex.Message}");
+                        ed.WriteMessage("\n请手动输入替换文本。");
+                    }
+                }
+
+                // 5. 手动输入替换文本（如果AI未提供）
+                if (string.IsNullOrEmpty(replaceText))
+                {
+                    var replaceOptions = new PromptStringOptions($"\n请输入替换文本（将把 \"{findText}\" 替换为）:")
+                    {
+                        AllowSpaces = true
+                    };
+
+                    var replaceResult = ed.GetString(replaceOptions);
+                    if (replaceResult.Status != PromptStatus.OK)
+                    {
+                        ed.WriteMessage("\n操作已取消。");
+                        return;
+                    }
+
+                    replaceText = replaceResult.StringResult;
+                }
+
+                // 6. 显示预览
+                ed.WriteMessage($"\n\n预览替换效果（前5个）:");
+                for (int i = 0; i < Math.Min(5, matchedEntities.Count); i++)
+                {
+                    var entity = matchedEntities[i];
+                    var newContent = entity.Content.Replace(findText, replaceText, StringComparison.OrdinalIgnoreCase);
+                    ed.WriteMessage($"\n{i + 1}. {entity.Content}");
+                    ed.WriteMessage($"\n   → {newContent}");
+                }
+
+                // 7. 确认替换
+                var confirmReplaceOptions = new PromptKeywordOptions($"\n\n确认替换 {matchedEntities.Count} 个匹配项？")
+                {
+                    Keywords = { "是", "否" },
+                    AllowNone = false
+                };
+                confirmReplaceOptions.Keywords.Default = "是";
+
+                var confirmReplaceResult = ed.GetKeywords(confirmReplaceOptions);
+                if (confirmReplaceResult.Status != PromptStatus.OK || confirmReplaceResult.StringResult != "是")
+                {
+                    ed.WriteMessage("\n操作已取消。");
+                    return;
+                }
+
+                // 8. 执行替换
+                int successCount = 0;
+                using (var docLock = doc.LockDocument())
+                using (var tr = db.TransactionManager.StartTransaction())
+                {
+                    foreach (var entity in matchedEntities)
+                    {
+                        try
+                        {
+                            var obj = tr.GetObject(entity.ObjectId, OpenMode.ForWrite);
+                            var newContent = entity.Content.Replace(findText, replaceText, StringComparison.OrdinalIgnoreCase);
+
+                            if (obj is DBText dbText)
+                            {
+                                dbText.TextString = newContent;
+                                successCount++;
+                            }
+                            else if (obj is MText mText)
+                            {
+                                mText.Contents = newContent;
+                                successCount++;
+                            }
+                            else if (obj is AttributeReference attRef)
+                            {
+                                attRef.TextString = newContent;
+                                successCount++;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning(ex, $"替换失败: {entity.ObjectId}");
+                        }
+                    }
+
+                    tr.Commit();
+                }
+
+                ed.WriteMessage($"\n\n✓ 批量替换完成！");
+                ed.WriteMessage($"\n  成功替换: {successCount}/{matchedEntities.Count}");
+                ed.WriteMessage($"\n  查找文本: \"{findText}\"");
+                ed.WriteMessage($"\n  替换为: \"{replaceText}\"");
+                ed.WriteMessage("\n");
+
+                Log.Information($"批量智能替换完成: {successCount}/{matchedEntities.Count}");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "批量智能替换失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 从AI响应中提取替换建议
+        /// </summary>
+        private string ExtractReplacementFromAI(string aiResponse, string originalText)
+        {
+            try
+            {
+                // 简单的提取逻辑：查找"替换为"或"->"后面的内容
+                var patterns = new[] { "替换为", "->", "→", "改为" };
+
+                foreach (var pattern in patterns)
+                {
+                    var index = aiResponse.IndexOf(pattern, StringComparison.OrdinalIgnoreCase);
+                    if (index >= 0)
+                    {
+                        var afterPattern = aiResponse.Substring(index + pattern.Length).Trim();
+                        var lines = afterPattern.Split('\n');
+                        var suggestion = lines[0].Trim().Trim('"', '\'', '【', '】', '[', ']');
+
+                        if (!string.IsNullOrWhiteSpace(suggestion))
+                        {
+                            return suggestion;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "提取AI建议失败");
+            }
+
+            return originalText; // 默认返回原文
+        }
+
+        #endregion
     }
 }

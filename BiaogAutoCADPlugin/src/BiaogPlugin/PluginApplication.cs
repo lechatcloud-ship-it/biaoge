@@ -194,6 +194,13 @@ namespace BiaogPlugin
                 Services.ServiceLocator.RegisterService(diagnosticTool);
                 Log.Debug("DiagnosticTool已注册");
 
+                // 8. 翻译历史记录
+                var translationHistory = new Services.TranslationHistory(
+                    configManager.Config.Translation.HistoryMaxSize
+                );
+                Services.ServiceLocator.RegisterService(translationHistory);
+                Log.Debug("TranslationHistory已注册");
+
                 Log.Information("所有服务初始化完成");
 
                 // 检查API密钥配置
