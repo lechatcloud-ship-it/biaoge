@@ -160,6 +160,16 @@ namespace BiaogPlugin
                 Services.ServiceLocator.RegisterService(translationEngine);
                 Log.Debug("TranslationEngine已注册");
 
+                // 6. 性能监控器
+                var performanceMonitor = new Services.PerformanceMonitor();
+                Services.ServiceLocator.RegisterService(performanceMonitor);
+                Log.Debug("PerformanceMonitor已注册");
+
+                // 7. 诊断工具
+                var diagnosticTool = new Services.DiagnosticTool(configManager, bailianClient, cacheService);
+                Services.ServiceLocator.RegisterService(diagnosticTool);
+                Log.Debug("DiagnosticTool已注册");
+
                 Log.Information("所有服务初始化完成");
 
                 // 检查API密钥配置

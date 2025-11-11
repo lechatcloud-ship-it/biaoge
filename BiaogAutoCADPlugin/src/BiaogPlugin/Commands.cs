@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
 using Autodesk.AutoCAD.Runtime;
 using Autodesk.AutoCAD.ApplicationServices;
@@ -264,6 +265,123 @@ namespace BiaogPlugin
             {
                 Log.Error(ex, "清除缓存失败");
                 ed.WriteMessage($"\n[错误] 清除缓存失败: {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region 诊断和性能监控命令
+
+        /// <summary>
+        /// 运行系统诊断
+        /// </summary>
+        [CommandMethod("BIAOGE_DIAGNOSTIC", CommandFlags.Modal)]
+        public async void RunDiagnostic()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                ed.WriteMessage("\n正在运行系统诊断，请稍候...");
+                Log.Information("开始运行诊断");
+
+                // 获取服务
+                var configManager = ServiceLocator.GetService<ConfigManager>();
+                var bailianClient = ServiceLocator.GetService<BailianApiClient>();
+                var cacheService = ServiceLocator.GetService<CacheService>();
+
+                if (configManager == null || bailianClient == null || cacheService == null)
+                {
+                    ed.WriteMessage("\n[错误] 无法获取必要的服务，插件可能未正确初始化");
+                    return;
+                }
+
+                var diagnostic = new DiagnosticTool(configManager, bailianClient, cacheService);
+                var report = await diagnostic.RunFullDiagnosticAsync();
+
+                // 显示报告
+                ed.WriteMessage("\n\n" + report.ToString());
+
+                // 保存到桌面
+                var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                var reportPath = System.IO.Path.Combine(desktopPath, $"BiaogPlugin_Diagnostic_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+                System.IO.File.WriteAllText(reportPath, report.ToString());
+
+                ed.WriteMessage($"\n诊断报告已保存到: {reportPath}");
+                Log.Information($"诊断报告已保存: {reportPath}");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "运行诊断失败");
+                ed.WriteMessage($"\n[错误] 诊断失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 显示性能监控报告
+        /// </summary>
+        [CommandMethod("BIAOGE_PERFORMANCE", CommandFlags.Modal)]
+        public void ShowPerformanceReport()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                var monitor = ServiceLocator.GetService<PerformanceMonitor>();
+                if (monitor == null)
+                {
+                    ed.WriteMessage("\n[警告] 性能监控器未初始化");
+                    return;
+                }
+
+                // 生成报告
+                var report = monitor.GenerateReport();
+                ed.WriteMessage("\n\n" + report);
+
+                // 检查性能问题
+                var warnings = monitor.CheckForIssues();
+                if (warnings.Any())
+                {
+                    ed.WriteMessage("\n\n=== 性能警告 ===\n");
+                    foreach (var warning in warnings)
+                    {
+                        ed.WriteMessage($"\n{warning}");
+                    }
+                }
+
+                // 询问是否保存报告
+                var options = new PromptKeywordOptions("\n是否保存性能报告到桌面? [是(Y)/否(N)]")
+                {
+                    Keywords = { "Y", "N" },
+                    AllowNone = false
+                };
+                options.Keywords.Default = "N";
+
+                var result = ed.GetKeywords(options);
+                if (result.Status == PromptStatus.OK && result.StringResult == "Y")
+                {
+                    var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                    var reportPath = System.IO.Path.Combine(desktopPath, $"BiaogPlugin_Performance_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+
+                    var fullReport = report;
+                    if (warnings.Any())
+                    {
+                        fullReport += "\n\n=== 性能警告 ===\n";
+                        fullReport += string.Join("\n\n", warnings.Select(w => w.ToString()));
+                    }
+
+                    System.IO.File.WriteAllText(reportPath, fullReport);
+                    ed.WriteMessage($"\n性能报告已保存到: {reportPath}");
+                }
+
+                Log.Information("显示性能报告");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "显示性能报告失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
             }
         }
 

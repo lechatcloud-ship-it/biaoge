@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ApplicationPackage
+  SchemaVersion="1.0"
+  ProductType="Application"
+  Name="BiaogPlugin"
+  Description="表哥 - 建筑工程CAD翻译和算量工具"
+  Author="Biaoge Team"
+  AppVersion="1.0.0"
+  ProductCode="{A5B4C3D2-1234-5678-9ABC-DEF012345678}"
+  UpgradeCode="{A5B4C3D2-1234-5678-9ABC-DEF012345678}"
+  HelpFile="./Contents/Help/BiaogPlugin_Help.htm"
+  Icon="./Contents/Resources/Icon.ico">
+
+  <CompanyDetails
+    Name="Biaoge Team"
+    Phone="123-456-7890"
+    Url="https://github.com/your-repo/biaoge"
+    Email="support@your-company.com" />
+
+  <RuntimeRequirements
+    OS="Win64"
+    Platform="AutoCAD"
+    SeriesMin="R24.0"
+    SeriesMax="R26.0" />
+
+  <Components Description="表哥 - AutoCAD翻译插件">
+
+    <!-- AutoCAD 2024 支持 -->
+    <ComponentEntry
+      AppName="BiaogPlugin"
+      Version="1.0.0"
+      ModuleName="./Contents/Windows/2024/BiaogPlugin.dll"
+      AppDescription="专业的建筑工程CAD图纸AI智能翻译和算量工具"
+      LoadOnCommandInvocation="False"
+      LoadOnAutoCADStartup="True">
+
+      <RuntimeRequirements
+        OS="Win64"
+        Platform="AutoCAD"
+        SeriesMin="R24.0"
+        SeriesMax="R24.9" />
+    </ComponentEntry>
+
+    <!-- AutoCAD 2025 支持 -->
+    <ComponentEntry
+      AppName="BiaogPlugin"
+      Version="1.0.0"
+      ModuleName="./Contents/Windows/2025/BiaogPlugin.dll"
+      AppDescription="专业的建筑工程CAD图纸AI智能翻译和算量工具"
+      LoadOnCommandInvocation="False"
+      LoadOnAutoCADStartup="True">
+
+      <RuntimeRequirements
+        OS="Win64"
+        Platform="AutoCAD"
+        SeriesMin="R25.0"
+        SeriesMax="R25.9" />
+    </ComponentEntry>
+
+  </Components>
+</ApplicationPackage>
