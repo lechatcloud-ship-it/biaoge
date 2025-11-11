@@ -39,12 +39,12 @@ namespace BiaogPlugin.UI
                     ApiKeyPasswordBox.Password = apiKey;
                 }
 
-                // 加载模型配置
-                LoadModelSelection("Bailian:TextTranslationModel", TranslationModelComboBox, BailianModelSelector.Models.QwenMT);
-                LoadModelSelection("Bailian:ConversationModel", ConversationModelComboBox, BailianModelSelector.Models.QwenPlus);
-                LoadModelSelection("Bailian:DeepThinkingModel", DeepThinkingModelComboBox, BailianModelSelector.Models.QwQMaxPreview);
-                LoadModelSelection("Bailian:RecognitionModel", RecognitionModelComboBox, BailianModelSelector.Models.QwenPlus);
-                LoadModelSelection("Bailian:ToolCallingModel", ToolCallingModelComboBox, BailianModelSelector.Models.Qwen3CoderPlus);
+                // 加载模型配置（Flash系列）
+                LoadModelSelection("Bailian:TextTranslationModel", TranslationModelComboBox, BailianModelSelector.Models.QwenMTFlash);
+                LoadModelSelection("Bailian:ConversationModel", ConversationModelComboBox, BailianModelSelector.Models.Qwen3MaxPreview);
+                LoadModelSelection("Bailian:VisionModel", VisionModelComboBox, BailianModelSelector.Models.Qwen3VLFlash);
+                LoadModelSelection("Bailian:ToolCallingModel", ToolCallingModelComboBox, BailianModelSelector.Models.Qwen3CoderFlash);
+                LoadModelSelection("Bailian:MultimodalModel", MultimodalModelComboBox, BailianModelSelector.Models.Qwen3OmniFlash);
 
                 // 加载翻译设置
                 UseCacheCheckBox.IsChecked = _configManager.GetBool("Translation:UseCache", true);
@@ -95,12 +95,12 @@ namespace BiaogPlugin.UI
                     _bailianClient.RefreshApiKey();
                 }
 
-                // 保存模型配置
+                // 保存模型配置（Flash系列）
                 SaveModelSelection("Bailian:TextTranslationModel", TranslationModelComboBox);
                 SaveModelSelection("Bailian:ConversationModel", ConversationModelComboBox);
-                SaveModelSelection("Bailian:DeepThinkingModel", DeepThinkingModelComboBox);
-                SaveModelSelection("Bailian:RecognitionModel", RecognitionModelComboBox);
+                SaveModelSelection("Bailian:VisionModel", VisionModelComboBox);
                 SaveModelSelection("Bailian:ToolCallingModel", ToolCallingModelComboBox);
+                SaveModelSelection("Bailian:MultimodalModel", MultimodalModelComboBox);
 
                 // 保存翻译设置
                 _configManager.SetConfig("Translation:UseCache", UseCacheCheckBox.IsChecked ?? true);

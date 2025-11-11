@@ -42,45 +42,43 @@
                         <!-- 翻译模型 -->
                         <TextBlock Text="翻译模型（Translation）:" Foreground="#CCCCCC" Margin="0,10,0,5"/>
                         <ComboBox x:Name="TranslationModelComboBox" Height="30" Margin="0,0,0,5">
-                            <ComboBoxItem Content="qwen-mt (推荐 - 92语言, 轻量快速)" Tag="qwen-mt" IsSelected="True"/>
-                            <ComboBoxItem Content="qwen-plus (高质量平衡)" Tag="qwen-plus"/>
-                            <ComboBoxItem Content="qwen-max (最佳质量)" Tag="qwen-max"/>
+                            <ComboBoxItem Content="qwen-mt-flash (推荐 - 术语定制+格式还原)" Tag="qwen-mt-flash" IsSelected="True"/>
+                            <ComboBoxItem Content="qwen-max (最强能力)" Tag="qwen-max"/>
                         </ComboBox>
-                        <TextBlock Text="定价: 极低成本" Foreground="#888" FontSize="10" Margin="5,0,0,10"/>
+                        <TextBlock Text="特性: 92语言，稳定术语定制、格式还原度、领域提示能力" Foreground="#888" FontSize="10" Margin="5,0,0,10"/>
 
                         <!-- 对话模型 -->
                         <TextBlock Text="AI对话模型（Conversation）:" Foreground="#CCCCCC" Margin="0,10,0,5"/>
                         <ComboBox x:Name="ConversationModelComboBox" Height="30" Margin="0,0,0,5">
-                            <ComboBoxItem Content="qwen-plus (推荐 - 性价比最高)" Tag="qwen-plus" IsSelected="True"/>
+                            <ComboBoxItem Content="qwen3-max-preview (推荐 - 思考融合)" Tag="qwen3-max-preview" IsSelected="True"/>
                             <ComboBoxItem Content="qwen-max (最强能力)" Tag="qwen-max"/>
-                            <ComboBoxItem Content="qwen-flash (极速响应)" Tag="qwen-flash"/>
+                            <ComboBoxItem Content="qwen-plus (性价比)" Tag="qwen-plus"/>
                         </ComboBox>
-                        <TextBlock Text="定价: ¥0.0008/0.002 (输入/输出 千token)" Foreground="#888" FontSize="10" Margin="5,0,0,10"/>
+                        <TextBlock Text="特性: 思考模式和非思考模式有效融合" Foreground="#888" FontSize="10" Margin="5,0,0,10"/>
 
-                        <!-- 深度思考模型 -->
-                        <TextBlock Text="深度思考模型（Deep Thinking）:" Foreground="#CCCCCC" Margin="0,10,0,5"/>
-                        <ComboBox x:Name="DeepThinkingModelComboBox" Height="30" Margin="0,0,0,5">
-                            <ComboBoxItem Content="qwq-max-preview (推荐 - 显示完整思维链)" Tag="qwq-max-preview" IsSelected="True"/>
-                            <ComboBoxItem Content="qwen3-max-thinking (Qwen3推理)" Tag="qwen3-max-thinking"/>
+                        <!-- 视觉识别模型 -->
+                        <TextBlock Text="视觉识别模型（Vision）:" Foreground="#CCCCCC" Margin="0,10,0,5"/>
+                        <ComboBox x:Name="VisionModelComboBox" Height="30" Margin="0,0,0,5">
+                            <ComboBoxItem Content="qwen3-vl-flash (推荐 - 空间感知+2D/3D定位)" Tag="qwen3-vl-flash" IsSelected="True"/>
+                            <ComboBoxItem Content="qwen-max (最强能力)" Tag="qwen-max"/>
                         </ComboBox>
-                        <TextBlock Text="适合: 复杂推理、数学、编程问题" Foreground="#888" FontSize="10" Margin="5,0,0,10"/>
-
-                        <!-- 构件识别模型 -->
-                        <TextBlock Text="构件识别模型（Recognition）:" Foreground="#CCCCCC" Margin="0,10,0,5"/>
-                        <ComboBox x:Name="RecognitionModelComboBox" Height="30" Margin="0,0,0,5">
-                            <ComboBoxItem Content="qwen-plus (推荐 - 平衡性能)" Tag="qwen-plus" IsSelected="True"/>
-                            <ComboBoxItem Content="qwen-max (最高准确度)" Tag="qwen-max"/>
-                            <ComboBoxItem Content="qwen-flash (快速识别)" Tag="qwen-flash"/>
-                        </ComboBox>
-                        <TextBlock Text="上下文: 1M tokens" Foreground="#888" FontSize="10" Margin="5,0,0,10"/>
+                        <TextBlock Text="特性: 空间感知与万物识别，具备视觉2D/3D定位能力" Foreground="#888" FontSize="10" Margin="5,0,0,10"/>
 
                         <!-- 工具调用模型 -->
                         <TextBlock Text="工具调用模型（Tool Calling）:" Foreground="#CCCCCC" Margin="0,10,0,5"/>
                         <ComboBox x:Name="ToolCallingModelComboBox" Height="30" Margin="0,0,0,5">
-                            <ComboBoxItem Content="qwen3-coder-plus (推荐 - Function Calling优化)" Tag="qwen3-coder-plus" IsSelected="True"/>
-                            <ComboBoxItem Content="qwen-max (通用最强)" Tag="qwen-max"/>
+                            <ComboBoxItem Content="qwen3-coder-flash (推荐 - 仓库级别理解)" Tag="qwen3-coder-flash" IsSelected="True"/>
+                            <ComboBoxItem Content="qwen-max (最强能力)" Tag="qwen-max"/>
                         </ComboBox>
-                        <TextBlock Text="定价: ¥0.001/0.004 (输入/输出 千token)" Foreground="#888" FontSize="10" Margin="5,0,0,10"/>
+                        <TextBlock Text="特性: Agent场景工具调用代码，优化仓库级别理解能力" Foreground="#888" FontSize="10" Margin="5,0,0,10"/>
+
+                        <!-- 全模态模型 -->
+                        <TextBlock Text="全模态模型（Multimodal）:" Foreground="#CCCCCC" Margin="0,10,0,5"/>
+                        <ComboBox x:Name="MultimodalModelComboBox" Height="30" Margin="0,0,0,5">
+                            <ComboBoxItem Content="qwen3-omni-flash (推荐 - 文本+图像+音频+视频)" Tag="qwen3-omni-flash" IsSelected="True"/>
+                            <ComboBoxItem Content="qwen-max (最强能力)" Tag="qwen-max"/>
+                        </ComboBox>
+                        <TextBlock Text="特性: 全模态统一处理（文本+图像+音频+视频）" Foreground="#888" FontSize="10" Margin="5,0,0,10"/>
 
                         <!-- 免费额度提示 -->
                         <Border Background="#2D2D30" Padding="10" Margin="0,15,0,0" CornerRadius="5">

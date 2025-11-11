@@ -110,7 +110,7 @@ public class BailianApiClient
         {
             model = _configManager.GetString(
                 "Bailian:TextTranslationModel",
-                BailianModelSelector.Models.QwenMT // 使用翻译专用模型（92语言，轻量快速）
+                BailianModelSelector.Models.QwenMTFlash // 2025 Flash：术语定制+格式还原
             );
         }
 
@@ -195,7 +195,7 @@ public class BailianApiClient
         {
             model = _configManager.GetString(
                 "Bailian:TextTranslationModel",
-                BailianModelSelector.Models.QwenMT // 使用翻译专用模型（92语言，轻量快速）
+                BailianModelSelector.Models.QwenMTFlash // 2025 Flash：术语定制+格式还原
             );
         }
 
@@ -322,7 +322,7 @@ public class BailianApiClient
         {
             model = _configManager.GetString(
                 "Bailian:ConversationModel",
-                BailianModelSelector.Models.QwenPlus
+                BailianModelSelector.Models.Qwen3MaxPreview // 2025 Flash：思考模式融合
             );
         }
 
@@ -464,7 +464,7 @@ public class BailianApiClient
         {
             model = _configManager.GetString(
                 "Bailian:ConversationModel",
-                BailianModelSelector.Models.QwenPlus
+                BailianModelSelector.Models.Qwen3MaxPreview // 2025 Flash：思考模式融合
             );
         }
 
