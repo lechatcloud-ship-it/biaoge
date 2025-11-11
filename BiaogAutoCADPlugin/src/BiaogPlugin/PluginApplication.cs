@@ -56,6 +56,12 @@ namespace BiaogPlugin
                 // 初始化UI面板
                 UI.PaletteManager.Initialize();
 
+                // 注册右键上下文菜单
+                Extensions.ContextMenuManager.RegisterContextMenus();
+
+                // 加载Ribbon工具栏
+                UI.Ribbon.RibbonManager.LoadRibbon();
+
                 Log.Information("插件初始化成功");
             }
             catch (Exception ex)
@@ -78,6 +84,12 @@ namespace BiaogPlugin
             try
             {
                 Log.Information("标哥插件正在卸载...");
+
+                // 注销右键上下文菜单
+                Extensions.ContextMenuManager.UnregisterContextMenus();
+
+                // 卸载Ribbon工具栏
+                UI.Ribbon.RibbonManager.UnloadRibbon();
 
                 // 清理UI资源
                 UI.PaletteManager.Cleanup();
