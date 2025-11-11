@@ -8,7 +8,7 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="15">
             <!-- 标题 -->
-            <TextBlock Text="表哥 - AI翻译工具"
+            <TextBlock Text="标哥 - AI翻译工具"
                        FontSize="20" FontWeight="Bold"
                        Foreground="White" Margin="0,0,0,20"/>
 

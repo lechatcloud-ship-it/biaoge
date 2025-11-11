@@ -9,7 +9,7 @@ using Serilog;
 namespace BiaogPlugin
 {
     /// <summary>
-    /// 表哥 - AutoCAD翻译插件主应用程序类
+    /// 标哥 - AutoCAD翻译插件主应用程序类
     /// 实现IExtensionApplication接口，用于插件的初始化和清理
     /// </summary>
     public class PluginApplication : IExtensionApplication
@@ -24,7 +24,7 @@ namespace BiaogPlugin
                 // 配置日志系统
                 ConfigureLogging();
 
-                Log.Information("表哥 - AutoCAD翻译插件正在初始化...");
+                Log.Information("标哥 - AutoCAD翻译插件正在初始化...");
 
                 // 初始化服务
                 InitializeServices();
@@ -38,7 +38,7 @@ namespace BiaogPlugin
                     // 输出欢迎信息
                     ed.WriteMessage("\n╔══════════════════════════════════════════════════╗");
                     ed.WriteMessage("\n║                                                  ║");
-                    ed.WriteMessage("\n║      表哥 - 建筑工程CAD翻译工具 v1.0           ║");
+                    ed.WriteMessage("\n║      标哥 - 建筑工程CAD翻译工具 v1.0           ║");
                     ed.WriteMessage("\n║                                                  ║");
                     ed.WriteMessage("\n║      基于AutoCAD .NET API                        ║");
                     ed.WriteMessage("\n║      100%准确的DWG文件处理                       ║");
@@ -77,7 +77,7 @@ namespace BiaogPlugin
         {
             try
             {
-                Log.Information("表哥插件正在卸载...");
+                Log.Information("标哥插件正在卸载...");
 
                 // 清理UI资源
                 UI.PaletteManager.Cleanup();

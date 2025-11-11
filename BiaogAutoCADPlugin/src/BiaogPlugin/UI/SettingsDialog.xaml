@@ -1,7 +1,7 @@
 <Window x:Class="BiaogPlugin.UI.SettingsDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="设置 - 表哥插件" Height="500" Width="600"
+        Title="设置 - 标哥插件" Height="500" Width="600"
         WindowStartupLocation="CenterOwner" Background="#1E1E1E">
     <Grid Margin="20">
         <Grid.RowDefinitions>
@@ -18,13 +18,7 @@
                     <TextBlock Text="API密钥:" Foreground="#CCCCCC" Margin="0,0,0,5"/>
                     <PasswordBox x:Name="ApiKeyPasswordBox" Height="30" Margin="0,0,0,10"/>
 
-                    <TextBlock Text="翻译模型:" Foreground="#CCCCCC" Margin="0,10,0,5"/>
-                    <ComboBox x:Name="TranslationModelComboBox" Height="30" Margin="0,0,0,15">
-                        <ComboBoxItem Content="qwen-mt-plus (推荐)" Tag="qwen-mt-plus" IsSelected="True"/>
-                        <ComboBoxItem Content="qwen-mt-turbo (快速)" Tag="qwen-mt-turbo"/>
-                        <ComboBoxItem Content="qwen-plus (高质量)" Tag="qwen-plus"/>
-                        <ComboBoxItem Content="qwen-max (最佳质量)" Tag="qwen-max"/>
-                    </ComboBox>
+                    <TextBlock Text="💡 一个API密钥可调用所有模型" Foreground="#888" FontSize="11" Margin="0,0,0,10"/>
 
                     <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                         <Button x:Name="TestConnectionButton" Content="测试连接" Width="120" Height="35"
@@ -34,6 +28,69 @@
                                    Margin="15,0,0,0" Foreground="#CCCCCC"/>
                     </StackPanel>
                 </StackPanel>
+            </TabItem>
+
+            <TabItem Header="模型配置">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="15">
+                        <TextBlock Text="模型选择 - 为不同任务选择最优模型" FontSize="16"
+                                   FontWeight="Bold" Foreground="White" Margin="0,0,0,15"/>
+
+                        <TextBlock Text="💡 智能推荐：默认已选择最优模型，可根据需求调整"
+                                   Foreground="#888" FontSize="11" Margin="0,0,0,15"/>
+
+                        <!-- 翻译模型 -->
+                        <TextBlock Text="翻译模型（Translation）:" Foreground="#CCCCCC" Margin="0,10,0,5"/>
+                        <ComboBox x:Name="TranslationModelComboBox" Height="30" Margin="0,0,0,5">
+                            <ComboBoxItem Content="qwen-mt-flash (推荐 - 术语定制+格式还原)" Tag="qwen-mt-flash" IsSelected="True"/>
+                            <ComboBoxItem Content="qwen-max (最强能力)" Tag="qwen-max"/>
+                        </ComboBox>
+                        <TextBlock Text="特性: 92语言，稳定术语定制、格式还原度、领域提示能力" Foreground="#888" FontSize="10" Margin="5,0,0,10"/>
+
+                        <!-- 对话模型 -->
+                        <TextBlock Text="AI对话模型（Conversation）:" Foreground="#CCCCCC" Margin="0,10,0,5"/>
+                        <ComboBox x:Name="ConversationModelComboBox" Height="30" Margin="0,0,0,5">
+                            <ComboBoxItem Content="qwen3-max-preview (推荐 - 思考融合)" Tag="qwen3-max-preview" IsSelected="True"/>
+                            <ComboBoxItem Content="qwen-max (最强能力)" Tag="qwen-max"/>
+                            <ComboBoxItem Content="qwen-plus (性价比)" Tag="qwen-plus"/>
+                        </ComboBox>
+                        <TextBlock Text="特性: 思考模式和非思考模式有效融合" Foreground="#888" FontSize="10" Margin="5,0,0,10"/>
+
+                        <!-- 视觉识别模型 -->
+                        <TextBlock Text="视觉识别模型（Vision）:" Foreground="#CCCCCC" Margin="0,10,0,5"/>
+                        <ComboBox x:Name="VisionModelComboBox" Height="30" Margin="0,0,0,5">
+                            <ComboBoxItem Content="qwen3-vl-flash (推荐 - 空间感知+2D/3D定位)" Tag="qwen3-vl-flash" IsSelected="True"/>
+                            <ComboBoxItem Content="qwen-max (最强能力)" Tag="qwen-max"/>
+                        </ComboBox>
+                        <TextBlock Text="特性: 空间感知与万物识别，具备视觉2D/3D定位能力" Foreground="#888" FontSize="10" Margin="5,0,0,10"/>
+
+                        <!-- 工具调用模型 -->
+                        <TextBlock Text="工具调用模型（Tool Calling）:" Foreground="#CCCCCC" Margin="0,10,0,5"/>
+                        <ComboBox x:Name="ToolCallingModelComboBox" Height="30" Margin="0,0,0,5">
+                            <ComboBoxItem Content="qwen3-coder-flash (推荐 - 仓库级别理解)" Tag="qwen3-coder-flash" IsSelected="True"/>
+                            <ComboBoxItem Content="qwen-max (最强能力)" Tag="qwen-max"/>
+                        </ComboBox>
+                        <TextBlock Text="特性: Agent场景工具调用代码，优化仓库级别理解能力" Foreground="#888" FontSize="10" Margin="5,0,0,10"/>
+
+                        <!-- 全模态模型 -->
+                        <TextBlock Text="全模态模型（Multimodal）:" Foreground="#CCCCCC" Margin="0,10,0,5"/>
+                        <ComboBox x:Name="MultimodalModelComboBox" Height="30" Margin="0,0,0,5">
+                            <ComboBoxItem Content="qwen3-omni-flash (推荐 - 文本+图像+音频+视频)" Tag="qwen3-omni-flash" IsSelected="True"/>
+                            <ComboBoxItem Content="qwen-max (最强能力)" Tag="qwen-max"/>
+                        </ComboBox>
+                        <TextBlock Text="特性: 全模态统一处理（文本+图像+音频+视频）" Foreground="#888" FontSize="10" Margin="5,0,0,10"/>
+
+                        <!-- 免费额度提示 -->
+                        <Border Background="#2D2D30" Padding="10" Margin="0,15,0,0" CornerRadius="5">
+                            <StackPanel>
+                                <TextBlock Text="💰 免费额度" Foreground="#4EC9B0" FontWeight="Bold" Margin="0,0,0,5"/>
+                                <TextBlock Text="• 每个模型提供 100万token 免费额度" Foreground="#CCCCCC" FontSize="11"/>
+                                <TextBlock Text="• 有效期为开通后 90天" Foreground="#CCCCCC" FontSize="11"/>
+                                <TextBlock Text="• 建议先用免费额度测试各模型效果" Foreground="#CCCCCC" FontSize="11"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
             </TabItem>
 
             <TabItem Header="翻译设置">
@@ -58,7 +115,7 @@
 
             <TabItem Header="关于">
                 <StackPanel Margin="15" VerticalAlignment="Center">
-                    <TextBlock Text="表哥 - AutoCAD翻译插件" FontSize="18"
+                    <TextBlock Text="标哥 - AutoCAD翻译插件" FontSize="18"
                                FontWeight="Bold" Foreground="White"
                                HorizontalAlignment="Center" Margin="0,0,0,10"/>
                     <TextBlock Text="版本 1.0.0" FontSize="14" Foreground="#CCCCCC"

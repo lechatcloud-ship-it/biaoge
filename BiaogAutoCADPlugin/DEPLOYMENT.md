@@ -136,7 +136,7 @@ dotnet build BiaogPlugin.sln --configuration Release
 6. 看到欢迎消息表示加载成功：
    ```
    ╔══════════════════════════════════════════════════╗
-   ║      表哥 - 建筑工程CAD翻译工具 v1.0           ║
+   ║      标哥 - 建筑工程CAD翻译工具 v1.0           ║
    ╚══════════════════════════════════════════════════╝
    ```
 
@@ -183,7 +183,7 @@ C:\ProgramData\Autodesk\ApplicationPlugins\
   SchemaVersion="1.0"
   ProductType="Application"
   Name="BiaogPlugin"
-  Description="表哥 - 建筑工程CAD翻译工具"
+  Description="标哥 - 建筑工程CAD翻译工具"
   Author="Your Company"
   AppVersion="1.0.0"
   ProductCode="{12345678-1234-1234-1234-123456789012}"
@@ -253,10 +253,10 @@ icacls "C:\ProgramData\Autodesk\ApplicationPlugins\BiaogPlugin.bundle" /grant Us
 创建或编辑 `acad.lsp` (位于AutoCAD支持文件搜索路径):
 
 ```lisp
-;; 自动加载表哥插件
+;; 自动加载标哥插件
 (defun S::STARTUP ()
   (command "_NETLOAD" "C:\\Plugins\\BiaogPlugin\\BiaogPlugin.dll")
-  (princ "\n表哥插件已加载")
+  (princ "\n标哥插件已加载")
 )
 ```
 
@@ -358,7 +358,7 @@ BIAOGE_SETTINGS
 
 应包含类似内容:
 ```
-2025-11-11 10:00:00.000 [INF] 表哥 - AutoCAD翻译插件正在初始化...
+2025-11-11 10:00:00.000 [INF] 标哥 - AutoCAD翻译插件正在初始化...
 2025-11-11 10:00:01.000 [INF] 所有服务初始化完成
 2025-11-11 10:00:02.000 [INF] API密钥已加载
 ```
@@ -553,7 +553,7 @@ echo 卸载完成
 ```batch
 @echo off
 REM ================================================================
-REM 表哥插件批量部署脚本 - 企业版
+REM 标哥插件批量部署脚本 - 企业版
 REM ================================================================
 
 setlocal
@@ -634,4 +634,4 @@ pause
 
 ---
 
-**版权所有 © 2025 - 表哥团队**
+**版权所有 © 2025 - 标哥团队**

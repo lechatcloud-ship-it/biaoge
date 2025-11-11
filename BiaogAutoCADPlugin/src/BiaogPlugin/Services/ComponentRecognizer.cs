@@ -1,23 +1,21 @@
-using BiaogeCSharp.Models;
-using Microsoft.Extensions.Logging;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using BiaogPlugin.Models;
 
-namespace BiaogeCSharp.Services;
+namespace BiaogPlugin.Services;
 
 /// <summary>
-/// 构件识别服务 - 使用多策略识别+AI验证
+/// 构件识别服务 - 基于AutoCAD文本实体的多策略识别+AI验证
 /// </summary>
 public class ComponentRecognizer
 {
-    private readonly BailianApiClient _apiClient;
-    private readonly ILogger<ComponentRecognizer> _logger;
+    private readonly BailianApiClient _bailianClient;
 
     // 静态正则表达式 - 使用Compiled选项提升性能
-    // 数量提取正则
     private static readonly Regex QuantityRegex = new(@"(\d+(?:\.\d+)?)\s*(?:个|根|块|片|扇|樘)?",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -27,7 +25,7 @@ public class ComponentRecognizer
     private static readonly Regex DiameterRegex = new(@"[ΦφØ]?\s*(\d+(?:\.\d+)?)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    // 构件识别规则 - 静态编译正则提升性能
+    // 构件识别规则
     private static readonly Dictionary<string, List<Regex>> ComponentPatterns = new()
     {
         // 混凝土构件
@@ -70,49 +68,44 @@ public class ComponentRecognizer
         // 门窗
         ["M1门"] = new List<Regex>
         {
-            new Regex(@"M1", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-            new Regex(@"门.*M1", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+            new Regex(@"M[01](?!\d)", RegexOptions.Compiled),
+            new Regex(@"门.*M[01]", RegexOptions.Compiled)
         },
         ["C1窗"] = new List<Regex>
         {
-            new Regex(@"C1", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-            new Regex(@"窗.*C1", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+            new Regex(@"C[01](?!\d)", RegexOptions.Compiled),
+            new Regex(@"窗.*C[01]", RegexOptions.Compiled)
         }
     };
 
-    public ComponentRecognizer(
-        BailianApiClient apiClient,
-        ILogger<ComponentRecognizer> logger)
+    public ComponentRecognizer(BailianApiClient bailianClient)
     {
-        _apiClient = apiClient;
-        _logger = logger;
+        _bailianClient = bailianClient;
     }
 
     /// <summary>
-    /// 识别构件
+    /// 从AutoCAD文本实体识别构件
     /// </summary>
-    /// <param name="texts">文本列表</param>
-    /// <param name="useAiVerification">是否使用AI验证</param>
-    public async Task<List<ComponentRecognitionResult>> RecognizeComponentsAsync(
-        List<string> texts,
-        bool useAiVerification = true)
+    public async Task<List<ComponentRecognitionResult>> RecognizeFromTextEntitiesAsync(
+        List<TextEntity> textEntities,
+        bool useAiVerification = false)
     {
-        _logger.LogInformation("开始识别构件: {Count}条文本", texts.Count);
+        Log.Information("开始识别构件: {Count}个文本实体", textEntities.Count);
 
         var results = new List<ComponentRecognitionResult>();
 
-        foreach (var text in texts)
+        foreach (var entity in textEntities)
         {
-            if (string.IsNullOrWhiteSpace(text))
+            if (string.IsNullOrWhiteSpace(entity.Content))
                 continue;
 
             // 策略1: 正则表达式匹配
-            var regexResult = RecognizeByRegex(text);
+            var regexResult = RecognizeByRegex(entity);
 
             if (regexResult != null)
             {
                 // 策略2: 提取数量和尺寸
-                ExtractQuantityAndDimensions(text, regexResult);
+                ExtractQuantityAndDimensions(entity.Content, regexResult);
 
                 // 策略3: 建筑规范验证
                 ApplyConstructionStandards(regexResult);
@@ -120,7 +113,7 @@ public class ComponentRecognizer
                 // 策略4: AI验证（可选）
                 if (useAiVerification && regexResult.Confidence < 0.9)
                 {
-                    await VerifyWithAiAsync(text, regexResult);
+                    await VerifyWithAiAsync(entity.Content, regexResult);
                 }
 
                 // 计算工程量
@@ -130,7 +123,7 @@ public class ComponentRecognizer
             }
         }
 
-        _logger.LogInformation("识别完成: {Count}个构件", results.Count);
+        Log.Information("识别完成: {Count}个构件", results.Count);
 
         return results;
     }
@@ -138,19 +131,21 @@ public class ComponentRecognizer
     /// <summary>
     /// 正则表达式识别
     /// </summary>
-    private ComponentRecognitionResult? RecognizeByRegex(string text)
+    private ComponentRecognitionResult? RecognizeByRegex(TextEntity entity)
     {
         foreach (var (type, patterns) in ComponentPatterns)
         {
             foreach (var pattern in patterns)
             {
-                if (pattern.IsMatch(text))
+                if (pattern.IsMatch(entity.Content))
                 {
                     return new ComponentRecognitionResult
                     {
                         Type = type,
-                        OriginalText = text,
-                        Confidence = 0.85, // 正则匹配基础置信度
+                        OriginalText = entity.Content,
+                        Layer = entity.Layer,
+                        Position = entity.Position,
+                        Confidence = 0.85,
                         Status = "识别中"
                     };
                 }
@@ -167,13 +162,10 @@ public class ComponentRecognizer
     {
         // 提取数量
         var quantityMatch = QuantityRegex.Match(text);
-        if (quantityMatch.Success)
+        if (quantityMatch.Success && int.TryParse(quantityMatch.Groups[1].Value, out var quantity))
         {
-            if (int.TryParse(quantityMatch.Groups[1].Value, out var quantity))
-            {
-                result.Quantity = quantity;
-                result.Confidence += 0.05; // 提高置信度
-            }
+            result.Quantity = quantity;
+            result.Confidence += 0.05;
         }
 
         // 提取尺寸
@@ -198,25 +190,23 @@ public class ComponentRecognizer
             }
         }
 
-        // 提取直径（用于钢筋等）
+        // 提取直径（钢筋等）
         var diameterMatch = DiameterRegex.Match(text);
         if (diameterMatch.Success && double.TryParse(diameterMatch.Groups[1].Value, out var diameter))
         {
-            result.Diameter = diameter / 1000.0; // 转换为米
+            result.Diameter = diameter / 1000.0;
             result.Confidence += 0.02;
         }
     }
 
     /// <summary>
-    /// 建筑规范验证
+    /// 建筑规范验证（GB 50854-2013）
     /// </summary>
     private void ApplyConstructionStandards(ComponentRecognitionResult result)
     {
-        // GB 50854-2013 建筑工程规范验证
-
         if (result.Type.Contains("柱"))
         {
-            // 柱的合理尺寸范围: 200mm-1000mm
+            // 柱的合理尺寸: 200mm-1000mm
             if (result.Width > 0 && (result.Width < 0.2 || result.Width > 1.0))
             {
                 result.Confidence -= 0.1;
@@ -242,7 +232,6 @@ public class ComponentRecognizer
             }
         }
 
-        // 如果没有异常，标记为有效
         if (result.Status == "识别中" && result.Confidence >= 0.8)
         {
             result.Status = "有效";
@@ -256,17 +245,13 @@ public class ComponentRecognizer
     {
         try
         {
-            // 使用AI模型验证识别结果
-            // 这里可以调用BailianApiClient进行更复杂的验证
-            // 暂时简化处理
+            // 使用AI验证识别结果（可选功能）
             await Task.CompletedTask;
-
-            // AI验证通过后提高置信度
             result.Confidence += 0.1;
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "AI验证失败");
+            Log.Warning(ex, "AI验证失败");
         }
     }
 
@@ -287,16 +272,15 @@ public class ComponentRecognizer
             result.Area = Math.Round(result.Length * result.Width * result.Quantity, 3);
         }
 
-        // 估算成本（简化处理，实际应从数据库获取单价）
+        // 估算成本
         result.Cost = EstimateCost(result);
     }
 
     /// <summary>
-    /// 估算成本
+    /// 估算成本（元）
     /// </summary>
     private decimal EstimateCost(ComponentRecognitionResult result)
     {
-        // 简化的成本估算（单位：元）
         var unitPrices = new Dictionary<string, decimal>
         {
             ["C30混凝土柱"] = 500.0m, // 元/m³
@@ -304,7 +288,7 @@ public class ComponentRecognizer
             ["C30混凝土板"] = 450.0m,
             ["HRB400钢筋"] = 4500.0m, // 元/吨
             ["HPB300钢筋"] = 4000.0m,
-            ["MU10砖墙"] = 200.0m, // 元/m³
+            ["MU10砖墙"] = 200.0m,
             ["MU15砌块"] = 180.0m,
             ["M1门"] = 800.0m, // 元/扇
             ["C1窗"] = 600.0m
@@ -324,68 +308,34 @@ public class ComponentRecognizer
 
         return 0;
     }
+}
 
-    /// <summary>
-    /// 从DWG文档提取文本进行识别
-    /// </summary>
-    public async Task<List<ComponentRecognitionResult>> RecognizeFromDocumentAsync(
-        DwgDocument document,
-        bool useAiVerification = true)
+/// <summary>
+/// 构件识别结果
+/// </summary>
+public class ComponentRecognitionResult
+{
+    public string Type { get; set; } = string.Empty;
+    public string OriginalText { get; set; } = string.Empty;
+    public string Layer { get; set; } = string.Empty;
+    public Autodesk.AutoCAD.Geometry.Point3d Position { get; set; }
+    public double Confidence { get; set; }
+    public string Status { get; set; } = string.Empty;
+
+    // 数量和尺寸
+    public int Quantity { get; set; } = 1;
+    public double Length { get; set; }
+    public double Width { get; set; }
+    public double Height { get; set; }
+    public double Diameter { get; set; }
+
+    // 工程量
+    public double Volume { get; set; }
+    public double Area { get; set; }
+    public decimal Cost { get; set; }
+
+    public override string ToString()
     {
-        if (document == null)
-        {
-            throw new ArgumentNullException(nameof(document));
-        }
-
-        _logger.LogInformation("从DWG文档提取文本进行构件识别");
-
-        var texts = new List<string>();
-
-        // 从CadImage中提取文本实体
-        if (document.CadImage?.Entities != null)
-        {
-            foreach (var entity in document.CadImage.Entities)
-            {
-                // 提取文本实体的文本内容
-                var text = ExtractTextFromEntity(entity);
-                if (!string.IsNullOrWhiteSpace(text))
-                {
-                    texts.Add(text);
-                }
-            }
-        }
-
-        _logger.LogInformation("提取了{Count}条文本", texts.Count);
-
-        return await RecognizeComponentsAsync(texts, useAiVerification);
-    }
-
-    /// <summary>
-    /// 从CAD实体提取文本
-    /// </summary>
-    private string ExtractTextFromEntity(object entity)
-    {
-        try
-        {
-            // 使用反射提取文本属性
-            var type = entity.GetType();
-
-            // 尝试获取Text属性
-            var textProperty = type.GetProperty("Text") ?? type.GetProperty("DefaultValue");
-            if (textProperty != null)
-            {
-                var text = textProperty.GetValue(entity)?.ToString();
-                if (!string.IsNullOrWhiteSpace(text))
-                {
-                    return text;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "无法从实体提取文本");
-        }
-
-        return string.Empty;
+        return $"{Type} | 数量:{Quantity} | 置信度:{Confidence:P} | 成本:{Cost:C}";
     }
 }

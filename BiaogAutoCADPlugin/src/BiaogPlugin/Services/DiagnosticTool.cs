@@ -373,7 +373,7 @@ public class DiagnosticReport
     {
         var sb = new StringBuilder();
         sb.AppendLine("╔═══════════════════════════════════════════════════════╗");
-        sb.AppendLine("║            表哥插件诊断报告                          ║");
+        sb.AppendLine("║            标哥插件诊断报告                          ║");
         sb.AppendLine("╚═══════════════════════════════════════════════════════╝");
         sb.AppendLine();
         sb.AppendLine($"报告时间: {Timestamp:yyyy-MM-dd HH:mm:ss}");

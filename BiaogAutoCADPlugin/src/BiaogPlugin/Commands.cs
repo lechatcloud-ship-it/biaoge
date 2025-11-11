@@ -11,7 +11,7 @@ using BiaogPlugin.UI;
 namespace BiaogPlugin
 {
     /// <summary>
-    /// 表哥插件的AutoCAD命令集
+    /// 标哥插件的AutoCAD命令集
     /// </summary>
     public class Commands
     {
@@ -144,6 +144,107 @@ namespace BiaogPlugin
 
         #endregion
 
+        #region AI助手命令
+
+        /// <summary>
+        /// 启动标哥AI助手 - 支持图纸问答和修改
+        /// </summary>
+        [CommandMethod("BIAOGE_AI", CommandFlags.Modal)]
+        public async void StartAIAssistant()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                Log.Information("启动AI助手");
+
+                ed.WriteMessage("\n╔══════════════════════════════════════════════════════════╗");
+                ed.WriteMessage("\n║  标哥AI助手 - 基于阿里云百炼大模型                    ║");
+                ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝");
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n正在分析当前图纸...");
+
+                // 初始化服务 - 使用统一的Bailian客户端
+                var configManager = ServiceLocator.GetService<ConfigManager>();
+                var bailianClient = ServiceLocator.GetService<BailianApiClient>();
+                var contextManager = new DrawingContextManager();
+                var aiService = new AIAssistantService(bailianClient!, configManager!, contextManager);
+
+                ed.WriteMessage("\n图纸分析完成！您可以问我任何关于这张图纸的问题。");
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n示例问题：");
+                ed.WriteMessage("\n  - 这张图纸有哪些图层？");
+                ed.WriteMessage("\n  - 统计一下文本实体的数量");
+                ed.WriteMessage("\n  - 帮我找到所有的梁构件");
+                ed.WriteMessage("\n  - 将图层0改名为结构层");
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n输入 'exit' 退出，输入 'clear' 清除历史，输入 'deep' 启用深度思考");
+                ed.WriteMessage("\n" + new string('─', 60));
+
+                bool deepThinking = false;
+
+                // 对话循环
+                while (true)
+                {
+                    ed.WriteMessage("\n\n您: ");
+                    var userInput = await Task.Run(() =>
+                    {
+                        var result = ed.GetString(new PromptStringOptions(""));
+                        return result.Status == PromptStatus.OK ? result.StringResult : null;
+                    });
+
+                    if (string.IsNullOrWhiteSpace(userInput))
+                        continue;
+
+                    // 处理命令
+                    if (userInput.ToLower() == "exit")
+                    {
+                        ed.WriteMessage("\n再见！感谢使用标哥AI助手。");
+                        break;
+                    }
+                    else if (userInput.ToLower() == "clear")
+                    {
+                        aiService.ClearHistory();
+                        ed.WriteMessage("\n对话历史已清除。");
+                        continue;
+                    }
+                    else if (userInput.ToLower() == "deep")
+                    {
+                        deepThinking = !deepThinking;
+                        ed.WriteMessage($"\n深度思考模式: {(deepThinking ? "已启用 🧠" : "已关闭")}");
+                        continue;
+                    }
+
+                    // AI回复
+                    ed.WriteMessage("\n\n标哥AI: ");
+
+                    var response = await aiService.ChatStreamAsync(
+                        userInput,
+                        deepThinking,
+                        chunk => ed.WriteMessage(chunk) // 流式输出到命令行
+                    );
+
+                    if (!response.Success)
+                    {
+                        ed.WriteMessage($"\n[错误] {response.Error}");
+                    }
+
+                    ed.WriteMessage("\n" + new string('─', 60));
+                }
+
+                Log.Information("AI助手会话结束");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "AI助手启动失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+                ed.WriteMessage("\n请确保已在设置中配置百炼API密钥（BIAOGE_SETTINGS）");
+            }
+        }
+
+        #endregion
+
         #region 帮助和工具命令
 
         /// <summary>
@@ -156,7 +257,7 @@ namespace BiaogPlugin
             var ed = doc.Editor;
 
             ed.WriteMessage("\n╔══════════════════════════════════════════════════════════╗");
-            ed.WriteMessage("\n║  表哥 - 建筑工程CAD翻译工具 v1.0 - 帮助                ║");
+            ed.WriteMessage("\n║  标哥 - 建筑工程CAD翻译工具 v1.0 - 帮助                ║");
             ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝");
             ed.WriteMessage("\n");
             ed.WriteMessage("\n【翻译功能】");
@@ -165,6 +266,12 @@ namespace BiaogPlugin
             ed.WriteMessage("\n");
             ed.WriteMessage("\n【算量功能】");
             ed.WriteMessage("\n  BIAOGE_CALCULATE      - 打开算量面板");
+            ed.WriteMessage("\n  BIAOGE_EXPORTEXCEL    - 快速导出Excel清单");
+            ed.WriteMessage("\n  BIAOGE_QUICKCOUNT     - 快速统计构件数量");
+            ed.WriteMessage("\n");
+            ed.WriteMessage("\n【AI助手】");
+            ed.WriteMessage("\n  BIAOGE_AI             - 启动标哥AI助手（图纸问答+修改）");
+            ed.WriteMessage("\n                          支持深度思考、流式输出");
             ed.WriteMessage("\n");
             ed.WriteMessage("\n【设置】");
             ed.WriteMessage("\n  BIAOGE_SETTINGS       - 打开设置对话框");
@@ -191,7 +298,7 @@ namespace BiaogPlugin
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
 
             ed.WriteMessage("\n╔══════════════════════════════════════════════════════════╗");
-            ed.WriteMessage("\n║  表哥 - 建筑工程CAD翻译工具                            ║");
+            ed.WriteMessage("\n║  标哥 - 建筑工程CAD翻译工具                            ║");
             ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝");
             ed.WriteMessage($"\n  版本: {version}");
             ed.WriteMessage("\n  技术: AutoCAD .NET API (100%准确的DWG处理)");
@@ -382,6 +489,294 @@ namespace BiaogPlugin
             {
                 Log.Error(ex, "显示性能报告失败");
                 ed.WriteMessage($"\n[错误] {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 重置性能统计
+        /// </summary>
+        [CommandMethod("BIAOGE_RESETPERF", CommandFlags.Modal)]
+        public void ResetPerformanceStats()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                var monitor = ServiceLocator.GetService<PerformanceMonitor>();
+                if (monitor == null)
+                {
+                    ed.WriteMessage("\n[警告] 性能监控器未初始化");
+                    return;
+                }
+
+                monitor.Reset();
+                ed.WriteMessage("\n性能统计已重置。");
+                Log.Information("性能统计已重置");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "重置性能统计失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region 快捷工具命令
+
+        /// <summary>
+        /// 快速导出Excel工程量清单
+        /// </summary>
+        [CommandMethod("BIAOGE_EXPORTEXCEL", CommandFlags.Modal)]
+        public async void QuickExportExcel()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                ed.WriteMessage("\n开始快速识别构件...");
+                Log.Information("执行快速Excel导出");
+
+                // 提取文本
+                var extractor = new DwgTextExtractor();
+                var textEntities = extractor.ExtractAllText();
+                ed.WriteMessage($"\n提取到 {textEntities.Count} 个文本实体");
+
+                // 识别构件
+                var bailianClient = ServiceLocator.GetService<BailianApiClient>();
+                var recognizer = new ComponentRecognizer(bailianClient);
+                var results = await recognizer.RecognizeFromTextEntitiesAsync(textEntities, useAiVerification: false);
+
+                // 过滤低置信度（默认0.7）
+                results = results.Where(r => r.Confidence >= 0.7).ToList();
+                ed.WriteMessage($"\n识别到 {results.Count} 个构件（置信度≥70%）");
+
+                // 计算工程量
+                var calculator = new QuantityCalculator();
+                var summary = calculator.CalculateSummary(results);
+
+                // 导出Excel
+                var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                var fileName = $"工程量清单_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+                var outputPath = System.IO.Path.Combine(desktopPath, fileName);
+
+                var exporter = new ExcelExporter();
+                exporter.ExportSummary(summary, outputPath);
+
+                ed.WriteMessage($"\n\nExcel清单已导出到: {outputPath}");
+                ed.WriteMessage($"\n  构件总数: {summary.TotalComponents}");
+                ed.WriteMessage($"\n  总成本: ¥{summary.TotalCost:N2}");
+
+                // 打开文件夹
+                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{outputPath}\"");
+
+                Log.Information($"Excel导出完成: {outputPath}");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "快速导出Excel失败");
+                ed.WriteMessage($"\n[错误] 导出失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 快速统计构件数量
+        /// </summary>
+        [CommandMethod("BIAOGE_QUICKCOUNT", CommandFlags.Modal)]
+        public async void QuickCountComponents()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                ed.WriteMessage("\n正在快速统计构件...");
+
+                // 提取文本
+                var extractor = new DwgTextExtractor();
+                var textEntities = extractor.ExtractAllText();
+
+                // 识别构件（不使用AI）
+                var bailianClient = ServiceLocator.GetService<BailianApiClient>();
+                var recognizer = new ComponentRecognizer(bailianClient);
+                var results = await recognizer.RecognizeFromTextEntitiesAsync(textEntities, useAiVerification: false);
+
+                // 按类型分组
+                var grouped = results
+                    .Where(r => r.Confidence >= 0.7)
+                    .GroupBy(r => r.Type)
+                    .OrderByDescending(g => g.Count())
+                    .ToList();
+
+                ed.WriteMessage("\n\n╔══════════════════════════════════════════════════════════╗");
+                ed.WriteMessage("\n║  构件统计（置信度≥70%）                                ║");
+                ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝\n");
+
+                foreach (var group in grouped.Take(15))
+                {
+                    var totalQty = group.Sum(r => r.Quantity);
+                    var avgConf = group.Average(r => r.Confidence);
+                    ed.WriteMessage($"\n  {group.Key,-20} × {totalQty,4}  (置信度: {avgConf:P0})");
+                }
+
+                if (grouped.Count > 15)
+                {
+                    ed.WriteMessage($"\n  ... 还有 {grouped.Count - 15} 种构件类型");
+                }
+
+                ed.WriteMessage($"\n\n  总计: {results.Count(r => r.Confidence >= 0.7)} 个构件");
+                ed.WriteMessage("\n");
+
+                Log.Information("快速统计完成");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "快速统计失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 统计文本实体
+        /// </summary>
+        [CommandMethod("BIAOGE_TEXTCOUNT", CommandFlags.Modal)]
+        public void CountTextEntities()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                ed.WriteMessage("\n正在统计文本实体...");
+
+                var extractor = new DwgTextExtractor();
+                var texts = extractor.ExtractAllText();
+
+                var byType = texts.GroupBy(t => t.Type).ToList();
+                var byLayer = texts.GroupBy(t => t.Layer).OrderByDescending(g => g.Count()).ToList();
+
+                ed.WriteMessage("\n\n╔══════════════════════════════════════════════════════════╗");
+                ed.WriteMessage("\n║  文本实体统计                                          ║");
+                ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝\n");
+
+                ed.WriteMessage("\n【按类型统计】");
+                foreach (var group in byType)
+                {
+                    ed.WriteMessage($"\n  {group.Key,-20} × {group.Count(),4}");
+                }
+
+                ed.WriteMessage("\n\n【按图层统计（前10个）】");
+                foreach (var group in byLayer.Take(10))
+                {
+                    ed.WriteMessage($"\n  {group.Key,-20} × {group.Count(),4}");
+                }
+
+                if (byLayer.Count > 10)
+                {
+                    ed.WriteMessage($"\n  ... 还有 {byLayer.Count - 10} 个图层");
+                }
+
+                ed.WriteMessage($"\n\n  总计: {texts.Count} 个文本实体");
+                ed.WriteMessage("\n");
+
+                Log.Information($"文本统计完成: {texts.Count} 个实体");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "统计文本失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 显示图层信息
+        /// </summary>
+        [CommandMethod("BIAOGE_LAYERINFO", CommandFlags.Modal)]
+        public void ShowLayerInfo()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+            var db = doc.Database;
+
+            try
+            {
+                using (var tr = db.TransactionManager.StartTransaction())
+                {
+                    var layerTable = (Autodesk.AutoCAD.DatabaseServices.LayerTable)tr.GetObject(
+                        db.LayerTableId,
+                        Autodesk.AutoCAD.DatabaseServices.OpenMode.ForRead);
+
+                    ed.WriteMessage("\n\n╔══════════════════════════════════════════════════════════╗");
+                    ed.WriteMessage("\n║  图层信息                                              ║");
+                    ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝\n");
+
+                    int count = 0;
+                    foreach (Autodesk.AutoCAD.DatabaseServices.ObjectId layerId in layerTable)
+                    {
+                        var layer = (Autodesk.AutoCAD.DatabaseServices.LayerTableRecord)tr.GetObject(
+                            layerId,
+                            Autodesk.AutoCAD.DatabaseServices.OpenMode.ForRead);
+
+                        var status = layer.IsOff ? "[关闭]" : layer.IsFrozen ? "[冻结]" : "[打开]";
+                        var locked = layer.IsLocked ? "[锁定]" : "";
+
+                        ed.WriteMessage($"\n  {layer.Name,-30} {status,-8} {locked}");
+                        count++;
+                    }
+
+                    ed.WriteMessage($"\n\n  总计: {count} 个图层");
+                    ed.WriteMessage("\n");
+
+                    tr.Commit();
+                }
+
+                Log.Information("显示图层信息");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "显示图层信息失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 备份当前图纸
+        /// </summary>
+        [CommandMethod("BIAOGE_BACKUP", CommandFlags.Modal)]
+        public void BackupDrawing()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                if (string.IsNullOrEmpty(doc.Name))
+                {
+                    ed.WriteMessage("\n[错误] 当前图纸未保存，无法备份");
+                    return;
+                }
+
+                var originalPath = doc.Name;
+                var directory = System.IO.Path.GetDirectoryName(originalPath);
+                var fileName = System.IO.Path.GetFileNameWithoutExtension(originalPath);
+                var extension = System.IO.Path.GetExtension(originalPath);
+
+                var backupPath = System.IO.Path.Combine(
+                    directory!,
+                    $"{fileName}_backup_{DateTime.Now:yyyyMMdd_HHmmss}{extension}");
+
+                // 复制文件
+                System.IO.File.Copy(originalPath, backupPath, overwrite: false);
+
+                ed.WriteMessage($"\n图纸已备份到: {backupPath}");
+                Log.Information($"图纸已备份: {backupPath}");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "备份图纸失败");
+                ed.WriteMessage($"\n[错误] 备份失败: {ex.Message}");
             }
         }
 

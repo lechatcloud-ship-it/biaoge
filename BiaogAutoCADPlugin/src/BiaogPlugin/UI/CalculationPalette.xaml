@@ -1,19 +1,139 @@
 <UserControl x:Class="BiaogPlugin.UI.CalculationPalette"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Width="400" Background="#1E1E1E">
+             Width="420" Background="#1E1E1E">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="15">
-            <TextBlock Text="表哥 - 构件识别算量"
+            <!-- 标题 -->
+            <TextBlock Text="标哥 - 构件识别算量"
                        FontSize="20" FontWeight="Bold"
-                       Foreground="White" Margin="0,0,0,20"/>
+                       Foreground="White" Margin="0,0,0,10"/>
+            <TextBlock Text="基于多策略识别+AI验证"
+                       FontSize="11" Foreground="#888888" Margin="0,0,0,20"/>
 
-            <Border Background="#2D2D30" CornerRadius="8" Padding="15">
+            <!-- 识别选项卡 -->
+            <Border Background="#2D2D30" CornerRadius="8" Padding="15" Margin="0,0,0,15">
                 <StackPanel>
-                    <TextBlock Text="功能开发中..." FontSize="14"
-                               Foreground="#CCCCCC" TextAlignment="Center"/>
-                    <TextBlock Text="即将推出超高精度构件识别功能" FontSize="12"
-                               Foreground="#999999" TextAlignment="Center" Margin="0,10,0,0"/>
+                    <TextBlock Text="识别选项" FontSize="14" FontWeight="Bold"
+                               Foreground="White" Margin="0,0,0,10"/>
+
+                    <CheckBox x:Name="UseAiVerificationCheckBox" Content="启用AI验证（提高置信度）"
+                              Foreground="#CCCCCC" Margin="0,0,0,8"/>
+                    <TextBlock Text="AI验证会提高识别准确率，但会增加处理时间"
+                               FontSize="10" Foreground="#666" Margin="20,0,0,15"/>
+
+                    <TextBlock Text="置信度阈值:" Foreground="#CCCCCC" Margin="0,5,0,5"/>
+                    <Slider x:Name="ConfidenceThresholdSlider" Minimum="0.5" Maximum="1.0" Value="0.8"
+                            TickFrequency="0.1" IsSnapToTickEnabled="True"/>
+                    <TextBlock x:Name="ConfidenceThresholdText" Text="80%"
+                               FontSize="11" Foreground="#CCCCCC" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 操作按钮 -->
+            <Button x:Name="RecognizeButton" Content="开始识别构件" Height="40"
+                    Background="#0078D4" Foreground="White" FontSize="14"
+                    BorderThickness="0" Margin="0,0,0,10" Click="RecognizeButton_Click"/>
+
+            <Button x:Name="ExportExcelButton" Content="导出Excel清单" Height="35"
+                    Background="#107C10" Foreground="White"
+                    BorderThickness="0" Margin="0,0,0,15" Click="ExportExcelButton_Click"
+                    IsEnabled="False"/>
+
+            <!-- 进度卡片 -->
+            <Border x:Name="ProgressCard" Background="#2D2D30" CornerRadius="8"
+                    Padding="15" Margin="0,0,0,15" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock x:Name="ProgressText" Text="识别中..." FontSize="12"
+                               Foreground="White" Margin="0,0,0,10"/>
+                    <ProgressBar x:Name="ProgressBar" Height="20"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 统计信息 -->
+            <Border x:Name="StatsCard" Background="#2D2D30" CornerRadius="8"
+                    Padding="15" Margin="0,0,0,15" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="识别统计" FontSize="14" FontWeight="Bold"
+                               Foreground="White" Margin="0,0,0,10"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="构件总数" FontSize="11" Foreground="#999"/>
+                            <TextBlock x:Name="TotalComponentsText" Text="0" FontSize="18"
+                                       Foreground="#4EC9B0" FontWeight="Bold" Margin="0,2,0,10"/>
+
+                            <TextBlock Text="有效构件" FontSize="11" Foreground="#999"/>
+                            <TextBlock x:Name="ValidComponentsText" Text="0" FontSize="18"
+                                       Foreground="#6A9955" FontWeight="Bold" Margin="0,2,0,10"/>
+
+                            <TextBlock Text="总成本" FontSize="11" Foreground="#999"/>
+                            <TextBlock x:Name="TotalCostText" Text="¥0.00" FontSize="16"
+                                       Foreground="#CE9178" FontWeight="Bold"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="平均置信度" FontSize="11" Foreground="#999"/>
+                            <TextBlock x:Name="AvgConfidenceText" Text="0%" FontSize="18"
+                                       Foreground="#DCDCAA" FontWeight="Bold" Margin="0,2,0,10"/>
+
+                            <TextBlock Text="异常构件" FontSize="11" Foreground="#999"/>
+                            <TextBlock x:Name="AbnormalComponentsText" Text="0" FontSize="18"
+                                       Foreground="#F48771" FontWeight="Bold" Margin="0,2,0,10"/>
+
+                            <TextBlock Text="总体积" FontSize="11" Foreground="#999"/>
+                            <TextBlock x:Name="TotalVolumeText" Text="0.00m³" FontSize="16"
+                                       Foreground="#9CDCFE" FontWeight="Bold"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- 构件列表 -->
+            <Border x:Name="ComponentsCard" Background="#2D2D30" CornerRadius="8"
+                    Padding="15" Margin="0,0,0,15" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="构件列表" FontSize="14" FontWeight="Bold"
+                               Foreground="White" Margin="0,0,0,10"/>
+
+                    <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="ComponentsList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#252526" Margin="0,0,0,5" Padding="10"
+                                            CornerRadius="4">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Type}" FontWeight="Bold"
+                                                       Foreground="White" FontSize="12"/>
+                                            <TextBlock FontSize="10" Foreground="#CCCCCC">
+                                                <Run Text="数量:"/><Run Text="{Binding Quantity}"/>
+                                                <Run Text=" | 置信度:"/><Run Text="{Binding Confidence, StringFormat={}{0:P}}"/>
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding OriginalText}" FontSize="10"
+                                                       Foreground="#888" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+
+            <!-- 日志查看器 -->
+            <Border Background="#252526" CornerRadius="8" Padding="10">
+                <StackPanel>
+                    <TextBlock Text="日志" FontSize="12" FontWeight="Bold"
+                               Foreground="White" Margin="0,0,0,5"/>
+                    <ScrollViewer MaxHeight="150" VerticalScrollBarVisibility="Auto">
+                        <TextBlock x:Name="LogText" FontFamily="Consolas" FontSize="10"
+                                   Foreground="#CCCCCC" TextWrapping="Wrap"/>
+                    </ScrollViewer>
                 </StackPanel>
             </Border>
         </StackPanel>

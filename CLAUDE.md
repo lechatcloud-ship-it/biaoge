@@ -4,344 +4,678 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目简介
 
-**表哥** - 专业的建筑工程CAD图纸翻译和算量工具
+**标哥AutoCAD插件** - 专业的建筑工程CAD图纸AI智能翻译和工程量计算工具
 
-这是一个基于PyQt6的桌面应用程序,集成了DWG文件预览、AI智能翻译、构件识别算量和多格式导出功能。采用阿里云百炼大模型提供AI能力。
+这是一个基于 **AutoCAD .NET API** 的AutoCAD插件（非独立软件），集成了AI智能翻译、构件识别算量和Excel导出功能。采用阿里云百炼大模型提供AI能力。
+
+**重要说明：**
+- 这是一个 **AutoCAD插件**，不是独立的桌面应用程序
+- 需要在AutoCAD环境中运行（通过NETLOAD或自动加载）
+- 使用AutoCAD官方引擎，实现100%准确的DWG文件读取
+- 仅支持 **Windows平台**（AutoCAD for Mac不支持.NET API）
 
 ## 核心技术栈
 
-- **UI框架**: PyQt6 6.6+
-- **CAD解析**: ezdxf 1.1+ (支持R12-R2024版本DWG/DXF)
-- **AI引擎**: 阿里云百炼 (DashScope API 1.23+)
-- **性能加速**: Numba 0.58+ (JIT编译)
-- **性能监控**: psutil 5.9+
+### 开发语言和框架
+- **开发语言**: C# 11 (.NET 8.0)
+- **AutoCAD API**: AutoCAD .NET API 2024/2025
+  - `acdbmgd.dll` - Database API（数据库对象）
+  - `acmgd.dll` - Application Services API（应用服务）
+  - `AcCoreMgd.dll` - Core API（核心功能）
+- **UI框架**: WPF (Windows Presentation Foundation)
+  - PaletteSet（AutoCAD可停靠面板）
+  - XAML布局 + Dark主题
+
+### 依赖库
+- **阿里云百炼**: DashScope API（AI翻译）
+- **日志**: Serilog 3.1+（结构化日志）
+- **数据库**: Microsoft.Data.Sqlite 8.0+（翻译缓存）
+- **Excel导出**: EPPlus 7.0.10（工程量清单）
+- **HTTP客户端**: System.Net.Http
+
+### 平台要求
+- **操作系统**: Windows 10/11（64-bit）
+- **AutoCAD版本**: AutoCAD 2024/2025
+- **.NET版本**: .NET Framework 4.8 或 .NET 8.0
+- **Visual Studio**: 2022+（推荐）
+
+**为什么只支持Windows？**
+- AutoCAD for Mac **不支持 .NET API**
+- Mac版只支持AutoLISP，不支持C#/.NET开发
+- 如果需要跨平台，必须使用C++ ObjectARX + Qt/wxWidgets
 
 ## 开发环境设置
 
-### 安装依赖
+### 前置要求
+
+1. **安装Visual Studio 2022**
+   - 工作负载：".NET桌面开发"
+   - 工作负载：".NET跨平台开发"
+
+2. **安装AutoCAD 2024或2025**
+   - 确保安装了桌面版（非Web版）
+   - 注意：Express版本不支持插件开发
+
+3. **配置AutoCAD .NET API引用**
+   - AutoCAD DLL位置：`C:\Program Files\Autodesk\AutoCAD 2024\`
+   - 在项目中引用（已在.csproj中配置）：
+     ```xml
+     <Reference Include="acdbmgd">
+       <HintPath>C:\Program Files\Autodesk\AutoCAD 2024\acdbmgd.dll</HintPath>
+       <Private>False</Private>
+     </Reference>
+     ```
+
+### 获取代码
 
 ```bash
-# 安装核心依赖
-pip install -r requirements.txt
-
-# 可选依赖（提升性能和UI）
-pip install pyqt-fluent-widgets  # Fluent Design风格UI
-pip install rtree                # 更快的空间索引
+git clone https://github.com/lechatcloud-ship-it/biaoge.git
+cd biaoge/BiaogAutoCADPlugin
 ```
 
 ### 配置API密钥
 
-```bash
-# 方式1: 环境变量（推荐用于开发）
-export DASHSCOPE_API_KEY="sk-your-api-key-here"
+首次运行需要配置阿里云百炼API密钥：
 
-# 方式2: 应用内设置（用户友好）
-# 运行应用后，"工具" -> "设置" -> "阿里云百炼"
-```
+1. **获取API密钥**：访问 https://dashscope.aliyuncs.com/
+2. **在AutoCAD中配置**：
+   - 加载插件后运行 `BIAOGE_SETTINGS` 命令
+   - 在"百炼API配置"选项卡中输入API密钥
+   - 配置保存在：`%USERPROFILE%\.biaoge\config.json`
 
-### 运行应用
-
-```bash
-# 开发模式
-python main.py
-
-# 或使用备用入口
-python src/main.py
-```
-
-### 测试
+### 构建项目
 
 ```bash
-# 运行性能基准测试
-python tests/performance_test.py
+# 使用自动化脚本（推荐）
+cd BiaogAutoCADPlugin
+.\build.bat
 
-# 预期结果：
-# - 50K实体空间查询 < 10ms ✅
-# - 内存占用 < 500MB ✅
-# - 构件识别速度 < 100ms ✅
-# - DWG导出速度 < 200ms ✅
+# 或使用dotnet CLI
+dotnet restore
+dotnet build --configuration Release
 ```
+
+### 调试插件
+
+1. **配置调试启动项**（已在.csproj中配置）：
+   ```xml
+   <PropertyGroup Condition="'$(Configuration)'=='Debug'">
+     <StartAction>Program</StartAction>
+     <StartProgram>C:\Program Files\Autodesk\AutoCAD 2024\acad.exe</StartProgram>
+   </PropertyGroup>
+   ```
+
+2. **按F5启动调试**：
+   - Visual Studio会自动启动AutoCAD
+   - 在AutoCAD命令行输入 `NETLOAD`
+   - 选择 `bin\Debug\net8.0\BiaogPlugin.dll`
+   - 输入 `BIAOGE_HELP` 查看所有命令
+
+3. **设置断点**：
+   - 在C#代码中设置断点
+   - 在AutoCAD中执行命令，触发断点
 
 ## 项目架构
 
 ### 架构分层
 
 ```
-用户界面层 (src/ui/)
-    ├── PyQt6主窗口和各功能面板
-    └── 实时性能监控和日志查看
-           ↓
-业务逻辑层 (src/dwg/, src/translation/, src/calculation/)
-    ├── DWG解析和渲染引擎
-    ├── AI翻译引擎（批量处理+质量控制）
-    └── 超高精度构件识别（99.9999%准确率目标）
-           ↓
-服务层 (src/services/)
-    ├── 百炼API客户端（支持多模型配置）
-    ├── 智能缓存系统（90%+命中率）
-    └── 性能监控服务
-           ↓
-数据层 (src/utils/)
-    ├── 配置管理（JSON持久化）
-    ├── 日志系统（结构化日志）
-    └── 资源管理（内存优化）
+┌─────────────────────────────────────────────────────────┐
+│          AutoCAD命令层 (Commands.cs)                    │
+│  BIAOGE_TRANSLATE | BIAOGE_CALCULATE | BIAOGE_SETTINGS  │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────┐
+│          UI层 (UI/)                                      │
+│  PaletteSet | TranslationPalette | CalculationPalette   │
+│  SettingsDialog | WPF Controls                          │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────┐
+│          业务逻辑层 (Services/)                          │
+│  TranslationController | TranslationEngine               │
+│  ComponentRecognizer | QuantityCalculator                │
+│  ExcelExporter | PerformanceMonitor                     │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────┐
+│          服务层 (Services/)                              │
+│  BailianApiClient | CacheService | ConfigManager        │
+└─────────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────────┐
+│          数据访问层 (Services/)                          │
+│  DwgTextExtractor | DwgTextUpdater                      │
+│  AutoCAD Database API (acdbmgd.dll)                     │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ### 关键模块说明
 
-#### DWG处理模块 (`src/dwg/`)
-- **parser.py**: DWG文件解析（基于ezdxf，支持密码保护检测）
-- **renderer.py**: CAD级交互渲染（拖动、缩放、旋转）
-- **spatial_index.py**: R-tree空间索引（支持50K+实体流畅查询）
-- **entities.py**: DWG实体数据模型（Line, Circle, Text, Polyline等）
+#### 插件生命周期 (`PluginApplication.cs`)
+- 实现 `IExtensionApplication` 接口
+- `Initialize()`: 插件加载时初始化服务
+- `Terminate()`: 插件卸载时清理资源
+- 使用 `ServiceLocator` 管理服务依赖
 
-#### 翻译模块 (`src/translation/`)
-- **engine.py**: 翻译引擎（批量处理、智能缓存）
-- **cache.py**: LRU缓存系统（提升90%+命中率）
-- **quality_control.py**: 翻译质量控制（99.9999%准确率）
+#### 命令系统 (`Commands.cs`)
+- 使用 `[CommandMethod]` 特性注册AutoCAD命令
+- 命令前缀：`BIAOGE_`
+- 17个命令（翻译、算量、设置、诊断、工具）
 
-#### 算量模块 (`src/calculation/`)
-- **ultra_precise_recognizer.py**: 超高精度构件识别（多策略融合+AI验证）
-- **component_recognizer.py**: 基础构件识别（正则表达式+模式匹配）
-- **result_validator.py**: 结果验证器（建筑规范约束）
-- **quantity_calculator.py**: 工程量计算（支持GB 50854-2013等标准）
+#### UI面板 (`UI/`)
+- **TranslationPalette**: 翻译界面（语言选择、进度显示）
+- **CalculationPalette**: 算量界面（构件识别、统计、导出）
+- **SettingsDialog**: 设置对话框（API配置、缓存管理）
+- 使用 `PaletteSet` 创建可停靠面板
 
-#### 导出模块 (`src/export/`)
-- **advanced_dwg_exporter.py**: DWG/DXF导出（R2010/R2013/R2018/R2024）
-- **pdf_exporter.py**: 矢量PDF导出
-- **excel_exporter.py**: Excel工程量清单导出
+#### 翻译引擎 (`Services/TranslationEngine.cs`)
+- 批量翻译（50条/批，减少API调用）
+- 智能缓存（90%+命中率）
+- 进度回调（实时更新UI）
 
-#### AI助手模块 (`src/ai/`)
-- **ai_assistant.py**: AI对话引擎（百炼大模型集成）
-- **context_manager.py**: 上下文管理（图纸+翻译+算量全局状态）
-- **assistant_widget.py**: AI聊天界面组件
+#### DWG处理 (`Services/Dwg*.cs`)
+- **DwgTextExtractor**: 提取DWG文本实体（DBText, MText, Attribute）
+- **DwgTextUpdater**: 更新DWG文本内容
+- **TextFilter**: 过滤可翻译文本（排除纯数字、符号）
 
-#### UI组件 (`src/ui/`)
-- **main_window.py**: 主窗口（分栏布局：预览区+功能选项卡）
-- **viewer.py**: DWG查看器（实现CAD级交互）
-- **translation.py**: 翻译界面（语言选择+实时进度）
-- **calculation.py**: 算量界面（构件识别+结果展示）
-- **settings_dialog.py**: 完整设置系统（6个选项卡）
-- **ai_chat_widget.py**: AI助手聊天界面
+#### 构件识别 (`Services/ComponentRecognizer.cs`)
+- 多策略识别：正则表达式 + 数量提取 + 规范验证 + AI验证
+- 建筑规范约束：GB 50854-2013等
+- 置信度评分：0.5-1.0
 
-### 核心数据流
+#### 工程量计算 (`Services/QuantityCalculator.cs`)
+- 按类型分组统计
+- 材料汇总（混凝土、钢筋、砌体、门窗）
+- 成本估算
 
-#### 翻译流程
+#### Excel导出 (`Services/ExcelExporter.cs`)
+- 使用EPPlus 7.0.10（NonCommercial许可）
+- 三个工作表：汇总表、明细表、材料表
+- 专业格式和样式
+
+## 核心数据流
+
+### 翻译流程
 ```
-用户上传DWG → DWGParser解析 → 提取文本实体 →
-去重+缓存查询 → 批量AI翻译(50条/批) → 质量控制验证 →
-应用翻译到DWG → 更新UI显示
+用户点击"翻译" → TranslationPalette
+         ↓
+    TranslationController
+         ↓
+1. DwgTextExtractor.ExtractAllText()
+   → 遍历BlockTable → 提取DBText/MText/Attribute
+         ↓
+2. TextFilter.FilterTranslatableText()
+   → 过滤纯数字、空文本、符号
+         ↓
+3. CacheService.GetTranslationAsync()
+   → SQLite查询（LRU缓存）
+         ↓
+4. TranslationEngine.TranslateBatchWithCacheAsync()
+   → BailianApiClient.TranslateTextAsync()
+   → 批量50条/次，带重试逻辑
+         ↓
+5. DwgTextUpdater.UpdateTexts()
+   → 使用Transaction更新DBText.TextString
+   → LockDocument确保线程安全
+         ↓
+    更新UI统计 → 完成
 ```
 
-#### 算量流程
+### 算量流程
 ```
-DWG文档 → 文本提取 → 术语匹配(TermMatcher) →
-多策略识别(正则+AI) → 建筑规范验证 → 上下文推理 →
-多轮自我验证 → 工程量计算 → 材料汇总 → 成本估算
+用户点击"识别" → CalculationPalette
+         ↓
+1. DwgTextExtractor.ExtractAllText()
+         ↓
+2. ComponentRecognizer.RecognizeFromTextEntitiesAsync()
+   → 策略1: 正则匹配（Compiled Regex）
+   → 策略2: 数量提取（QuantityRegex）
+   → 策略3: 规范验证（GB标准）
+   → 策略4: AI验证（可选）
+         ↓
+3. 过滤置信度 >= 阈值
+         ↓
+4. QuantityCalculator.CalculateSummary()
+   → GroupByType（按类型分组）
+   → CalculateMaterialSummary（材料汇总）
+         ↓
+5. ExcelExporter.ExportSummary()
+   → EPPlus生成三个工作表
+   → 保存到桌面
+         ↓
+    打开文件夹 → 完成
 ```
 
-#### AI助手上下文
-```python
-AIAssistantContext包含：
-1. 图纸上下文: DWG文档、图层、实体、元数据
-2. 翻译上下文: 翻译结果、统计、质量问题
-3. 算量上下文: 识别构件、置信度、工程量、材料汇总
-4. 用户历史: 操作记录、标注、偏好设置
-5. 系统状态: 性能指标、配置信息
+## AutoCAD .NET API最佳实践
+
+基于Autodesk官方文档（help.autodesk.com/view/OARX/2025/ENU/）：
+
+### 1. Transaction模式（必须）
+
+```csharp
+// ✅ 正确：始终使用Transaction
+using (var tr = db.TransactionManager.StartTransaction())
+{
+    var obj = tr.GetObject(objectId, OpenMode.ForWrite);
+    // 修改对象...
+    tr.Commit(); // 提交更改
+}
+
+// ❌ 错误：不使用Transaction
+var obj = objectId.GetObject(OpenMode.ForWrite); // 不安全！
 ```
 
-## 关键设计模式
+### 2. Document Locking（必须）
 
-### 1. 多模型配置系统
-支持3种任务类型独立配置模型：
-- **多模态对话**: qwen-vl-max/plus, qwen-max
-- **图片翻译**: qwen-vl-max/plus, qwen-mt-image
-- **文本翻译**: qwen-mt-plus/turbo, qwen-plus/turbo/max
-- **自定义模型**: 支持所有DashScope兼容模型
+```csharp
+// ✅ 正确：锁定文档
+var doc = Application.DocumentManager.MdiActiveDocument;
+using (var docLock = doc.LockDocument())
+{
+    // 修改DWG数据...
+}
 
-### 2. 智能缓存策略
-- **三级缓存**: 内存LRU → SQLite → API
-- **批量优化**: 50条文本/批，减少API调用
-- **缓存预热**: 常用术语预加载
-- **自动失效**: 基于TTL和最大大小
+// ❌ 错误：不锁定文档（多线程不安全）
+```
 
-### 3. 质量控制系统
-翻译质量控制（99.9999%准确率目标）：
-- **格式保留**: 尺寸、特殊符号、单位
-- **术语一致性**: 建筑专业术语库
-- **上下文验证**: 前后文语义检查
-- **自动修正**: 常见问题自动纠正
+### 3. 命令标志
 
-构件识别质量控制：
-- **多策略融合**: 正则+AI+规范约束
-- **建筑规范验证**: GB 50854-2013等标准
-- **置信度评分**: 0-1评分+详细依据
-- **多轮自我验证**: 交叉验证结果
+```csharp
+// Modal命令（阻塞UI）
+[CommandMethod("BIAOGE_TRANSLATE", CommandFlags.Modal)]
 
-### 4. 性能优化
-- **空间索引**: R-tree索引支持50K+实体
-- **视口剔除**: 只渲染可见实体
-- **JIT加速**: Numba编译关键计算
-- **懒加载**: 按需加载图层和实体
-- **内存池**: 复用大对象减少GC
+// Session命令（非阻塞，适合长时间操作）
+[CommandMethod("BIAOGE_BACKGROUND", CommandFlags.Session)]
+```
+
+### 4. 异步操作
+
+```csharp
+// ✅ 正确：async/await模式
+[CommandMethod("BIAOGE_TRANSLATE", CommandFlags.Modal)]
+public async void TranslateDrawing()
+{
+    await Task.Run(() => {
+        // 长时间操作...
+    });
+}
+```
+
+### 5. 资源释放
+
+```csharp
+// ✅ 正确：使用using确保释放
+using (var reader = blockRecord.GetObjects())
+{
+    foreach (ObjectId objId in reader)
+    {
+        // 处理对象...
+    }
+} // 自动释放
+```
+
+### 6. 错误处理
+
+```csharp
+try
+{
+    using (var tr = db.TransactionManager.StartTransaction())
+    {
+        // 操作...
+        tr.Commit();
+    }
+}
+catch (Autodesk.AutoCAD.Runtime.Exception ex)
+{
+    // 处理AutoCAD特定异常
+    Log.Error(ex, "AutoCAD操作失败");
+    ed.WriteMessage($"\n[错误] {ex.Message}");
+}
+```
+
+## 代码规范
+
+### 注释语言
+- 代码注释统一使用**中文**
+- XML文档注释使用中文
+- 变量命名使用英文
+
+### 命名约定
+```csharp
+// 类名：PascalCase
+public class TranslationEngine { }
+
+// 方法名：PascalCase
+public async Task TranslateAsync() { }
+
+// 私有字段：_camelCase
+private readonly BailianApiClient _bailianClient;
+
+// 局部变量：camelCase
+var textEntities = extractor.ExtractAllText();
+
+// 常量：PascalCase
+private const int BatchSize = 50;
+```
+
+### 日志规范
+```csharp
+// 使用结构化日志
+Log.Information("开始翻译: {Count} 条文本", texts.Count);
+Log.Error(ex, "API调用失败: {ErrorCode}", errorCode);
+Log.Debug("缓存命中: {CacheKey}", cacheKey);
+```
+
+### 异步编程
+```csharp
+// ✅ 使用async/await
+public async Task<List<string>> TranslateAsync(List<string> texts)
+{
+    return await Task.Run(() => {
+        // 同步操作...
+    });
+}
+
+// ✅ 异步方法以Async结尾
+public async Task<string> GetTranslationAsync(string text)
+```
 
 ## 配置管理
 
 ### 配置文件位置
 ```
-~/.biaoge/config.json          # 用户配置
-~/.biaoge/cache.db             # 翻译缓存
-~/.biaoge/logs/                # 日志文件
-~/.biaoge/backups/             # 数据备份
+%USERPROFILE%\.biaoge\
+    ├── config.json           # 用户配置
+    ├── cache.db              # 翻译缓存（SQLite）
+    └── logs\                 # 日志文件
 ```
 
-### 关键配置项
-```python
-# 百炼API配置
-bailian.api_key                 # API密钥
-bailian.multimodal_model        # 多模态模型
-bailian.image_translation_model # 图片翻译模型
-bailian.text_translation_model  # 文本翻译模型
-
-# 翻译引擎配置
-translation.batch_size = 50     # 批量大小
-translation.cache_enabled = True
-translation.quality_control = True
-
-# 性能配置
-performance.spatial_index = True
-performance.use_numba = True
-performance.max_entities = 100000
-```
-
-## 打包和部署
-
-### PyInstaller打包
-```bash
-# 安装打包工具
-pip install pyinstaller
-
-# 使用build.spec配置文件打包
-pyinstaller build.spec
-
-# 输出位置:
-# Windows: dist/biaoge/biaoge.exe
-# macOS: dist/biaoge.app
-# Linux: dist/biaoge/biaoge
-```
-
-### 发布前检查
-- [ ] API密钥已从代码中移除
-- [ ] 日志级别设置为INFO
-- [ ] 版本号已更新
-- [ ] 性能测试通过
-- [ ] 在目标平台测试打包文件
-
-## 代码规范
-
-### 注释语言
-**重要**: 代码注释统一使用**中文**，与现有代码库保持一致。
-
-### 日志规范
-```python
-# 使用结构化日志
-logger.info(f"开始翻译: {文本数量} 条文本")
-logger.error(f"API调用失败: {错误信息}", exc_info=True)
-logger.debug(f"缓存命中: {缓存键}")
-```
-
-### 错误处理
-```python
-# 详细的用户友好错误信息
-raise DWGParseError(
-    f"文件读取失败\n\n"
-    f"文件路径：{filepath}\n\n"
-    "可能的原因：\n"
-    "1. 文件已被移动或删除\n"
-    "2. 文件路径输入错误\n\n"
-    "建议：请确认文件路径是否正确"
-)
+### 配置结构
+```json
+{
+  "Bailian": {
+    "ApiKey": "sk-...",
+    "BaseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "TextTranslationModel": "qwen-mt-plus",
+    "ImageTranslationModel": "qwen-vl-max",
+    "MultimodalDialogModel": "qwen-vl-max"
+  },
+  "Translation": {
+    "BatchSize": 50,
+    "EnableCache": true,
+    "CacheExpirationDays": 30
+  }
+}
 ```
 
 ## 常见开发任务
 
-### 添加新的构件识别规则
-修改 `src/calculation/ultra_precise_recognizer.py`:
-```python
-# 在 _multi_strategy_recognition 方法中添加新的识别策略
-# 在 _apply_construction_standards 方法中添加规范验证
+### 添加新命令
+
+1. 在 `Commands.cs` 中添加：
+```csharp
+[CommandMethod("BIAOGE_NEWFEATURE", CommandFlags.Modal)]
+public void NewFeature()
+{
+    var doc = Application.DocumentManager.MdiActiveDocument;
+    var ed = doc.Editor;
+
+    ed.WriteMessage("\n执行新功能...");
+    // 实现逻辑...
+}
 ```
 
-### 添加新的翻译模型
-修改 `src/services/bailian_client.py`:
-```python
-# 在 DEFAULT_MODELS 字典中添加新模型
-# 更新 SettingsDialog 的模型选择下拉框
+2. 更新 `BIAOGE_HELP` 命令的帮助信息
+
+### 添加新的识别规则
+
+修改 `Services/ComponentRecognizer.cs`:
+```csharp
+private static readonly Dictionary<string, List<Regex>> ComponentPatterns = new()
+{
+    ["新构件类型"] = new List<Regex>
+    {
+        new Regex(@"匹配模式1", RegexOptions.Compiled),
+        new Regex(@"匹配模式2", RegexOptions.Compiled)
+    }
+};
 ```
 
-### 添加新的导出格式
-在 `src/export/` 目录创建新的导出器类：
-```python
-class NewFormatExporter:
-    def export(self, document: DWGDocument, output_path: Path):
-        # 实现导出逻辑
-        pass
+### 添加新的UI面板
+
+1. 创建 `UI/NewPalette.xaml` 和 `NewPalette.xaml.cs`
+2. 在 `PaletteManager.cs` 中注册
+3. 添加命令打开面板
+
+### 修改缓存策略
+
+修改 `Services/CacheService.cs`:
+```csharp
+public async Task<string?> GetTranslationAsync(string originalText, string targetLanguage)
+{
+    // 自定义缓存逻辑...
+}
 ```
 
-### 修改UI主题
-修改 `src/ui/settings_dialog.py` 中的主题设置：
-```python
-# 支持的主题: light, dark, system, blue, green
-# 通过 ConfigManager 持久化用户选择
+## 部署和分发
+
+### 构建发布版本
+
+```bash
+# Windows批处理脚本
+.\build.bat
+
+# 输出位置
+dist\BiaogPlugin\
+    ├── BiaogPlugin.dll           # 主插件DLL
+    ├── Serilog.dll               # 依赖库
+    ├── Microsoft.Data.Sqlite.dll
+    └── EPPlus.dll
 ```
 
-## 性能基准
+### 安装方式
 
-项目要求达到商业级性能标准：
+#### 方式1：NETLOAD手动加载
+```
+1. 复制dist\BiaogPlugin\到用户电脑
+2. 在AutoCAD中输入NETLOAD
+3. 选择BiaogPlugin.dll
+4. 输入BIAOGE_HELP查看命令
+```
 
-| 测试项目 | 目标标准 | 当前性能 |
-|---------|---------|---------|
-| 50K实体空间查询 | < 10ms | 5.35ms ✅ |
-| 内存占用（大型文件） | < 500MB | 151.55MB ✅ |
-| 构件识别速度 | < 100ms | 1.07ms ✅ |
-| DWG导出速度 | < 200ms | 14.85ms ✅ |
+#### 方式2：自动加载（ApplicationPlugins）
+```
+1. 复制整个插件包到：
+   C:\ProgramData\Autodesk\ApplicationPlugins\BiaogPlugin.bundle\
 
-## 重要文档
+2. 目录结构：
+   BiaogPlugin.bundle\
+       ├── PackageContents.xml  # 插件清单
+       └── Contents\
+           └── Windows\
+               └── 2024\
+                   ├── BiaogPlugin.dll
+                   └── 依赖DLL...
 
-- **README.md**: 用户使用指南和功能介绍
-- **BUILD.md**: 详细的构建和打包指南
-- **DEPLOYMENT.md**: 部署和发布指南
-- **PRODUCT_ARCHITECTURE_AI_ASSISTANT.md**: AI助手产品架构设计（v2.0规划）
-- **docs/完整功能使用教程.md**: 6大功能详细教程
-- **docs/商业级优化总结.md**: 性能优化技术详解
+3. 重启AutoCAD，插件自动加载
+```
 
-## API成本优化
+#### 方式3：acad.lsp启动脚本
+```lisp
+; 在Support路径下创建acad.lsp
+(command "._NETLOAD" "C:\\Path\\To\\BiaogPlugin.dll")
+```
 
-翻译成本约 ¥0.03-0.05/图纸（根据模型选择）：
-- **智能缓存**: 90%+命中率，大幅减少API调用
-- **批量处理**: 50条/批，提升效率
-- **模型选择**: qwen-plus平衡质量和成本，qwen-max最高质量
-- **跳过优化**: 纯数字、空文本自动跳过
+### 企业批量部署
 
-## Git Flow 工作流
+使用Group Policy或脚本：
+```powershell
+# deploy.ps1
+$pluginPath = "\\server\share\BiaogPlugin"
+$targetPath = "$env:ProgramData\Autodesk\ApplicationPlugins\BiaogPlugin.bundle"
 
-项目使用标准Git Flow分支管理：
-- **main**: 生产版本
-- **develop**: 开发主分支
-- **feature/**: 功能分支
-- **release/**: 发布分支
-- **hotfix/**: 紧急修复分支
+Copy-Item -Path $pluginPath -Destination $targetPath -Recurse -Force
+```
 
-## 注意事项
+## 功能清单
 
-1. **密码保护的DWG文件**: ezdxf不支持密码保护的DWG，需要用户先用AutoCAD解密
-2. **模型兼容性**: 确保使用的百炼模型支持Function Calling（AI助手需要）
-3. **性能监控**: 使用内置的PerformancePanel监控CPU、内存使用
-4. **日志查看**: 使用LogViewerDialog实时查看应用日志
-5. **配置备份**: 设置系统支持配置备份和恢复
+| 功能类别 | 命令 | 说明 | 状态 |
+|---------|------|------|------|
+| **翻译** | `BIAOGE_TRANSLATE` | 打开翻译面板 | ✅ |
+|  | `BIAOGE_TRANSLATE_EN` | 快速翻译为英语 | ✅ |
+| **算量** | `BIAOGE_CALCULATE` | 打开算量面板 | ✅ |
+|  | `BIAOGE_EXPORTEXCEL` | 快速导出Excel清单 | ✅ |
+|  | `BIAOGE_QUICKCOUNT` | 快速统计构件数量 | ✅ |
+| **设置** | `BIAOGE_SETTINGS` | 打开设置对话框 | ✅ |
+| **工具** | `BIAOGE_HELP` | 显示帮助信息 | ✅ |
+|  | `BIAOGE_VERSION` | 显示版本信息 | ✅ |
+|  | `BIAOGE_ABOUT` | 关于插件 | ✅ |
+|  | `BIAOGE_CLEARCACHE` | 清除翻译缓存 | ✅ |
+|  | `BIAOGE_TEXTCOUNT` | 统计文本实体 | ✅ |
+|  | `BIAOGE_LAYERINFO` | 显示图层信息 | ✅ |
+|  | `BIAOGE_BACKUP` | 备份当前图纸 | ✅ |
+| **诊断** | `BIAOGE_DIAGNOSTIC` | 运行系统诊断 | ✅ |
+|  | `BIAOGE_PERFORMANCE` | 性能监控报告 | ✅ |
+|  | `BIAOGE_RESETPERF` | 重置性能统计 | ✅ |
+
+## 插件vs桌面应用功能对比
+
+| 功能 | AutoCAD插件 | 桌面应用（PyQt6/Avalonia） |
+|-----|-------------|---------------------------|
+| DWG读取准确性 | ✅ 100%（官方引擎） | ❌ 70-80%（ezdxf/Aspose.CAD） |
+| AI智能翻译 | ✅ 8种语言 | ✅ 8种语言 |
+| 构件识别算量 | ✅ 多策略识别 | ✅ 多策略识别 |
+| Excel导出 | ✅ 三表格式 | ✅ 三表格式 |
+| PDF导出 | ⏳ 计划中 | ✅ 已实现 |
+| 工作流集成 | ✅ 无缝集成 | ❌ 需切换软件 |
+| 平台支持 | ❌ 仅Windows | ✅ Windows/Mac/Linux |
+| 独立分发 | ❌ 依赖AutoCAD | ✅ 独立运行 |
+| 成本 | ✅ $0（已有AutoCAD） | ❌ Aspose.CAD $999/年 |
+
+**结论：**
+- 对于已有AutoCAD的建筑设计公司，**插件方案是最佳选择**
+- 如果需要给没有AutoCAD的客户使用，才需要桌面应用
+
+## 性能优化技巧
+
+### 1. 批量处理
+```csharp
+// ✅ 批量处理（50条/次）
+var batches = texts.Chunk(50);
+foreach (var batch in batches)
+{
+    await TranslateBatchAsync(batch);
+}
+
+// ❌ 逐条处理（慢）
+foreach (var text in texts)
+{
+    await TranslateAsync(text); // 每次API调用
+}
+```
+
+### 2. 缓存优化
+```csharp
+// ✅ 使用内存缓存 + SQLite持久化
+var cached = _memoryCache.Get(cacheKey);
+if (cached == null)
+{
+    cached = await _sqliteCache.GetAsync(cacheKey);
+    _memoryCache.Set(cacheKey, cached);
+}
+```
+
+### 3. 并发控制
+```csharp
+// ✅ 使用SemaphoreSlim限制并发
+private static readonly SemaphoreSlim _semaphore = new(5); // 最多5个并发
+
+await _semaphore.WaitAsync();
+try
+{
+    await ProcessAsync();
+}
+finally
+{
+    _semaphore.Release();
+}
+```
+
+### 4. 性能监控
+```csharp
+// ✅ 使用PerformanceMonitor跟踪
+var monitor = ServiceLocator.GetService<PerformanceMonitor>();
+using (monitor.Measure("TranslateOperation"))
+{
+    await TranslateAsync();
+}
+```
+
+## 故障排除
+
+### 插件加载失败
+
+1. **检查.NET版本**：
+   ```
+   dotnet --version
+   # 应显示 8.0.x
+   ```
+
+2. **检查AutoCAD版本**：
+   - 插件支持AutoCAD 2024/2025
+   - 检查PackageContents.xml中的版本号
+
+3. **查看日志**：
+   ```
+   %USERPROFILE%\.biaoge\logs\
+   ```
+
+### API调用失败
+
+1. **检查API密钥**：
+   - 运行 `BIAOGE_DIAGNOSTIC`
+   - 查看"API连接检查"结果
+
+2. **检查网络连接**：
+   - 确保能访问 `dashscope.aliyuncs.com`
+   - 检查防火墙设置
+
+3. **查看详细错误**：
+   ```
+   %USERPROFILE%\.biaoge\logs\biaoge-{date}.log
+   ```
+
+### 缓存问题
+
+1. **清除缓存**：
+   ```
+   BIAOGE_CLEARCACHE
+   ```
+
+2. **手动删除**：
+   ```
+   del %USERPROFILE%\.biaoge\cache.db
+   ```
+
+## 相关资源
+
+- **Autodesk官方文档**: https://help.autodesk.com/view/OARX/2025/ENU/
+- **AutoCAD DevBlog**: https://adndevblog.typepad.com/autocad/
+- **Autodesk Platform Services**: https://aps.autodesk.com/
+- **项目GitHub**: https://github.com/lechatcloud-ship-it/biaoge
 
 ## 许可证
 
 商业软件 - 版权所有 © 2025
 
 本软件为商业软件，未经授权不得用于商业用途。
+
+---
+
+**注意事项：**
+1. 这是**AutoCAD插件**，不是独立桌面软件
+2. **仅支持Windows**（Mac不支持.NET API）
+3. 需要AutoCAD 2024/2025运行环境
+4. 使用AutoCAD官方引擎，100%准确DWG读取
+5. 对于已有AutoCAD的建筑设计公司，这是$0成本解决方案
