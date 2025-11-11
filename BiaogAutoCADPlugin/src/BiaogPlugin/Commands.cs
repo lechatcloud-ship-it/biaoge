@@ -218,24 +218,29 @@ namespace BiaogPlugin
 
                 // 翻译文本
                 var bailianClient = ServiceLocator.GetService<BailianApiClient>();
-                var configManager = ServiceLocator.GetService<ConfigManager>();
                 var cacheService = ServiceLocator.GetService<CacheService>();
 
-                var engine = new TranslationEngine(bailianClient!, configManager!, cacheService!);
+                if (bailianClient == null || cacheService == null)
+                {
+                    ed.WriteMessage("\n[错误] 翻译服务未初始化");
+                    return;
+                }
+
+                var engine = new TranslationEngine(bailianClient, cacheService);
 
                 int translatedCount = 0;
                 int skippedCount = 0;
 
-                var progress = new Progress<TranslationProgress>(p =>
+                var apiProgress = new Progress<double>(p =>
                 {
-                    ed.WriteMessage($"\r{p.Stage}: {p.Percentage}%    ");
+                    ed.WriteMessage($"\r翻译进度: {p:F1}%    ");
                 });
 
                 var translations = await engine.TranslateBatchWithCacheAsync(
                     textEntities.Select(t => t.Content).ToList(),
-                    "auto",
                     targetLanguage,
-                    progress
+                    apiProgress,
+                    CancellationToken.None
                 );
 
                 ed.WriteMessage("\n更新DWG文件...");
