@@ -1,0 +1,146 @@
+<UserControl x:Class="BiaogPlugin.UI.TranslationPalette"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             Width="380" Background="#1E1E1E">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="15">
+            <!-- 标题 -->
+            <TextBlock Text="表哥 - AI翻译工具"
+                       FontSize="20" FontWeight="Bold"
+                       Foreground="White" Margin="0,0,0,20"/>
+
+            <!-- 语言选择卡片 -->
+            <Border Background="#2D2D30" CornerRadius="8" Padding="15" Margin="0,0,0,15">
+                <StackPanel>
+                    <TextBlock Text="目标语言" FontSize="14" FontWeight="Bold"
+                               Foreground="White" Margin="0,0,0,10"/>
+                    <ComboBox x:Name="LanguageComboBox" Height="36" Margin="0,0,0,0"
+                              FontSize="13">
+                        <ComboBoxItem Content="英语 (English)" Tag="en" IsSelected="True"/>
+                        <ComboBoxItem Content="日语 (日本語)" Tag="ja"/>
+                        <ComboBoxItem Content="韩语 (한국어)" Tag="ko"/>
+                        <ComboBoxItem Content="法语 (Français)" Tag="fr"/>
+                        <ComboBoxItem Content="德语 (Deutsch)" Tag="de"/>
+                        <ComboBoxItem Content="西班牙语 (Español)" Tag="es"/>
+                        <ComboBoxItem Content="俄语 (Русский)" Tag="ru"/>
+                    </ComboBox>
+                </StackPanel>
+            </Border>
+
+            <!-- 选项卡片 -->
+            <Border Background="#2D2D30" CornerRadius="8" Padding="15" Margin="0,0,0,15">
+                <StackPanel>
+                    <TextBlock Text="翻译选项" FontSize="14" FontWeight="Bold"
+                               Foreground="White" Margin="0,0,0,10"/>
+                    <CheckBox x:Name="UseCache" Content="使用缓存（推荐）"
+                              IsChecked="True" Foreground="#CCCCCC" Margin="0,0,0,8"/>
+                    <CheckBox x:Name="OnlySelectedText" Content="仅翻译选定文本"
+                              Foreground="#CCCCCC" Margin="0,0,0,8"/>
+                    <CheckBox x:Name="SkipNumbers" Content="跳过纯数字文本"
+                              IsChecked="True" Foreground="#CCCCCC"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 操作按钮 -->
+            <Button x:Name="TranslateButton" Content="开始翻译"
+                    Height="45" Background="#0078D4" Foreground="White"
+                    FontSize="15" FontWeight="Bold" BorderThickness="0"
+                    Click="TranslateButton_Click" Margin="0,0,0,15"
+                    Cursor="Hand">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}"
+                                            CornerRadius="6" Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter HorizontalAlignment="Center"
+                                                        VerticalAlignment="Center"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#106EBE"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Background" Value="#005A9E"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+
+            <!-- 进度卡片 -->
+            <Border x:Name="ProgressCard" Background="#2D2D30" CornerRadius="8"
+                    Padding="15" Margin="0,0,0,15" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock Text="翻译进度" FontSize="14" FontWeight="Bold"
+                               Foreground="White" Margin="0,0,0,10"/>
+                    <ProgressBar x:Name="ProgressBar" Height="8" Margin="0,0,0,10"
+                                 Background="#1E1E1E" Foreground="#0078D4"/>
+                    <TextBlock x:Name="ProgressText" Foreground="#CCCCCC"
+                               HorizontalAlignment="Center" FontSize="12"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 统计信息卡片 -->
+            <Border Background="#2D2D30" CornerRadius="8" Padding="15" Margin="0,0,0,15">
+                <StackPanel>
+                    <TextBlock Text="统计信息" FontSize="14" FontWeight="Bold"
+                               Foreground="White" Margin="0,0,0,10"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="文本总数:" Foreground="#CCCCCC" Margin="0,0,0,5"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="TotalCountText" Text="0" Foreground="White" FontWeight="Bold"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="唯一文本:" Foreground="#CCCCCC" Margin="0,0,0,5"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="UniqueCountText" Text="0" Foreground="White" FontWeight="Bold"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="缓存命中:" Foreground="#CCCCCC" Margin="0,0,0,5"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="CacheHitText" Text="0%" Foreground="#0F7B0F" FontWeight="Bold"/>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="API调用:" Foreground="#CCCCCC"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="ApiCallText" Text="0" Foreground="White" FontWeight="Bold"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- 日志卡片 -->
+            <Border Background="#2D2D30" CornerRadius="8" Padding="15">
+                <StackPanel>
+                    <TextBlock Text="操作日志" FontSize="14" FontWeight="Bold"
+                               Foreground="White" Margin="0,0,0,10"/>
+                    <ScrollViewer Height="150" VerticalScrollBarVisibility="Auto">
+                        <TextBlock x:Name="LogText" Foreground="#CCCCCC"
+                                   TextWrapping="Wrap" FontSize="11" FontFamily="Consolas"/>
+                    </ScrollViewer>
+                </StackPanel>
+            </Border>
+
+            <!-- 底部操作按钮 -->
+            <StackPanel Orientation="Horizontal" Margin="0,15,0,0" HorizontalAlignment="Center">
+                <Button Content="清除缓存" Width="110" Height="32" Margin="0,0,10,0"
+                        Click="ClearCacheButton_Click" Background="#3E3E42"
+                        Foreground="White" BorderThickness="0"/>
+                <Button Content="导出日志" Width="110" Height="32"
+                        Click="ExportLogButton_Click" Background="#3E3E42"
+                        Foreground="White" BorderThickness="0"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
