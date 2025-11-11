@@ -556,6 +556,131 @@ namespace BiaogPlugin
             }
         }
 
+        /// <summary>
+        /// 切换双击翻译功能
+        /// </summary>
+        [CommandMethod("BIAOGE_TOGGLE_DOUBLECLICK", CommandFlags.Modal)]
+        public void ToggleDoubleClickTranslation()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                var configManager = ServiceLocator.GetService<ConfigManager>();
+                if (configManager == null)
+                {
+                    ed.WriteMessage("\n[错误] 配置管理器未初始化");
+                    return;
+                }
+
+                // 切换设置
+                var currentState = configManager.Config.Translation.EnableDoubleClickTranslation;
+                configManager.Config.Translation.EnableDoubleClickTranslation = !currentState;
+                configManager.SaveTypedConfig();
+
+                var newState = !currentState;
+                ed.WriteMessage($"\n双击翻译功能已{(newState ? "启用" : "禁用")}");
+                ed.WriteMessage($"\n提示: 双击文本实体即可{(newState ? "快速翻译" : "（当前已禁用）")}");
+
+                Log.Information($"双击翻译功能已切换: {newState}");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "切换双击翻译功能失败");
+                ed.WriteMessage($"\n[错误] 切换失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 切换输入法自动切换功能
+        /// </summary>
+        [CommandMethod("BIAOGE_TOGGLE_IME", CommandFlags.Modal)]
+        public void ToggleInputMethodSwitch()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                var configManager = ServiceLocator.GetService<ConfigManager>();
+                if (configManager == null)
+                {
+                    ed.WriteMessage("\n[错误] 配置管理器未初始化");
+                    return;
+                }
+
+                // 切换设置
+                var currentState = configManager.Config.InputMethod.AutoSwitch;
+                configManager.Config.InputMethod.AutoSwitch = !currentState;
+                configManager.SaveTypedConfig();
+
+                var newState = !currentState;
+                ed.WriteMessage($"\n智能输入法切换已{(newState ? "启用" : "禁用")}");
+                ed.WriteMessage($"\n提示: {(newState ? "命令模式自动切换英文，文本编辑切换中文" : "输入法不再自动切换")}");
+
+                Log.Information($"输入法自动切换已切换: {newState}");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "切换输入法自动切换失败");
+                ed.WriteMessage($"\n[错误] 切换失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 显示功能状态
+        /// </summary>
+        [CommandMethod("BIAOGE_STATUS", CommandFlags.Modal)]
+        public void ShowFeatureStatus()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                var configManager = ServiceLocator.GetService<ConfigManager>();
+                if (configManager == null)
+                {
+                    ed.WriteMessage("\n[错误] 配置管理器未初始化");
+                    return;
+                }
+
+                ed.WriteMessage("\n╔══════════════════════════════════════════════╗");
+                ed.WriteMessage("\n║  标哥插件 - 功能状态                        ║");
+                ed.WriteMessage("\n╚══════════════════════════════════════════════╝");
+                ed.WriteMessage("\n");
+                ed.WriteMessage($"\n【UI功能】");
+                ed.WriteMessage($"\n  Ribbon工具栏:          {GetStatusText(configManager.Config.UI.EnableRibbon)}");
+                ed.WriteMessage($"\n  右键上下文菜单:        {GetStatusText(configManager.Config.UI.EnableContextMenu)}");
+                ed.WriteMessage($"\n  双击翻译:              {GetStatusText(configManager.Config.Translation.EnableDoubleClickTranslation)}");
+                ed.WriteMessage($"\n");
+                ed.WriteMessage($"\n【智能功能】");
+                ed.WriteMessage($"\n  输入法自动切换:        {GetStatusText(configManager.Config.InputMethod.AutoSwitch)}");
+                ed.WriteMessage($"\n  翻译缓存:              {GetStatusText(configManager.Config.Translation.EnableCache)}");
+                ed.WriteMessage($"\n  翻译历史:              {GetStatusText(configManager.Config.Translation.EnableHistory)}");
+                ed.WriteMessage($"\n");
+                ed.WriteMessage($"\n【翻译设置】");
+                ed.WriteMessage($"\n  默认目标语言:          {configManager.Config.Translation.DefaultTargetLanguage}");
+                ed.WriteMessage($"\n  批处理大小:            {configManager.Config.Translation.BatchSize}");
+                ed.WriteMessage($"\n  缓存过期天数:          {configManager.Config.Translation.CacheExpirationDays}");
+                ed.WriteMessage($"\n");
+                ed.WriteMessage($"\n提示: 使用 BIAOGE_TOGGLE_DOUBLECLICK 切换双击翻译");
+                ed.WriteMessage($"\n      使用 BIAOGE_TOGGLE_IME 切换输入法自动切换");
+                ed.WriteMessage("\n");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "显示功能状态失败");
+                ed.WriteMessage($"\n[错误] 显示失败: {ex.Message}");
+            }
+        }
+
+        private string GetStatusText(bool enabled)
+        {
+            return enabled ? "✓ 已启用" : "✗ 已禁用";
+        }
+
         #endregion
 
         #region AI助手命令

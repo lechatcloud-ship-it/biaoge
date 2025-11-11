@@ -62,6 +62,12 @@ namespace BiaogPlugin
                 // 加载Ribbon工具栏
                 UI.Ribbon.RibbonManager.LoadRibbon();
 
+                // 启用双击翻译功能
+                Extensions.DoubleClickHandler.Enable();
+
+                // 启用智能输入法切换
+                Services.InputMethodManager.Enable();
+
                 Log.Information("插件初始化成功");
             }
             catch (Exception ex)
@@ -90,6 +96,12 @@ namespace BiaogPlugin
 
                 // 卸载Ribbon工具栏
                 UI.Ribbon.RibbonManager.UnloadRibbon();
+
+                // 禁用双击翻译功能
+                Extensions.DoubleClickHandler.Disable();
+
+                // 禁用智能输入法切换
+                Services.InputMethodManager.Disable();
 
                 // 清理UI资源
                 UI.PaletteManager.Cleanup();

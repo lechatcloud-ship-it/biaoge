@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
+using BiaogPlugin.Models;
 
 namespace BiaogPlugin.Services;
 
@@ -14,7 +15,23 @@ public class ConfigManager
 {
     private readonly string _configPath;
     private Dictionary<string, object?> _configCache = new();
+    private PluginConfig? _typedConfig;
     private readonly object _lock = new();
+
+    /// <summary>
+    /// 强类型配置对象
+    /// </summary>
+    public PluginConfig Config
+    {
+        get
+        {
+            if (_typedConfig == null)
+            {
+                LoadTypedConfig();
+            }
+            return _typedConfig ?? new PluginConfig();
+        }
+    }
 
     public ConfigManager()
     {
@@ -27,6 +44,7 @@ public class ConfigManager
 
         // 初始化时加载配置
         LoadConfig();
+        LoadTypedConfig();
     }
 
     private void LoadConfig()
@@ -193,6 +211,64 @@ public class ConfigManager
         lock (_lock)
         {
             return _configCache.ContainsKey(key);
+        }
+    }
+
+    /// <summary>
+    /// 加载强类型配置
+    /// </summary>
+    private void LoadTypedConfig()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                if (File.Exists(_configPath))
+                {
+                    var json = File.ReadAllText(_configPath);
+                    _typedConfig = JsonSerializer.Deserialize<PluginConfig>(json) ?? new PluginConfig();
+                    Log.Debug("强类型配置已加载");
+                }
+                else
+                {
+                    _typedConfig = new PluginConfig();
+                    Log.Debug("使用默认强类型配置");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "加载强类型配置失败");
+                _typedConfig = new PluginConfig();
+            }
+        }
+    }
+
+    /// <summary>
+    /// 保存强类型配置
+    /// </summary>
+    public void SaveTypedConfig()
+    {
+        lock (_lock)
+        {
+            try
+            {
+                var options = new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                };
+                var json = JsonSerializer.Serialize(_typedConfig, options);
+                File.WriteAllText(_configPath, json);
+                Log.Information("强类型配置已保存: {ConfigPath}", _configPath);
+
+                // 同步到旧的配置缓存
+                _configCache = JsonSerializer.Deserialize<Dictionary<string, object?>>(json)
+                    ?? new Dictionary<string, object?>();
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "保存强类型配置失败");
+            }
         }
     }
 }
