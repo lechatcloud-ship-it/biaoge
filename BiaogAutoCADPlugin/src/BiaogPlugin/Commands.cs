@@ -276,6 +276,196 @@ namespace BiaogPlugin
         }
 
         /// <summary>
+        /// 图层翻译命令 - 按图层选择性翻译
+        /// </summary>
+        [CommandMethod("BIAOGE_TRANSLATE_LAYER", CommandFlags.Modal)]
+        public async void TranslateByLayer()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                Log.Information("执行图层翻译命令");
+
+                ed.WriteMessage("\n╔══════════════════════════════════════════════╗");
+                ed.WriteMessage("\n║  标哥插件 - 图层翻译功能                    ║");
+                ed.WriteMessage("\n╚══════════════════════════════════════════════╝");
+                ed.WriteMessage("\n");
+
+                // 1. 获取所有图层及文本统计
+                ed.WriteMessage("\n正在分析图层...");
+                var layers = LayerTranslationService.GetAllLayersWithTextCount();
+
+                if (layers.Count == 0)
+                {
+                    ed.WriteMessage("\n图纸中没有图层。");
+                    return;
+                }
+
+                // 2. 显示图层列表
+                ed.WriteMessage($"\n\n图层列表（共 {layers.Count} 个图层）：");
+                ed.WriteMessage("\n" + new string('─', 70));
+                ed.WriteMessage("\n序号  图层名称                     文本数量  颜色        状态");
+                ed.WriteMessage("\n" + new string('─', 70));
+
+                int index = 1;
+                foreach (var layer in layers.Take(20)) // 只显示前20个
+                {
+                    var status = "";
+                    if (layer.IsLocked) status += "锁定 ";
+                    if (layer.IsOff) status += "关闭 ";
+                    if (layer.IsFrozen) status += "冻结 ";
+                    if (string.IsNullOrEmpty(status)) status = "正常";
+
+                    ed.WriteMessage($"\n{index,4}  {layer.LayerName,-28} {layer.TextCount,8}  {layer.ColorName,-10} {status}");
+                    index++;
+                }
+
+                if (layers.Count > 20)
+                {
+                    ed.WriteMessage($"\n... 还有 {layers.Count - 20} 个图层（未显示）");
+                }
+
+                ed.WriteMessage("\n" + new string('─', 70));
+
+                // 3. 提示用户输入图层名称
+                ed.WriteMessage("\n\n请输入要翻译的图层名称（多个图层用逗号分隔）：");
+                ed.WriteMessage("\n提示：");
+                ed.WriteMessage("\n  - 输入 'all' 翻译所有图层");
+                ed.WriteMessage("\n  - 输入图层名称，例如: 墙体,门窗");
+                ed.WriteMessage("\n  - 输入 '*文字*' 翻译包含'文字'的所有图层");
+                ed.WriteMessage("\n");
+
+                var layerInputResult = ed.GetString("\n图层名称: ");
+                if (layerInputResult.Status != PromptStatus.OK || string.IsNullOrWhiteSpace(layerInputResult.StringResult))
+                {
+                    ed.WriteMessage("\n操作已取消。");
+                    return;
+                }
+
+                var layerInput = layerInputResult.StringResult.Trim();
+
+                // 4. 解析图层选择
+                List<string> selectedLayers;
+
+                if (layerInput.ToLower() == "all")
+                {
+                    selectedLayers = layers.Where(l => l.TextCount > 0).Select(l => l.LayerName).ToList();
+                }
+                else if (layerInput.StartsWith("*") && layerInput.EndsWith("*"))
+                {
+                    var keyword = layerInput.Trim('*');
+                    selectedLayers = layers
+                        .Where(l => l.LayerName.Contains(keyword) && l.TextCount > 0)
+                        .Select(l => l.LayerName)
+                        .ToList();
+                }
+                else
+                {
+                    selectedLayers = layerInput.Split(',')
+                        .Select(s => s.Trim())
+                        .Where(s => !string.IsNullOrEmpty(s))
+                        .ToList();
+                }
+
+                if (selectedLayers.Count == 0)
+                {
+                    ed.WriteMessage("\n未选择任何图层或选择的图层不存在。");
+                    return;
+                }
+
+                // 统计选中图层的文本数量
+                int totalTexts = layers
+                    .Where(l => selectedLayers.Contains(l.LayerName))
+                    .Sum(l => l.TextCount);
+
+                ed.WriteMessage($"\n\n已选择 {selectedLayers.Count} 个图层，共 {totalTexts} 个文本实体");
+                ed.WriteMessage("\n选中的图层: " + string.Join(", ", selectedLayers));
+
+                // 5. 选择目标语言（默认中文）
+                var languageOptions = new PromptKeywordOptions("\n选择目标语言")
+                {
+                    Keywords = { "中文", "英语", "日语", "韩语", "法语", "西班牙语", "德语", "俄语" },
+                    AllowNone = false
+                };
+                languageOptions.Keywords.Default = "中文";
+
+                var languageResult = ed.GetKeywords(languageOptions);
+                if (languageResult.Status != PromptStatus.OK)
+                {
+                    ed.WriteMessage("\n操作已取消。");
+                    return;
+                }
+
+                // 语言映射
+                var languageMap = new System.Collections.Generic.Dictionary<string, (string code, string name)>
+                {
+                    ["中文"] = ("zh", "简体中文"),
+                    ["英语"] = ("en", "英语"),
+                    ["日语"] = ("ja", "日语"),
+                    ["韩语"] = ("ko", "韩语"),
+                    ["法语"] = ("fr", "法语"),
+                    ["西班牙语"] = ("es", "西班牙语"),
+                    ["德语"] = ("de", "德语"),
+                    ["俄语"] = ("ru", "俄语")
+                };
+
+                var selectedLanguage = languageResult.StringResult;
+                var (targetLanguage, languageName) = languageMap[selectedLanguage];
+
+                // 6. 确认翻译
+                var confirmOptions = new PromptKeywordOptions($"\n确认翻译 {selectedLayers.Count} 个图层（{totalTexts} 个文本）为{languageName}？")
+                {
+                    Keywords = { "是", "否" },
+                    AllowNone = false
+                };
+                confirmOptions.Keywords.Default = "是";
+
+                var confirmResult = ed.GetKeywords(confirmOptions);
+                if (confirmResult.Status != PromptStatus.OK || confirmResult.StringResult != "是")
+                {
+                    ed.WriteMessage("\n操作已取消。");
+                    return;
+                }
+
+                // 7. 执行翻译
+                ed.WriteMessage($"\n\n开始翻译为{languageName}...");
+
+                var progress = new Progress<TranslationProgress>(p =>
+                {
+                    ed.WriteMessage($"\r{p.Stage}: {p.Percentage}%    ");
+                });
+
+                var stats = await LayerTranslationService.TranslateLayerTexts(
+                    selectedLayers,
+                    targetLanguage,
+                    progress
+                );
+
+                // 8. 显示结果
+                ed.WriteMessage("\n\n╔══════════════════════════════════════════════╗");
+                ed.WriteMessage("\n║  图层翻译完成！                              ║");
+                ed.WriteMessage("\n╚══════════════════════════════════════════════╝");
+                ed.WriteMessage($"\n\n统计信息：");
+                ed.WriteMessage($"\n  图层数量: {selectedLayers.Count}");
+                ed.WriteMessage($"\n  文本总数: {stats.TotalTextCount}");
+                ed.WriteMessage($"\n  唯一文本: {stats.UniqueTextCount}");
+                ed.WriteMessage($"\n  成功翻译: {stats.SuccessCount}");
+                ed.WriteMessage($"\n  失败数量: {stats.FailureCount}");
+                ed.WriteMessage($"\n  成功率: {stats.SuccessRate:F1}%");
+                ed.WriteMessage("\n");
+
+                Log.Information($"图层翻译完成: {stats}");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "图层翻译失败");
+                ed.WriteMessage($"\n[错误] 图层翻译失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// 快速翻译到指定语言
         /// </summary>
         private async Task QuickTranslate(string targetLanguage, string languageName)
