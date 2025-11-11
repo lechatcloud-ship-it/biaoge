@@ -8,10 +8,14 @@ namespace BiaogPlugin.Services;
 
 /// <summary>
 /// 翻译缓存服务（SQLite）
+/// ✅ 优化：使用连接池化 + 异步延迟初始化
 /// </summary>
 public class CacheService
 {
     private readonly string _dbPath;
+    private readonly string _connectionString;
+    private bool _initialized = false;
+    private readonly System.Threading.SemaphoreSlim _initLock = new(1, 1);
 
     public CacheService()
     {
@@ -23,49 +27,96 @@ public class CacheService
 
         _dbPath = Path.Combine(appDataPath, "cache.db");
 
-        InitializeDatabase();
+        // ✅ 优化：使用连接字符串池化，提高性能
+        // Mode=ReadWriteCreate: 如果不存在则创建
+        // Cache=Shared: 多个连接共享缓存
+        // Pooling=True: 启用连接池
+        _connectionString = $"Data Source={_dbPath};Mode=ReadWriteCreate;Cache=Shared;Pooling=True";
+
+        Log.Debug("CacheService已构造，延迟初始化数据库");
     }
 
-    private void InitializeDatabase()
+    /// <summary>
+    /// ✅ 优化：异步延迟初始化，避免阻塞AutoCAD启动
+    /// </summary>
+    private async Task EnsureInitializedAsync()
     {
-        using var connection = new SqliteConnection($"Data Source={_dbPath}");
-        connection.Open();
+        if (_initialized) return;
 
-        var command = connection.CreateCommand();
-        command.CommandText = @"
-            CREATE TABLE IF NOT EXISTS translation_cache (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                source_text TEXT NOT NULL,
-                target_language TEXT NOT NULL,
-                translated_text TEXT NOT NULL,
-                created_at INTEGER NOT NULL,
-                UNIQUE(source_text, target_language)
-            )
-        ";
-        command.ExecuteNonQuery();
+        await _initLock.WaitAsync();
+        try
+        {
+            if (_initialized) return;
 
-        Log.Information("缓存数据库初始化完成: {DbPath}", _dbPath);
+            await using var connection = new SqliteConnection(_connectionString);
+            await connection.OpenAsync();
+
+            await using var command = connection.CreateCommand();
+            command.CommandText = @"
+                CREATE TABLE IF NOT EXISTS translation_cache (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source_text TEXT NOT NULL,
+                    target_language TEXT NOT NULL,
+                    translated_text TEXT NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    UNIQUE(source_text, target_language)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_cache_lookup
+                ON translation_cache(source_text, target_language);
+
+                CREATE INDEX IF NOT EXISTS idx_cache_created
+                ON translation_cache(created_at);
+            ";
+            await command.ExecuteNonQueryAsync();
+
+            _initialized = true;
+            Log.Information("缓存数据库初始化完成: {DbPath}", _dbPath);
+        }
+        finally
+        {
+            _initLock.Release();
+        }
     }
 
     /// <summary>
     /// 获取翻译缓存
+    /// ✅ 优化：添加TTL检查，默认30天过期
     /// </summary>
-    public async Task<string?> GetTranslationAsync(string sourceText, string targetLanguage)
+    public async Task<string?> GetTranslationAsync(string sourceText, string targetLanguage, int expirationDays = 30)
     {
-        await using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await EnsureInitializedAsync();
+
+        await using var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync();
 
         await using var command = connection.CreateCommand();
         command.CommandText = @"
-            SELECT translated_text
+            SELECT translated_text, created_at
             FROM translation_cache
             WHERE source_text = $source_text AND target_language = $target_language
         ";
         command.Parameters.AddWithValue("$source_text", sourceText);
         command.Parameters.AddWithValue("$target_language", targetLanguage);
 
-        var result = await command.ExecuteScalarAsync();
-        return result?.ToString();
+        await using var reader = await command.ExecuteReaderAsync();
+        if (await reader.ReadAsync())
+        {
+            var translatedText = reader.GetString(0);
+            var createdAt = reader.GetInt64(1);
+
+            // ✅ 检查是否过期
+            var expirationTimestamp = DateTimeOffset.UtcNow.AddDays(-expirationDays).ToUnixTimeSeconds();
+            if (createdAt < expirationTimestamp)
+            {
+                Log.Debug("缓存已过期: {Text}, 创建时间: {CreatedAt}", sourceText, DateTimeOffset.FromUnixTimeSeconds(createdAt));
+                return null; // 返回null，触发重新翻译
+            }
+
+            return translatedText;
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -73,7 +124,9 @@ public class CacheService
     /// </summary>
     public async Task SetTranslationAsync(string sourceText, string targetLanguage, string translatedText)
     {
-        await using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await EnsureInitializedAsync();
+
+        await using var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync();
 
         await using var command = connection.CreateCommand();
@@ -90,11 +143,13 @@ public class CacheService
     }
 
     /// <summary>
-    /// 清理缓存
+    /// 清理所有缓存
     /// </summary>
     public async Task ClearCacheAsync()
     {
-        await using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await EnsureInitializedAsync();
+
+        await using var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync();
 
         await using var command = connection.CreateCommand();
@@ -105,11 +160,35 @@ public class CacheService
     }
 
     /// <summary>
+    /// ✅ 优化：清理过期缓存
+    /// </summary>
+    public async Task<int> CleanExpiredCacheAsync(int expirationDays = 30)
+    {
+        await EnsureInitializedAsync();
+
+        await using var connection = new SqliteConnection(_connectionString);
+        await connection.OpenAsync();
+
+        var expirationTimestamp = DateTimeOffset.UtcNow.AddDays(-expirationDays).ToUnixTimeSeconds();
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM translation_cache WHERE created_at < $expiration";
+        command.Parameters.AddWithValue("$expiration", expirationTimestamp);
+
+        var deletedCount = await command.ExecuteNonQueryAsync();
+        Log.Information($"清理过期缓存: 删除 {deletedCount} 条记录（超过 {expirationDays} 天）");
+
+        return deletedCount;
+    }
+
+    /// <summary>
     /// 获取缓存统计信息
     /// </summary>
     public async Task<CacheStatistics> GetStatisticsAsync()
     {
-        await using var connection = new SqliteConnection($"Data Source={_dbPath}");
+        await EnsureInitializedAsync();
+
+        await using var connection = new SqliteConnection(_connectionString);
         await connection.OpenAsync();
 
         await using var command = connection.CreateCommand();

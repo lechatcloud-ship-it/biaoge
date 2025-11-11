@@ -14,6 +14,14 @@ namespace BiaogPlugin
     /// </summary>
     public class PluginApplication : IExtensionApplication
     {
+        // ✅ 静态HttpClient实例，整个应用程序生命周期复用
+        // 根据Microsoft最佳实践：HttpClient应该被实例化一次并复用，避免Socket耗尽
+        // 参考：https://learn.microsoft.com/en-us/dotnet/fundamentals/networking/http/httpclient-guidelines
+        private static readonly System.Net.Http.HttpClient _sharedHttpClient = new System.Net.Http.HttpClient
+        {
+            Timeout = TimeSpan.FromMinutes(5) // 5分钟超时，适合长时间AI翻译操作
+        };
+
         /// <summary>
         /// 插件初始化 - AutoCAD加载插件时调用
         /// </summary>
@@ -168,14 +176,13 @@ namespace BiaogPlugin
                 Services.ServiceLocator.RegisterService(cacheService);
                 Log.Debug("CacheService已注册");
 
-                // 3. HTTP客户端
-                var httpClient = new System.Net.Http.HttpClient();
-                httpClient.Timeout = TimeSpan.FromSeconds(60);
-                Services.ServiceLocator.RegisterService(httpClient);
-                Log.Debug("HttpClient已注册");
+                // 3. HTTP客户端（使用静态共享实例）
+                // ✅ 修复：使用静态HttpClient避免Socket耗尽
+                Services.ServiceLocator.RegisterService(_sharedHttpClient);
+                Log.Debug("HttpClient已注册（静态实例）");
 
                 // 4. 百炼API客户端
-                var bailianClient = new Services.BailianApiClient(httpClient, configManager);
+                var bailianClient = new Services.BailianApiClient(_sharedHttpClient, configManager);
                 Services.ServiceLocator.RegisterService(bailianClient);
                 Log.Debug("BailianApiClient已注册");
 
