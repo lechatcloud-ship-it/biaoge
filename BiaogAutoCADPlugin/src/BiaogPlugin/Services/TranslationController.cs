@@ -203,6 +203,42 @@ namespace BiaogPlugin.Services
 
                 Log.Information($"更新结果: {updateResult}");
 
+                // 记录翻译历史
+                if (_configManager != null && _configManager.Config.Translation.EnableHistory)
+                {
+                    var history = ServiceLocator.GetService<TranslationHistory>();
+                    if (history != null && updateResult.SuccessCount > 0)
+                    {
+                        var historyRecords = new List<TranslationHistory.HistoryRecord>();
+
+                        foreach (var textEntity in translatableTexts)
+                        {
+                            if (translationMap.TryGetValue(textEntity.Content, out var translatedText)
+                                && !string.IsNullOrEmpty(translatedText))
+                            {
+                                historyRecords.Add(new TranslationHistory.HistoryRecord
+                                {
+                                    Timestamp = DateTime.Now,
+                                    ObjectIdHandle = textEntity.ObjectId.Handle.ToString(),
+                                    OriginalText = textEntity.Content,
+                                    TranslatedText = translatedText,
+                                    SourceLanguage = "auto",
+                                    TargetLanguage = targetLanguage,
+                                    EntityType = textEntity.Type,
+                                    Layer = textEntity.Layer,
+                                    Operation = "translate"
+                                });
+                            }
+                        }
+
+                        if (historyRecords.Count > 0)
+                        {
+                            await history.AddRecordsAsync(historyRecords);
+                            Log.Debug($"已记录 {historyRecords.Count} 条全图翻译历史");
+                        }
+                    }
+                }
+
                 // ====== 完成 ======
                 stopwatch.Stop();
                 statistics.TotalSeconds = stopwatch.Elapsed.TotalSeconds;

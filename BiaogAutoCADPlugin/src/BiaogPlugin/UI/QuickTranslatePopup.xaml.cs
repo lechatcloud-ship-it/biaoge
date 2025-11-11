@@ -188,6 +188,58 @@ namespace BiaogPlugin.UI
 
                 updater.UpdateTexts(updateMap);
 
+                // 记录翻译历史
+                var configManager = ServiceLocator.GetService<ConfigManager>();
+                if (configManager != null && configManager.Config.Translation.EnableHistory)
+                {
+                    var history = ServiceLocator.GetService<TranslationHistory>();
+                    if (history != null)
+                    {
+                        var doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
+                        var db = doc.Database;
+
+                        // 获取实体类型和图层信息
+                        string entityType = "Unknown";
+                        string layerName = "0";
+
+                        using (var tr = db.TransactionManager.StartTransaction())
+                        {
+                            var obj = tr.GetObject(_textObjectId, Autodesk.AutoCAD.DatabaseServices.OpenMode.ForRead);
+                            if (obj is Autodesk.AutoCAD.DatabaseServices.DBText dbText)
+                            {
+                                entityType = "DBText";
+                                layerName = dbText.Layer;
+                            }
+                            else if (obj is Autodesk.AutoCAD.DatabaseServices.MText mText)
+                            {
+                                entityType = "MText";
+                                layerName = mText.Layer;
+                            }
+                            else if (obj is Autodesk.AutoCAD.DatabaseServices.AttributeReference attRef)
+                            {
+                                entityType = "AttributeReference";
+                                layerName = attRef.Layer;
+                            }
+                            tr.Commit();
+                        }
+
+                        await history.AddRecordAsync(new TranslationHistory.HistoryRecord
+                        {
+                            Timestamp = DateTime.Now,
+                            ObjectIdHandle = _textObjectId.Handle.ToString(),
+                            OriginalText = _originalText,
+                            TranslatedText = _translatedText,
+                            SourceLanguage = "auto",
+                            TargetLanguage = _currentLanguageCode,
+                            EntityType = entityType,
+                            Layer = layerName,
+                            Operation = "translate"
+                        });
+
+                        Log.Debug("已记录双击翻译历史");
+                    }
+                }
+
                 IsApplied = true;
                 StatusTextBlock.Text = "✓ 已应用";
 
