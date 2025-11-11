@@ -259,6 +259,41 @@ namespace BiaogPlugin
 
                 updater.UpdateTexts(updateMap);
 
+                // 记录翻译历史
+                var configManager2 = ServiceLocator.GetService<ConfigManager>();
+                if (configManager2 != null && configManager2.Config.Translation.EnableHistory)
+                {
+                    var history = ServiceLocator.GetService<TranslationHistory>();
+                    if (history != null)
+                    {
+                        var historyRecords = new List<TranslationHistory.HistoryRecord>();
+                        for (int i = 0; i < textEntities.Count && i < translations.Count; i++)
+                        {
+                            if (!string.IsNullOrEmpty(translations[i]))
+                            {
+                                historyRecords.Add(new TranslationHistory.HistoryRecord
+                                {
+                                    Timestamp = DateTime.Now,
+                                    ObjectIdHandle = textEntities[i].ObjectId.Handle.ToString(),
+                                    OriginalText = textEntities[i].Content,
+                                    TranslatedText = translations[i],
+                                    SourceLanguage = "auto",
+                                    TargetLanguage = targetLanguage,
+                                    EntityType = textEntities[i].Type,
+                                    Layer = textEntities[i].Layer,
+                                    Operation = "translate"
+                                });
+                            }
+                        }
+
+                        if (historyRecords.Count > 0)
+                        {
+                            await history.AddRecordsAsync(historyRecords);
+                            Log.Debug($"已记录 {historyRecords.Count} 条翻译历史");
+                        }
+                    }
+                }
+
                 ed.WriteMessage($"\n\n框选翻译完成！");
                 ed.WriteMessage($"\n  已翻译: {translatedCount} 个文本");
                 if (skippedCount > 0)
@@ -920,6 +955,60 @@ namespace BiaogPlugin
         #region 帮助和工具命令
 
         /// <summary>
+        /// 快速上手指南
+        /// </summary>
+        [CommandMethod("BIAOGE_QUICKSTART", CommandFlags.Modal)]
+        public void ShowQuickStart()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            ed.WriteMessage("\n╔══════════════════════════════════════════════════════════╗");
+            ed.WriteMessage("\n║  标哥插件 - 5分钟快速上手指南                          ║");
+            ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝");
+            ed.WriteMessage("\n");
+            ed.WriteMessage("\n【第1步：配置API密钥】");
+            ed.WriteMessage("\n  1. 运行命令: BIAOGE_SETTINGS");
+            ed.WriteMessage("\n  2. 在\"百炼API配置\"选项卡输入您的API密钥");
+            ed.WriteMessage("\n  3. 点击\"保存\"按钮");
+            ed.WriteMessage("\n  提示: 访问 https://dashscope.aliyuncs.com/ 获取API密钥");
+            ed.WriteMessage("\n");
+            ed.WriteMessage("\n【第2步：开始翻译】");
+            ed.WriteMessage("\n  最简单的方式 - 直接翻译为中文:");
+            ed.WriteMessage("\n    BIAOGE_TRANSLATE_ZH  （推荐！一键翻译整个图纸）");
+            ed.WriteMessage("\n");
+            ed.WriteMessage("\n  高级方式 - 选择翻译:");
+            ed.WriteMessage("\n    BIAOGE_TRANSLATE_SELECTED  （框选要翻译的文本）");
+            ed.WriteMessage("\n    BIAOGE_TRANSLATE_LAYER     （按图层翻译）");
+            ed.WriteMessage("\n");
+            ed.WriteMessage("\n【第3步：体验智能功能】");
+            ed.WriteMessage("\n  ✓ 双击文本 - 自动弹出翻译窗口");
+            ed.WriteMessage("\n  ✓ 右键文本 - 选择\"翻译文本\"快速翻译");
+            ed.WriteMessage("\n  ✓ 输入法自动切换 - 命令模式英文，编辑模式中文");
+            ed.WriteMessage("\n  ✓ 翻译历史 - 运行 BIAOGE_HISTORY 查看所有翻译记录");
+            ed.WriteMessage("\n");
+            ed.WriteMessage("\n【常用命令速查】");
+            ed.WriteMessage("\n  BZ   - 快速翻译为中文（需安装快捷键）");
+            ed.WriteMessage("\n  BE   - 快速翻译为英文（需安装快捷键）");
+            ed.WriteMessage("\n  BIAOGE_AI      - 启动AI助手（图纸问答、智能修改）");
+            ed.WriteMessage("\n  BIAOGE_HISTORY - 查看翻译历史（支持撤销）");
+            ed.WriteMessage("\n  BIAOGE_SMART_REPLACE - 批量智能替换文本");
+            ed.WriteMessage("\n");
+            ed.WriteMessage("\n【安装快捷键（可选）】");
+            ed.WriteMessage("\n  运行: BIAOGE_INSTALL_KEYS");
+            ed.WriteMessage("\n  然后输入: REINIT 并选择 PGP file 重新加载");
+            ed.WriteMessage("\n  之后就可以使用 BZ、BE 等快捷键了！");
+            ed.WriteMessage("\n");
+            ed.WriteMessage("\n【需要帮助？】");
+            ed.WriteMessage("\n  BIAOGE_HELP      - 查看完整命令列表");
+            ed.WriteMessage("\n  BIAOGE_STATUS    - 查看功能状态");
+            ed.WriteMessage("\n  BIAOGE_DIAGNOSTIC - 运行系统诊断");
+            ed.WriteMessage("\n");
+            ed.WriteMessage("\n详细文档: https://github.com/lechatcloud-ship-it/biaoge");
+            ed.WriteMessage("\n");
+        }
+
+        /// <summary>
         /// 显示帮助信息
         /// </summary>
         [CommandMethod("BIAOGE_HELP", CommandFlags.Modal)]
@@ -937,6 +1026,13 @@ namespace BiaogPlugin
             ed.WriteMessage("\n  BIAOGE_TRANSLATE_SELECTED  - 框选翻译（仅翻译选中文本）");
             ed.WriteMessage("\n  BIAOGE_TRANSLATE_ZH        - 快速翻译为中文（推荐）");
             ed.WriteMessage("\n  BIAOGE_TRANSLATE_EN        - 快速翻译为英语");
+            ed.WriteMessage("\n  BIAOGE_TRANSLATE_LAYER     - 按图层选择性翻译");
+            ed.WriteMessage("\n");
+            ed.WriteMessage("\n【高级功能 - Phase 3】");
+            ed.WriteMessage("\n  BIAOGE_HISTORY             - 查看翻译历史记录和统计");
+            ed.WriteMessage("\n  BIAOGE_UNDO_TRANSLATION    - 撤销最近的翻译操作");
+            ed.WriteMessage("\n  BIAOGE_CLEAR_HISTORY       - 清除所有翻译历史");
+            ed.WriteMessage("\n  BIAOGE_SMART_REPLACE       - 批量智能替换（支持AI建议）");
             ed.WriteMessage("\n");
             ed.WriteMessage("\n【算量功能】");
             ed.WriteMessage("\n  BIAOGE_CALCULATE      - 打开算量面板");
@@ -949,14 +1045,30 @@ namespace BiaogPlugin
             ed.WriteMessage("\n                          智能调用: 翻译/代码/视觉专用模型");
             ed.WriteMessage("\n                          支持: 深度思考、流式输出、工具调用");
             ed.WriteMessage("\n");
-            ed.WriteMessage("\n【设置】");
+            ed.WriteMessage("\n【用户体验增强 - Phase 2】");
+            ed.WriteMessage("\n  双击文本翻译       - 双击文本实体快速翻译");
+            ed.WriteMessage("\n  智能输入法切换     - 命令模式自动切换英文/中文");
+            ed.WriteMessage("\n  右键菜单翻译       - 右键文本实体快速翻译");
+            ed.WriteMessage("\n  Ribbon工具栏       - 专业的工具栏界面");
+            ed.WriteMessage("\n");
+            ed.WriteMessage("\n【设置与工具】");
             ed.WriteMessage("\n  BIAOGE_SETTINGS       - 打开设置对话框");
+            ed.WriteMessage("\n  BIAOGE_STATUS         - 显示功能状态");
+            ed.WriteMessage("\n  BIAOGE_TOGGLE_DOUBLECLICK  - 切换双击翻译");
+            ed.WriteMessage("\n  BIAOGE_TOGGLE_IME     - 切换智能输入法");
             ed.WriteMessage("\n  BIAOGE_ABOUT          - 关于插件");
             ed.WriteMessage("\n");
-            ed.WriteMessage("\n【工具】");
+            ed.WriteMessage("\n【快捷键】");
+            ed.WriteMessage("\n  BIAOGE_KEYS           - 显示快捷键配置指南");
+            ed.WriteMessage("\n  BIAOGE_EXPORT_KEYS    - 导出快捷键配置到桌面");
+            ed.WriteMessage("\n  BIAOGE_INSTALL_KEYS   - 自动安装快捷键");
+            ed.WriteMessage("\n");
+            ed.WriteMessage("\n【诊断工具】");
             ed.WriteMessage("\n  BIAOGE_HELP           - 显示此帮助信息");
             ed.WriteMessage("\n  BIAOGE_VERSION        - 显示版本信息");
             ed.WriteMessage("\n  BIAOGE_CLEARCACHE     - 清除翻译缓存");
+            ed.WriteMessage("\n  BIAOGE_DIAGNOSTIC     - 运行系统诊断");
+            ed.WriteMessage("\n  BIAOGE_PERFORMANCE    - 显示性能报告");
             ed.WriteMessage("\n");
             ed.WriteMessage("\n详细文档: https://github.com/lechatcloud-ship-it/biaoge");
             ed.WriteMessage("\n");

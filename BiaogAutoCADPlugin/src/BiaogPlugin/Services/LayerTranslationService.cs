@@ -263,6 +263,40 @@ namespace BiaogPlugin.Services
 
                 updater.UpdateTexts(updateMap);
 
+                // 记录翻译历史
+                if (configManager != null && configManager.Config.Translation.EnableHistory)
+                {
+                    var history = ServiceLocator.GetService<TranslationHistory>();
+                    if (history != null)
+                    {
+                        var historyRecords = new List<TranslationHistory.HistoryRecord>();
+                        for (int i = 0; i < textEntities.Count && i < translations.Count; i++)
+                        {
+                            if (!string.IsNullOrEmpty(translations[i]))
+                            {
+                                historyRecords.Add(new TranslationHistory.HistoryRecord
+                                {
+                                    Timestamp = DateTime.Now,
+                                    ObjectIdHandle = textEntities[i].ObjectId.Handle.ToString(),
+                                    OriginalText = textEntities[i].Content,
+                                    TranslatedText = translations[i],
+                                    SourceLanguage = "auto",
+                                    TargetLanguage = targetLanguage,
+                                    EntityType = textEntities[i].Type,
+                                    Layer = textEntities[i].Layer,
+                                    Operation = "translate"
+                                });
+                            }
+                        }
+
+                        if (historyRecords.Count > 0)
+                        {
+                            await history.AddRecordsAsync(historyRecords);
+                            Log.Debug($"已记录 {historyRecords.Count} 条图层翻译历史");
+                        }
+                    }
+                }
+
                 // 4. 生成统计信息
                 var stats = new TranslationStatistics
                 {

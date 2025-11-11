@@ -45,11 +45,11 @@ namespace BiaogPlugin
                     ed.WriteMessage("\n║                                                  ║");
                     ed.WriteMessage("\n╚══════════════════════════════════════════════════╝");
                     ed.WriteMessage("\n");
-                    ed.WriteMessage("\n可用命令:");
-                    ed.WriteMessage("\n  BIAOGE_TRANSLATE  - 翻译当前图纸");
-                    ed.WriteMessage("\n  BIAOGE_CALCULATE  - 构件识别和工程量计算");
-                    ed.WriteMessage("\n  BIAOGE_SETTINGS   - 打开设置对话框");
-                    ed.WriteMessage("\n  BIAOGE_HELP       - 显示帮助信息");
+                    ed.WriteMessage("\n快速开始:");
+                    ed.WriteMessage("\n  BIAOGE_QUICKSTART - 5分钟快速上手指南（新用户推荐）");
+                    ed.WriteMessage("\n  BIAOGE_TRANSLATE_ZH - 一键翻译为中文");
+                    ed.WriteMessage("\n  BIAOGE_AI         - 启动AI助手");
+                    ed.WriteMessage("\n  BIAOGE_HELP       - 查看完整命令列表");
                     ed.WriteMessage("\n");
                 }
 
