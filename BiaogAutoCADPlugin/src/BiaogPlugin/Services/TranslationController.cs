@@ -17,19 +17,19 @@ namespace BiaogPlugin.Services
     {
         private readonly DwgTextExtractor _extractor;
         private readonly DwgTextUpdater _updater;
-
-        // 注意：以下服务需要从BiaogeCSharp项目复制实现
-        // private readonly TranslationEngine _translationEngine;
-        // private readonly CacheService _cacheService;
+        private readonly TranslationEngine _translationEngine;
+        private readonly CacheService _cacheService;
+        private readonly ConfigManager _configManager;
 
         public TranslationController()
         {
             _extractor = new DwgTextExtractor();
             _updater = new DwgTextUpdater();
 
-            // TODO: 从ServiceLocator获取服务
-            // _translationEngine = ServiceLocator.GetOrCreateService<TranslationEngine>();
-            // _cacheService = ServiceLocator.GetOrCreateService<CacheService>();
+            // 从ServiceLocator获取服务
+            _translationEngine = ServiceLocator.GetService<TranslationEngine>()!;
+            _cacheService = ServiceLocator.GetService<CacheService>()!;
+            _configManager = ServiceLocator.GetService<ConfigManager>()!;
         }
 
         /// <summary>
@@ -112,23 +112,29 @@ namespace BiaogPlugin.Services
                 var translationMap = new Dictionary<string, string>();
                 var uncachedTexts = new List<string>();
 
-                // TODO: 实现缓存查询
-                // foreach (var text in uniqueTexts)
-                // {
-                //     var cached = await _cacheService.GetTranslationAsync(text, targetLanguage);
-                //     if (cached != null)
-                //     {
-                //         translationMap[text] = cached.TranslatedText;
-                //         statistics.CacheHitCount++;
-                //     }
-                //     else
-                //     {
-                //         uncachedTexts.Add(text);
-                //     }
-                // }
+                // 查询缓存
+                bool useCacheEnabled = _configManager.GetBool("Translation:UseCache", true);
 
-                // 临时实现：所有文本都需要翻译
-                uncachedTexts = uniqueTexts;
+                if (useCacheEnabled)
+                {
+                    foreach (var text in uniqueTexts)
+                    {
+                        var cached = await _cacheService.GetTranslationAsync(text, targetLanguage);
+                        if (cached != null)
+                        {
+                            translationMap[text] = cached;
+                            statistics.CacheHitCount++;
+                        }
+                        else
+                        {
+                            uncachedTexts.Add(text);
+                        }
+                    }
+                }
+                else
+                {
+                    uncachedTexts = uniqueTexts;
+                }
 
                 var cacheHitRate = uniqueTexts.Count > 0
                     ? (double)statistics.CacheHitCount / uniqueTexts.Count * 100
@@ -146,38 +152,32 @@ namespace BiaogPlugin.Services
                         Percentage = 50
                     });
 
-                    // TODO: 实现真实的翻译调用
-                    // var translations = await _translationEngine.TranslateBatchAsync(
-                    //     uncachedTexts,
-                    //     targetLanguage,
-                    //     progress: new Progress<double>(p =>
-                    //     {
-                    //         progress?.Report(new TranslationProgress
-                    //         {
-                    //             Stage = "翻译中",
-                    //             Percentage = 50 + (int)(p * 0.3)
-                    //         });
-                    //     })
-                    // );
-
-                    // 临时实现：模拟翻译（在真实环境中会调用百炼API）
-                    var translations = SimulateTranslation(uncachedTexts, targetLanguage);
+                    // 使用TranslationEngine进行批量翻译（自动处理缓存）
+                    var translations = await _translationEngine.TranslateBatchWithCacheAsync(
+                        uncachedTexts,
+                        targetLanguage,
+                        progress: new Progress<double>(p =>
+                        {
+                            progress?.Report(new TranslationProgress
+                            {
+                                Stage = "翻译中",
+                                Percentage = 50 + (int)(p * 0.3),
+                                ProcessedCount = (int)(uncachedTexts.Count * p / 100.0),
+                                TotalCount = uncachedTexts.Count
+                            });
+                        })
+                    );
 
                     // 添加到翻译映射
                     for (int i = 0; i < uncachedTexts.Count; i++)
                     {
                         translationMap[uncachedTexts[i]] = translations[i];
-
-                        // TODO: 写入缓存
-                        // await _cacheService.SetTranslationAsync(
-                        //     uncachedTexts[i],
-                        //     targetLanguage,
-                        //     translations[i]
-                        // );
                     }
 
                     statistics.ApiCallCount = (int)Math.Ceiling(uncachedTexts.Count / 50.0);
                     statistics.SuccessCount = translationMap.Count;
+
+                    Log.Information($"批量翻译完成: {translations.Count} 条");
                 }
 
                 // ====== 阶段6: 构建更新请求 ======
@@ -227,28 +227,6 @@ namespace BiaogPlugin.Services
             }
         }
 
-        /// <summary>
-        /// 模拟翻译（用于测试，真实环境会调用百炼API）
-        /// </summary>
-        private List<string> SimulateTranslation(List<string> texts, string targetLanguage)
-        {
-            Log.Warning("使用模拟翻译（真实环境需要配置百炼API密钥）");
-
-            return texts.Select(text =>
-            {
-                switch (targetLanguage.ToLower())
-                {
-                    case "en":
-                        return $"[EN] {text}";
-                    case "ja":
-                        return $"[JA] {text}";
-                    case "ko":
-                        return $"[KO] {text}";
-                    default:
-                        return $"[{targetLanguage.ToUpper()}] {text}";
-                }
-            }).ToList();
-        }
 
         /// <summary>
         /// 翻译选定的文本

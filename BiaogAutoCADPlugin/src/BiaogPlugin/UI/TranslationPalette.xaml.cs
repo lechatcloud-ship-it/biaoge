@@ -128,7 +128,7 @@ namespace BiaogPlugin.UI
             });
         }
 
-        private void ClearCacheButton_Click(object sender, RoutedEventArgs e)
+        private async void ClearCacheButton_Click(object sender, RoutedEventArgs e)
         {
             var result = MessageBox.Show(
                 "确定要清除所有翻译缓存吗？\n\n这将删除所有已缓存的翻译结果。",
@@ -143,7 +143,7 @@ namespace BiaogPlugin.UI
                     var cacheService = ServiceLocator.GetService<CacheService>();
                     if (cacheService != null)
                     {
-                        cacheService.ClearAll();
+                        await cacheService.ClearCacheAsync();
                         AddLog("缓存已清除");
                         MessageBox.Show("缓存已清除", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
