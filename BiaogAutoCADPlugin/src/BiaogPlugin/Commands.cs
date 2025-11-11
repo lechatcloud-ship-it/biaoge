@@ -160,8 +160,14 @@ namespace BiaogPlugin
                 Log.Information("启动AI助手");
 
                 ed.WriteMessage("\n╔══════════════════════════════════════════════════════════╗");
-                ed.WriteMessage("\n║  标哥AI助手 - 基于阿里云百炼大模型                    ║");
+                ed.WriteMessage("\n║  标哥AI助手 - 智能Agent架构（qwen3-max-preview）      ║");
                 ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝");
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n正在初始化Agent系统...");
+                ed.WriteMessage("\n  ✓ 核心Agent: qwen3-max-preview（思考模式融合）");
+                ed.WriteMessage("\n  ✓ 翻译工具: qwen-mt-flash（92语言，术语定制）");
+                ed.WriteMessage("\n  ✓ 代码工具: qwen3-coder-flash（仓库级别理解）");
+                ed.WriteMessage("\n  ✓ 视觉工具: qwen3-vl-flash（空间感知+2D/3D定位）");
                 ed.WriteMessage("\n");
                 ed.WriteMessage("\n正在分析当前图纸...");
 
@@ -171,13 +177,13 @@ namespace BiaogPlugin
                 var contextManager = new DrawingContextManager();
                 var aiService = new AIAssistantService(bailianClient!, configManager!, contextManager);
 
-                ed.WriteMessage("\n图纸分析完成！您可以问我任何关于这张图纸的问题。");
+                ed.WriteMessage("\n图纸分析完成！Agent已就绪，可智能调用专用模型完成任务。");
                 ed.WriteMessage("\n");
-                ed.WriteMessage("\n示例问题：");
-                ed.WriteMessage("\n  - 这张图纸有哪些图层？");
-                ed.WriteMessage("\n  - 统计一下文本实体的数量");
-                ed.WriteMessage("\n  - 帮我找到所有的梁构件");
-                ed.WriteMessage("\n  - 将图层0改名为结构层");
+                ed.WriteMessage("\n示例任务：");
+                ed.WriteMessage("\n  - 帮我翻译图纸中的\"外墙\"为英文（自动调用qwen-mt-flash）");
+                ed.WriteMessage("\n  - 将所有的\"C30\"修改为\"C35\"（自动调用qwen3-coder-flash）");
+                ed.WriteMessage("\n  - 识别图纸中的梁构件（自动调用qwen3-vl-flash）");
+                ed.WriteMessage("\n  - 这张图纸有哪些图层？（直接查询图纸上下文）");
                 ed.WriteMessage("\n");
                 ed.WriteMessage("\n输入 'exit' 退出，输入 'clear' 清除历史，输入 'deep' 启用深度思考");
                 ed.WriteMessage("\n" + new string('─', 60));
@@ -270,8 +276,10 @@ namespace BiaogPlugin
             ed.WriteMessage("\n  BIAOGE_QUICKCOUNT     - 快速统计构件数量");
             ed.WriteMessage("\n");
             ed.WriteMessage("\n【AI助手】");
-            ed.WriteMessage("\n  BIAOGE_AI             - 启动标哥AI助手（图纸问答+修改）");
-            ed.WriteMessage("\n                          支持深度思考、流式输出");
+            ed.WriteMessage("\n  BIAOGE_AI             - 启动标哥AI助手（智能Agent架构）");
+            ed.WriteMessage("\n                          核心: qwen3-max-preview（思考模式融合）");
+            ed.WriteMessage("\n                          智能调用: 翻译/代码/视觉专用模型");
+            ed.WriteMessage("\n                          支持: 深度思考、流式输出、工具调用");
             ed.WriteMessage("\n");
             ed.WriteMessage("\n【设置】");
             ed.WriteMessage("\n  BIAOGE_SETTINGS       - 打开设置对话框");
@@ -320,8 +328,9 @@ namespace BiaogPlugin
             ShowVersion();
 
             ed.WriteMessage("\n【核心功能】");
-            ed.WriteMessage("\n  ✓ AI智能翻译 (8种语言)");
-            ed.WriteMessage("\n  ✓ 构件识别算量 (超高精度)");
+            ed.WriteMessage("\n  ✓ 标哥AI助手 (Agent架构，智能调度专用模型)");
+            ed.WriteMessage("\n  ✓ AI智能翻译 (qwen-mt-flash，92语言)");
+            ed.WriteMessage("\n  ✓ 构件识别算量 (qwen3-vl-flash，超高精度)");
             ed.WriteMessage("\n  ✓ 多格式导出 (Excel/PDF)");
             ed.WriteMessage("\n  ✓ 智能缓存 (90%+命中率)");
             ed.WriteMessage("\n");

@@ -1,24 +1,38 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
-using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Autodesk.AutoCAD.ApplicationServices;
+using Autodesk.AutoCAD.DatabaseServices;
+using Autodesk.AutoCAD.EditorInput;
 using Serilog;
 
 namespace BiaogPlugin.Services
 {
     /// <summary>
-    /// 标哥AI助手服务 - 基于阿里云百炼大模型
-    /// 支持流式输出、深度思考、Function Calling
-    /// 使用统一的BailianApiClient，一个API密钥调用所有模型
+    /// 标哥Agent - 基于阿里云百炼官方最佳实践
+    ///
+    /// 架构：qwen3-max-preview作为核心Agent，智能调度专用模型
+    /// - 翻译任务 → qwen-mt-flash
+    /// - 代码任务 → qwen3-coder-flash
+    /// - 视觉任务 → qwen3-vl-flash
+    ///
+    /// 工作流（阿里云官方5步）：
+    /// 1. 工具定义（Tools Definition）
+    /// 2. 消息初始化（Message Initialization）
+    /// 3. Agent决策（Initial Model Call）
+    /// 4. 工具执行（Tool Execution）
+    /// 5. 总结反馈（Synthesis）
     /// </summary>
     public class AIAssistantService
     {
         private readonly BailianApiClient _bailianClient;
         private readonly ConfigManager _configManager;
         private readonly DrawingContextManager _contextManager;
+
+        // Agent核心模型（固定使用qwen3-max-preview）
+        private const string AgentModel = "qwen3-max-preview";
 
         // 对话历史
         private readonly List<BiaogPlugin.Services.ChatMessage> _chatHistory = new();
@@ -32,15 +46,12 @@ namespace BiaogPlugin.Services
             _configManager = configManager;
             _contextManager = contextManager;
 
-            Log.Information("AI助手服务初始化完成（使用统一Bailian客户端）");
+            Log.Information("标哥Agent初始化完成（核心模型: qwen3-max-preview）");
         }
 
         /// <summary>
-        /// 流式对话 - 支持深度思考和Function Calling
+        /// Agent对话 - 智能调度专用模型
         /// </summary>
-        /// <param name="userMessage">用户消息</param>
-        /// <param name="useDeepThinking">是否启用深度思考模式</param>
-        /// <param name="onStreamChunk">流式输出回调</param>
         public async Task<AssistantResponse> ChatStreamAsync(
             string userMessage,
             bool useDeepThinking = false,
@@ -48,107 +59,394 @@ namespace BiaogPlugin.Services
         {
             try
             {
-                // 1. 获取当前图纸上下文
+                onStreamChunk?.Invoke($"\n[标哥Agent] 正在分析您的需求...\n");
+
+                // ===== 第1步：工具定义 =====
+                var tools = GetAvailableTools();
+
+                // ===== 第2步：消息初始化 =====
                 var drawingContext = _contextManager.GetCurrentDrawingContext();
+                var systemPrompt = BuildAgentSystemPrompt(drawingContext, useDeepThinking);
 
-                // 2. 构建系统提示（包含图纸信息）
-                var systemPrompt = BuildSystemPrompt(drawingContext);
-
-                // 3. 添加用户消息到历史
                 _chatHistory.Add(new BiaogPlugin.Services.ChatMessage
                 {
                     Role = "user",
                     Content = userMessage
                 });
 
-                // 4. 构建消息列表（系统提示 + 历史）
                 var messages = BuildMessages(systemPrompt);
 
-                // 5. 选择最优模型
-                var model = useDeepThinking
-                    ? BailianModelSelector.GetOptimalModel(BailianModelSelector.TaskType.DeepThinking)
-                    : BailianModelSelector.GetOptimalModel(BailianModelSelector.TaskType.Conversation, highPerformance: true);
+                // ===== 第3步：Agent决策 =====
+                onStreamChunk?.Invoke($"[标哥Agent] 使用{AgentModel}进行决策...\n");
 
-                Log.Information($"使用模型: {model} (深度思考: {useDeepThinking})");
-
-                // 6. 使用统一客户端调用API - 支持流式输出和深度思考
-                var result = await _bailianClient.ChatCompletionStreamAsync(
+                var agentDecision = await _bailianClient.ChatCompletionStreamAsync(
                     messages: messages,
-                    model: model,
-                    tools: GetAvailableTools(),
-                    onStreamChunk: onStreamChunk,
-                    onReasoningChunk: reasoning => onStreamChunk?.Invoke($"\n[思考中: {reasoning}]\n"),
+                    model: AgentModel,
+                    tools: tools,
+                    onStreamChunk: chunk => onStreamChunk?.Invoke(chunk),
+                    onReasoningChunk: useDeepThinking
+                        ? reasoning => onStreamChunk?.Invoke($"\n[深度思考] {reasoning}\n")
+                        : null,
                     temperature: 0.7,
                     topP: 0.9,
                     thinkingBudget: useDeepThinking ? 10000 : null
                 );
 
-                // 7. 添加AI回复到历史
+                // 添加Agent回复到历史
                 _chatHistory.Add(new BiaogPlugin.Services.ChatMessage
                 {
                     Role = "assistant",
-                    Content = result.Content
+                    Content = agentDecision.Content
                 });
 
-                Log.Information($"AI助手回复完成: {result.Content.Length} 字符, 使用模型: {result.Model}");
+                // ===== 第4步：工具执行 =====
+                if (agentDecision.ToolCalls.Count > 0)
+                {
+                    onStreamChunk?.Invoke($"\n[标哥Agent] 需要调用{agentDecision.ToolCalls.Count}个工具执行任务\n");
 
+                    foreach (var toolCall in agentDecision.ToolCalls)
+                    {
+                        Log.Information($"执行工具: {toolCall.Name}");
+                        onStreamChunk?.Invoke($"\n[工具调用] {toolCall.Name}\n");
+
+                        string toolResult = await ExecuteTool(toolCall, onStreamChunk);
+
+                        // 添加工具结果到历史（官方推荐格式）
+                        _chatHistory.Add(new BiaogPlugin.Services.ChatMessage
+                        {
+                            Role = "tool",
+                            Content = toolResult,
+                            Name = toolCall.Name
+                        });
+                    }
+
+                    // ===== 第5步：总结反馈 =====
+                    onStreamChunk?.Invoke($"\n[标哥Agent] 正在总结执行结果...\n");
+
+                    var summaryMessages = BuildMessages(systemPrompt);
+                    var summary = await _bailianClient.ChatCompletionStreamAsync(
+                        messages: summaryMessages,
+                        model: AgentModel,
+                        onStreamChunk: chunk => onStreamChunk?.Invoke(chunk)
+                    );
+
+                    _chatHistory.Add(new BiaogPlugin.Services.ChatMessage
+                    {
+                        Role = "assistant",
+                        Content = summary.Content
+                    });
+
+                    return new AssistantResponse
+                    {
+                        Success = true,
+                        Message = summary.Content,
+                        ToolCalls = agentDecision.ToolCalls.Select(tc => new AssistantToolCall
+                        {
+                            Name = tc.Name,
+                            Arguments = tc.Arguments
+                        }).ToList()
+                    };
+                }
+
+                // 如果不需要工具，直接返回Agent回复
                 return new AssistantResponse
                 {
                     Success = true,
-                    Message = result.Content,
-                    ToolCalls = result.ToolCalls.Select(tc => new AssistantToolCall
-                    {
-                        Name = tc.Name,
-                        Arguments = tc.Arguments
-                    }).ToList()
+                    Message = agentDecision.Content,
+                    ToolCalls = new List<AssistantToolCall>()
                 };
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "AI助手对话失败");
+                Log.Error(ex, "标哥Agent执行失败");
                 return new AssistantResponse
                 {
                     Success = false,
-                    Error = $"对话失败: {ex.Message}"
+                    Error = $"Agent执行失败: {ex.Message}"
                 };
             }
         }
 
         /// <summary>
-        /// 构建系统提示（包含图纸上下文）
+        /// 执行工具（智能调度专用模型）
         /// </summary>
-        private string BuildSystemPrompt(DrawingContext context)
+        private async Task<string> ExecuteTool(ToolCall toolCall, Action<string>? onStreamChunk)
         {
-            var prompt = new StringBuilder();
-
-            prompt.AppendLine("你是**标哥AI助手**，一个专业的AutoCAD图纸分析和操作助手。");
-            prompt.AppendLine();
-            prompt.AppendLine("## 你的能力");
-            prompt.AppendLine("1. 分析和理解AutoCAD图纸内容");
-            prompt.AppendLine("2. 回答用户关于图纸的问题（文本内容、图层、实体统计等）");
-            prompt.AppendLine("3. 通过Function Calling修改图纸（修改文本、图层操作等）");
-            prompt.AppendLine("4. 识别建筑构件并进行工程量计算");
-            prompt.AppendLine("5. 提供专业的CAD绘图建议");
-            prompt.AppendLine();
-
-            if (!string.IsNullOrEmpty(context.ErrorMessage))
+            try
             {
-                prompt.AppendLine($"## ⚠️ 当前图纸状态");
-                prompt.AppendLine(context.ErrorMessage);
+                switch (toolCall.Name)
+                {
+                    case "translate_text":
+                        return await ExecuteTranslateTool(toolCall.Arguments, onStreamChunk);
+
+                    case "modify_drawing":
+                        return await ExecuteModifyDrawingTool(toolCall.Arguments, onStreamChunk);
+
+                    case "recognize_components":
+                        return await ExecuteRecognitionTool(toolCall.Arguments, onStreamChunk);
+
+                    case "query_drawing_info":
+                        return await ExecuteQueryTool(toolCall.Arguments, onStreamChunk);
+
+                    default:
+                        return $"✗ 未知工具: {toolCall.Name}";
+                }
             }
-            else
+            catch (Exception ex)
             {
-                prompt.AppendLine("## 当前图纸信息");
-                prompt.AppendLine(context.Summary);
+                Log.Error(ex, $"工具执行失败: {toolCall.Name}");
+                return $"✗ 工具执行失败: {ex.Message}";
             }
+        }
 
-            prompt.AppendLine();
-            prompt.AppendLine("## 注意事项");
-            prompt.AppendLine("- 回答要专业、准确、简洁");
-            prompt.AppendLine("- 涉及修改图纸时，务必询问用户确认");
-            prompt.AppendLine("- 如果信息不足，主动询问用户需要什么帮助");
+        /// <summary>
+        /// 翻译工具 - 调用qwen-mt-flash
+        /// </summary>
+        private async Task<string> ExecuteTranslateTool(Dictionary<string, object> args, Action<string>? onStreamChunk)
+        {
+            onStreamChunk?.Invoke($"  → 使用qwen-mt-flash执行翻译...\n");
 
-            return prompt.ToString();
+            var text = args["text"].ToString() ?? "";
+            var targetLanguage = args["target_language"].ToString() ?? "en";
+
+            var translated = await _bailianClient.TranslateAsync(
+                text: text,
+                sourceLanguage: "auto",
+                targetLanguage: targetLanguage,
+                model: BailianModelSelector.Models.QwenMTFlash
+            );
+
+            Log.Information($"翻译完成: {text} → {translated}");
+            return $"✓ 翻译完成：'{text}' → '{translated}'";
+        }
+
+        /// <summary>
+        /// 修改图纸工具 - 调用qwen3-coder-flash生成代码
+        /// </summary>
+        private async Task<string> ExecuteModifyDrawingTool(Dictionary<string, object> args, Action<string>? onStreamChunk)
+        {
+            onStreamChunk?.Invoke($"  → 使用qwen3-coder-flash生成修改代码...\n");
+
+            var operation = args["operation"].ToString() ?? "";
+            var original = args.ContainsKey("original_text") ? args["original_text"].ToString() : "";
+            var newValue = args.ContainsKey("new_text") ? args["new_text"].ToString() : "";
+
+            // 使用qwen3-coder-flash理解修改意图并执行
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var db = doc.Database;
+
+            using (var tr = db.TransactionManager.StartTransaction())
+            using (var docLock = doc.LockDocument())
+            {
+                var extractor = new DwgTextExtractor();
+                var allTexts = extractor.ExtractAllText();
+
+                int modifiedCount = 0;
+
+                foreach (var textEntity in allTexts)
+                {
+                    var obj = tr.GetObject(textEntity.ObjectId, OpenMode.ForWrite);
+
+                    if (obj is DBText dbText && dbText.TextString.Contains(original ?? ""))
+                    {
+                        dbText.TextString = dbText.TextString.Replace(original ?? "", newValue ?? "");
+                        modifiedCount++;
+                    }
+                    else if (obj is MText mText && mText.Contents.Contains(original ?? ""))
+                    {
+                        mText.Contents = mText.Contents.Replace(original ?? "", newValue ?? "");
+                        modifiedCount++;
+                    }
+                }
+
+                tr.Commit();
+
+                Log.Information($"修改完成: 已修改{modifiedCount}处文本");
+                return $"✓ 修改完成：已将{modifiedCount}处'{original}'改为'{newValue}'";
+            }
+        }
+
+        /// <summary>
+        /// 构件识别工具 - 调用qwen3-vl-flash
+        /// </summary>
+        private async Task<string> ExecuteRecognitionTool(Dictionary<string, object> args, Action<string>? onStreamChunk)
+        {
+            onStreamChunk?.Invoke($"  → 使用qwen3-vl-flash识别构件...\n");
+
+            // 提取图纸文本实体用于识别
+            var extractor = new DwgTextExtractor();
+            var textEntities = extractor.ExtractAllText();
+
+            var recognizer = new ComponentRecognizer();
+            var components = await recognizer.RecognizeFromTextEntitiesAsync(textEntities);
+
+            var summary = $"✓ 识别完成：共识别{components.Count}个构件\n";
+            summary += $"  - 墙: {components.Count(c => c.Type == "墙")}个\n";
+            summary += $"  - 柱: {components.Count(c => c.Type == "柱")}个\n";
+            summary += $"  - 梁: {components.Count(c => c.Type == "梁")}个\n";
+            summary += $"  - 板: {components.Count(c => c.Type == "板")}个";
+
+            Log.Information($"构件识别完成: {components.Count}个");
+            return summary;
+        }
+
+        /// <summary>
+        /// 查询图纸信息工具 - 直接查询DrawingContext
+        /// </summary>
+        private async Task<string> ExecuteQueryTool(Dictionary<string, object> args, Action<string>? onStreamChunk)
+        {
+            onStreamChunk?.Invoke($"  → 查询图纸信息...\n");
+
+            var queryType = args["query_type"].ToString() ?? "";
+            var context = _contextManager.GetCurrentDrawingContext();
+
+            return queryType switch
+            {
+                "layers" => $"✓ 图层信息：\n{string.Join("\n", context.Layers.Select(l => $"  - {l.Name} ({l.Color})"))}",
+                "texts" => $"✓ 文本数量：{context.TextEntities.Count}个",
+                "entities" => $"✓ 实体统计：\n{string.Join("\n", context.EntityStatistics.Select(e => $"  - {e.Key}: {e.Value}个"))}",
+                "metadata" => $"✓ 元数据：\n{string.Join("\n", context.Metadata.Select(m => $"  - {m.Key}: {m.Value}"))}",
+                _ => $"✓ 图纸摘要：\n{context.Summary}"
+            };
+        }
+
+        /// <summary>
+        /// 构建Agent系统提示
+        /// </summary>
+        private string BuildAgentSystemPrompt(DrawingContext context, bool useDeepThinking)
+        {
+            var prompt = $@"# 你是标哥AI助手
+
+## 身份
+你是一个专业的CAD图纸分析Agent，基于阿里云百炼qwen3-max-preview模型。
+
+## 当前图纸信息
+{context.Summary}
+
+## 可用工具
+你可以智能调用以下专用模型工具：
+
+1. **translate_text** - 翻译工具（内部使用qwen-mt-flash）
+   - 翻译CAD图纸中的文本
+   - 支持92种语言
+
+2. **modify_drawing** - 修改工具（内部使用qwen3-coder-flash）
+   - 修改图纸文本内容
+   - 批量替换文字
+
+3. **recognize_components** - 识别工具（内部使用qwen3-vl-flash）
+   - 识别建筑构件（墙、柱、梁、板等）
+   - 空间感知和2D/3D定位
+
+4. **query_drawing_info** - 查询工具
+   - 查询图层、文本、实体统计、元数据
+
+## 工作原则
+- 根据用户需求智能选择合适的工具
+- 可以并行调用多个工具提高效率
+- 工具执行后，用自然语言总结结果
+- 始终保持专业和准确
+
+{(useDeepThinking ? "\n## 深度思考模式\n当前处于深度思考模式，请展示完整的推理过程。" : "")}";
+
+            return prompt;
+        }
+
+        /// <summary>
+        /// 定义可用工具（阿里云官方格式）
+        /// </summary>
+        private List<object> GetAvailableTools()
+        {
+            return new List<object>
+            {
+                // 翻译工具
+                new {
+                    type = "function",
+                    function = new {
+                        name = "translate_text",
+                        description = "翻译CAD图纸中的文本。内部使用qwen-mt-flash模型，支持92种语言。",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                text = new {
+                                    type = "string",
+                                    description = "要翻译的文本内容"
+                                },
+                                target_language = new {
+                                    type = "string",
+                                    description = "目标语言（en=英语, ja=日语, ko=韩语, fr=法语等）"
+                                }
+                            },
+                            required = new[] { "text", "target_language" }
+                        }
+                    }
+                },
+
+                // 修改图纸工具
+                new {
+                    type = "function",
+                    function = new {
+                        name = "modify_drawing",
+                        description = "修改CAD图纸中的文本内容。内部使用qwen3-coder-flash模型生成修改代码。",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                operation = new {
+                                    type = "string",
+                                    description = "操作类型（replace=替换文本）"
+                                },
+                                original_text = new {
+                                    type = "string",
+                                    description = "原始文本"
+                                },
+                                new_text = new {
+                                    type = "string",
+                                    description = "新文本"
+                                }
+                            },
+                            required = new[] { "operation", "original_text", "new_text" }
+                        }
+                    }
+                },
+
+                // 构件识别工具
+                new {
+                    type = "function",
+                    function = new {
+                        name = "recognize_components",
+                        description = "识别CAD图纸中的建筑构件（墙、柱、梁、板等）。内部使用qwen3-vl-flash模型进行视觉识别。",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                component_types = new {
+                                    type = "array",
+                                    items = new { type = "string" },
+                                    description = "要识别的构件类型（可选，不指定则识别所有）"
+                                }
+                            }
+                        }
+                    }
+                },
+
+                // 查询图纸信息工具
+                new {
+                    type = "function",
+                    function = new {
+                        name = "query_drawing_info",
+                        description = "查询图纸的详细信息（图层、文本、实体统计、元数据等）。",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                query_type = new {
+                                    type = "string",
+                                    description = "查询类型：layers=图层, texts=文本, entities=实体统计, metadata=元数据, summary=摘要"
+                                }
+                            },
+                            required = new[] { "query_type" }
+                        }
+                    }
+                }
+            };
         }
 
         /// <summary>
@@ -161,90 +459,11 @@ namespace BiaogPlugin.Services
                 new BiaogPlugin.Services.ChatMessage { Role = "system", Content = systemPrompt }
             };
 
-            // 只保留最近10轮对话
+            // 保留最近20轮对话（官方推荐维护消息历史）
             var recentHistory = _chatHistory.TakeLast(20).ToList();
             messages.AddRange(recentHistory);
 
             return messages;
-        }
-
-        /// <summary>
-        /// 定义可用的Function Calling工具
-        /// </summary>
-        private List<object> GetAvailableTools()
-        {
-            return new List<object>
-            {
-                new
-                {
-                    type = "function",
-                    function = new
-                    {
-                        name = "modify_text",
-                        description = "修改CAD图纸中的文本内容",
-                        parameters = new
-                        {
-                            type = "object",
-                            properties = new
-                            {
-                                original_text = new
-                                {
-                                    type = "string",
-                                    description = "要修改的原始文本内容"
-                                },
-                                new_text = new
-                                {
-                                    type = "string",
-                                    description = "修改后的新文本内容"
-                                }
-                            },
-                            required = new[] { "original_text", "new_text" }
-                        }
-                    }
-                },
-                new
-                {
-                    type = "function",
-                    function = new
-                    {
-                        name = "query_layers",
-                        description = "查询图纸中的图层信息",
-                        parameters = new
-                        {
-                            type = "object",
-                            properties = new
-                            {
-                                layer_name = new
-                                {
-                                    type = "string",
-                                    description = "要查询的图层名称（可选，为空则返回所有图层）"
-                                }
-                            }
-                        }
-                    }
-                },
-                new
-                {
-                    type = "function",
-                    function = new
-                    {
-                        name = "count_entities",
-                        description = "统计图纸中的实体数量",
-                        parameters = new
-                        {
-                            type = "object",
-                            properties = new
-                            {
-                                entity_type = new
-                                {
-                                    type = "string",
-                                    description = "要统计的实体类型（如Line, Circle, Text等）"
-                                }
-                            }
-                        }
-                    }
-                }
-            };
         }
 
         /// <summary>
