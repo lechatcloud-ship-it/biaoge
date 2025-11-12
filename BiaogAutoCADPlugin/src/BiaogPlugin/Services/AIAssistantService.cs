@@ -11,12 +11,7 @@ using Serilog;
 namespace BiaogPlugin.Services
 {
     /// <summary>
-    /// 标哥Agent - 基于阿里云百炼官方最佳实践
-    ///
-    /// 架构：qwen3-max-preview作为核心Agent，智能调度专用模型
-    /// - 翻译任务 → qwen-mt-flash
-    /// - 代码任务 → qwen3-coder-flash
-    /// - 视觉任务 → qwen3-vl-flash
+    /// 标哥AI助手 - 由Excellent开发的专为CAD图纸服务的Agent
     ///
     /// 工作流（阿里云官方5步）：
     /// 1. 工具定义（Tools Definition）
@@ -31,7 +26,7 @@ namespace BiaogPlugin.Services
         private readonly ConfigManager _configManager;
         private readonly DrawingContextManager _contextManager;
 
-        // Agent核心模型（固定使用qwen3-max-preview）
+        // Agent核心模型配置
         private const string AgentModel = "qwen3-max-preview";
 
         // 对话历史
@@ -46,11 +41,11 @@ namespace BiaogPlugin.Services
             _configManager = configManager;
             _contextManager = contextManager;
 
-            Log.Information("标哥Agent初始化完成（核心模型: qwen3-max-preview）");
+            Log.Information("标哥AI助手初始化完成");
         }
 
         /// <summary>
-        /// Agent对话 - 智能调度专用模型
+        /// Agent对话 - 智能分析和执行任务
         /// </summary>
         public async Task<AssistantResponse> ChatStreamAsync(
             string userMessage,
@@ -177,7 +172,7 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
-        /// 执行工具（智能调度专用模型）
+        /// 执行工具（智能调度和执行）
         /// </summary>
         private async Task<string> ExecuteTool(ToolCall toolCall, Action<string>? onStreamChunk)
         {
@@ -209,11 +204,11 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
-        /// 翻译工具 - 调用qwen-mt-flash
+        /// 翻译工具 - 执行翻译任务
         /// </summary>
         private async Task<string> ExecuteTranslateTool(Dictionary<string, object> args, Action<string>? onStreamChunk)
         {
-            onStreamChunk?.Invoke($"  → 使用qwen-mt-flash执行翻译...\n");
+            onStreamChunk?.Invoke($"  → 正在执行翻译...\n");
 
             var text = args["text"].ToString() ?? "";
             var targetLanguage = args["target_language"].ToString() ?? "en";
@@ -229,17 +224,17 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
-        /// 修改图纸工具 - 调用qwen3-coder-flash生成代码
+        /// 修改图纸工具 - 执行图纸修改任务
         /// </summary>
         private async Task<string> ExecuteModifyDrawingTool(Dictionary<string, object> args, Action<string>? onStreamChunk)
         {
-            onStreamChunk?.Invoke($"  → 使用qwen3-coder-flash生成修改代码...\n");
+            onStreamChunk?.Invoke($"  → 正在执行图纸修改...\n");
 
             var operation = args["operation"].ToString() ?? "";
             var original = args.ContainsKey("original_text") ? args["original_text"].ToString() : "";
             var newValue = args.ContainsKey("new_text") ? args["new_text"].ToString() : "";
 
-            // 使用qwen3-coder-flash理解修改意图并执行
+            // 理解修改意图并执行
             var doc = Application.DocumentManager.MdiActiveDocument;
             var db = doc.Database;
 
@@ -275,11 +270,11 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
-        /// 构件识别工具 - 调用qwen3-vl-flash
+        /// 构件识别工具 - 执行构件识别任务
         /// </summary>
         private async Task<string> ExecuteRecognitionTool(Dictionary<string, object> args, Action<string>? onStreamChunk)
         {
-            onStreamChunk?.Invoke($"  → 使用qwen3-vl-flash识别构件...\n");
+            onStreamChunk?.Invoke($"  → 正在识别构件...\n");
 
             // 提取图纸文本实体用于识别
             var extractor = new DwgTextExtractor();
@@ -364,7 +359,7 @@ namespace BiaogPlugin.Services
                     type = "function",
                     function = new {
                         name = "translate_text",
-                        description = "翻译CAD图纸中的文本。内部使用qwen-mt-flash模型，支持92种语言。",
+                        description = "翻译CAD图纸中的文本，支持92种语言。",
                         parameters = new {
                             type = "object",
                             properties = new {
@@ -387,7 +382,7 @@ namespace BiaogPlugin.Services
                     type = "function",
                     function = new {
                         name = "modify_drawing",
-                        description = "修改CAD图纸中的文本内容。内部使用qwen3-coder-flash模型生成修改代码。",
+                        description = "修改CAD图纸中的文本内容。",
                         parameters = new {
                             type = "object",
                             properties = new {
@@ -414,7 +409,7 @@ namespace BiaogPlugin.Services
                     type = "function",
                     function = new {
                         name = "recognize_components",
-                        description = "识别CAD图纸中的建筑构件（墙、柱、梁、板等）。内部使用qwen3-vl-flash模型进行视觉识别。",
+                        description = "识别CAD图纸中的建筑构件（墙、柱、梁、板等）。",
                         parameters = new {
                             type = "object",
                             properties = new {
