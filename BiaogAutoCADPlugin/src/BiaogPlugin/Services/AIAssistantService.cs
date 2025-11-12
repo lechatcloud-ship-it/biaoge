@@ -61,12 +61,21 @@ namespace BiaogPlugin.Services
             {
                 onStreamChunk?.Invoke($"\n[标哥Agent] 正在分析您的需求...\n");
 
+                // ===== 第0步：场景检测 =====
+                var detectedScenario = ScenarioPromptManager.DetectScenario(userMessage);
+                Log.Information($"检测到场景: {detectedScenario}");
+
+                if (detectedScenario != ScenarioPromptManager.Scenario.General)
+                {
+                    onStreamChunk?.Invoke($"[标哥Agent] 场景识别: {GetScenarioDisplayName(detectedScenario)}\n");
+                }
+
                 // ===== 第1步：工具定义 =====
                 var tools = GetAvailableTools();
 
                 // ===== 第2步：消息初始化 =====
                 var drawingContext = _contextManager.GetCurrentDrawingContext();
-                var systemPrompt = BuildAgentSystemPrompt(drawingContext, useDeepThinking);
+                var systemPrompt = BuildAgentSystemPrompt(drawingContext, detectedScenario, useDeepThinking);
 
                 _chatHistory.Add(new BiaogPlugin.Services.ChatMessage
                 {
@@ -211,7 +220,6 @@ namespace BiaogPlugin.Services
 
             var translated = await _bailianClient.TranslateAsync(
                 text: text,
-                sourceLanguage: "auto",
                 targetLanguage: targetLanguage,
                 model: BailianModelSelector.Models.QwenMTFlash
             );
@@ -311,45 +319,37 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
-        /// 构建Agent系统提示
+        /// 构建Agent系统提示（使用场景化提示词）
         /// </summary>
-        private string BuildAgentSystemPrompt(DrawingContext context, bool useDeepThinking)
+        private string BuildAgentSystemPrompt(
+            DrawingContext context,
+            ScenarioPromptManager.Scenario scenario,
+            bool useDeepThinking)
         {
-            var prompt = $@"# 你是标哥AI助手
+            // 使用ScenarioPromptManager构建场景化提示词
+            var prompt = ScenarioPromptManager.BuildPrompt(scenario, context, useDeepThinking);
 
-## 身份
-你是一个专业的CAD图纸分析Agent，基于阿里云百炼qwen3-max-preview模型。
-
-## 当前图纸信息
-{context.Summary}
-
-## 可用工具
-你可以智能调用以下专用模型工具：
-
-1. **translate_text** - 翻译工具（内部使用qwen-mt-flash）
-   - 翻译CAD图纸中的文本
-   - 支持92种语言
-
-2. **modify_drawing** - 修改工具（内部使用qwen3-coder-flash）
-   - 修改图纸文本内容
-   - 批量替换文字
-
-3. **recognize_components** - 识别工具（内部使用qwen3-vl-flash）
-   - 识别建筑构件（墙、柱、梁、板等）
-   - 空间感知和2D/3D定位
-
-4. **query_drawing_info** - 查询工具
-   - 查询图层、文本、实体统计、元数据
-
-## 工作原则
-- 根据用户需求智能选择合适的工具
-- 可以并行调用多个工具提高效率
-- 工具执行后，用自然语言总结结果
-- 始终保持专业和准确
-
-{(useDeepThinking ? "\n## 深度思考模式\n当前处于深度思考模式，请展示完整的推理过程。" : "")}";
+            // 附加建筑规范知识库摘要
+            prompt += "\n\n" + BuildingStandardsKnowledge.GetKnowledgeSummary();
 
             return prompt;
+        }
+
+        /// <summary>
+        /// 获取场景显示名称
+        /// </summary>
+        private string GetScenarioDisplayName(ScenarioPromptManager.Scenario scenario)
+        {
+            return scenario switch
+            {
+                ScenarioPromptManager.Scenario.Translation => "翻译场景",
+                ScenarioPromptManager.Scenario.Calculation => "算量场景",
+                ScenarioPromptManager.Scenario.DrawingQA => "图纸问答",
+                ScenarioPromptManager.Scenario.Modification => "图纸修改",
+                ScenarioPromptManager.Scenario.Diagnosis => "错误诊断",
+                ScenarioPromptManager.Scenario.QualityCheck => "质量检查",
+                _ => "通用对话"
+            };
         }
 
         /// <summary>
