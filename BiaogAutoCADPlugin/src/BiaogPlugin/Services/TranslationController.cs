@@ -153,19 +153,22 @@ namespace BiaogPlugin.Services
                     });
 
                     // 使用TranslationEngine进行批量翻译（自动处理缓存）
+                    var apiProgress = new Progress<double>(p =>
+                    {
+                        progress?.Report(new TranslationProgress
+                        {
+                            Stage = "翻译中",
+                            Percentage = 50 + (int)(p * 0.3),
+                            ProcessedCount = (int)(uncachedTexts.Count * p / 100.0),
+                            TotalCount = uncachedTexts.Count
+                        });
+                    });
+
                     var translations = await _translationEngine.TranslateBatchWithCacheAsync(
                         uncachedTexts,
                         targetLanguage,
-                        progress: new Progress<double>(p =>
-                        {
-                            progress?.Report(new TranslationProgress
-                            {
-                                Stage = "翻译中",
-                                Percentage = 50 + (int)(p * 0.3),
-                                ProcessedCount = (int)(uncachedTexts.Count * p / 100.0),
-                                TotalCount = uncachedTexts.Count
-                            });
-                        })
+                        apiProgress,
+                        CancellationToken.None
                     );
 
                     // 添加到翻译映射

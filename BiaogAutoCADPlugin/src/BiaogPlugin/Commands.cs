@@ -62,17 +62,21 @@ namespace BiaogPlugin
 
         /// <summary>
         /// 框选翻译命令 - 仅翻译用户选中的文本实体
+        /// ✅ 优化：使用全局异常处理防止AutoCAD崩溃
         /// </summary>
         [CommandMethod("BIAOGE_TRANSLATE_SELECTED", CommandFlags.Modal)]
         public async void TranslateSelected()
         {
-            var doc = Application.DocumentManager.MdiActiveDocument;
-            var ed = doc.Editor;
-            var db = doc.Database;
-
-            try
+            // ✅ 顶层异常处理，防止AutoCAD崩溃
+            Services.CommandExceptionHandler.ExecuteSafely(async () =>
             {
-                Log.Information("执行框选翻译命令");
+                var doc = Application.DocumentManager.MdiActiveDocument;
+                var ed = doc.Editor;
+                var db = doc.Database;
+
+                try
+                {
+                    Log.Information("执行框选翻译命令");
 
                 // 提示用户选择文本实体
                 ed.WriteMessage("\n请选择要翻译的文本实体...");
@@ -218,24 +222,29 @@ namespace BiaogPlugin
 
                 // 翻译文本
                 var bailianClient = ServiceLocator.GetService<BailianApiClient>();
-                var configManager = ServiceLocator.GetService<ConfigManager>();
                 var cacheService = ServiceLocator.GetService<CacheService>();
 
-                var engine = new TranslationEngine(bailianClient!, configManager!, cacheService!);
+                if (bailianClient == null || cacheService == null)
+                {
+                    ed.WriteMessage("\n[错误] 翻译服务未初始化");
+                    return;
+                }
+
+                var engine = new TranslationEngine(bailianClient, cacheService);
 
                 int translatedCount = 0;
                 int skippedCount = 0;
 
-                var progress = new Progress<TranslationProgress>(p =>
+                var apiProgress = new Progress<double>(p =>
                 {
-                    ed.WriteMessage($"\r{p.Stage}: {p.Percentage}%    ");
+                    ed.WriteMessage($"\r翻译进度: {p:F1}%    ");
                 });
 
                 var translations = await engine.TranslateBatchWithCacheAsync(
                     textEntities.Select(t => t.Content).ToList(),
-                    "auto",
                     targetLanguage,
-                    progress
+                    apiProgress,
+                    CancellationToken.None
                 );
 
                 ed.WriteMessage("\n更新DWG文件...");
@@ -302,12 +311,13 @@ namespace BiaogPlugin
                 }
 
                 Log.Information($"框选翻译完成: {translatedCount}/{textEntities.Count}");
-            }
-            catch (System.Exception ex)
-            {
-                Log.Error(ex, "框选翻译失败");
-                ed.WriteMessage($"\n[错误] 框选翻译失败: {ex.Message}");
-            }
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Error(ex, "框选翻译失败");
+                    ed.WriteMessage($"\n[错误] 框选翻译失败: {ex.Message}");
+                }
+            }, "BIAOGE_TRANSLATE_SELECTED");
         }
 
         /// <summary>

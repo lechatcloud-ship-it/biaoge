@@ -12,11 +12,15 @@ namespace BiaogPlugin.Services
     /// <summary>
     /// 翻译历史记录
     /// 记录所有翻译操作，支持查询和撤销
+    /// ✅ 优化：使用连接池化 + 异步延迟初始化 + 批量插入
     /// </summary>
     public class TranslationHistory
     {
         private readonly string _dbPath;
+        private readonly string _connectionString;
         private readonly int _maxRecords;
+        private bool _initialized = false;
+        private readonly System.Threading.SemaphoreSlim _initLock = new(1, 1);
 
         /// <summary>
         /// 历史记录条目
@@ -45,20 +49,28 @@ namespace BiaogPlugin.Services
             _dbPath = System.IO.Path.Combine(appDataPath, "history.db");
             _maxRecords = maxRecords;
 
-            InitializeDatabase();
+            // ✅ 优化：使用连接字符串池化
+            _connectionString = $"Data Source={_dbPath};Mode=ReadWriteCreate;Cache=Shared;Pooling=True";
+
+            Log.Debug("TranslationHistory已构造，延迟初始化数据库");
         }
 
         /// <summary>
-        /// 初始化数据库
+        /// ✅ 优化：异步延迟初始化，避免阻塞AutoCAD启动
         /// </summary>
-        private void InitializeDatabase()
+        private async Task EnsureInitializedAsync()
         {
+            if (_initialized) return;
+
+            await _initLock.WaitAsync();
             try
             {
-                using var connection = new SqliteConnection($"Data Source={_dbPath}");
-                connection.Open();
+                if (_initialized) return;
 
-                var createTableCmd = connection.CreateCommand();
+                await using var connection = new SqliteConnection(_connectionString);
+                await connection.OpenAsync();
+
+                await using var createTableCmd = connection.CreateCommand();
                 createTableCmd.CommandText = @"
                     CREATE TABLE IF NOT EXISTS translation_history (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,18 +85,23 @@ namespace BiaogPlugin.Services
                         operation TEXT NOT NULL DEFAULT 'translate'
                     );
 
-                    CREATE INDEX IF NOT EXISTS idx_timestamp ON translation_history(timestamp);
+                    CREATE INDEX IF NOT EXISTS idx_timestamp ON translation_history(timestamp DESC);
                     CREATE INDEX IF NOT EXISTS idx_object_id ON translation_history(object_id_handle);
                     CREATE INDEX IF NOT EXISTS idx_operation ON translation_history(operation);
                 ";
-                createTableCmd.ExecuteNonQuery();
+                await createTableCmd.ExecuteNonQueryAsync();
 
+                _initialized = true;
                 Log.Information("翻译历史数据库初始化成功: {DbPath}", _dbPath);
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "初始化翻译历史数据库失败");
                 throw;
+            }
+            finally
+            {
+                _initLock.Release();
             }
         }
 
@@ -95,10 +112,12 @@ namespace BiaogPlugin.Services
         {
             try
             {
-                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await EnsureInitializedAsync();
+
+                await using var connection = new SqliteConnection(_connectionString);
                 await connection.OpenAsync();
 
-                var insertCmd = connection.CreateCommand();
+                await using var insertCmd = connection.CreateCommand();
                 insertCmd.CommandText = @"
                     INSERT INTO translation_history
                     (timestamp, object_id_handle, original_text, translated_text,
@@ -132,39 +151,54 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
-        /// 批量添加记录
+        /// ✅ 优化：批量添加记录（使用批量INSERT提高性能）
         /// </summary>
         public async Task AddRecordsAsync(List<HistoryRecord> records)
         {
+            if (records == null || records.Count == 0) return;
+
             try
             {
-                using var connection = new SqliteConnection($"Data Source={_dbPath}");
+                await EnsureInitializedAsync();
+
+                await using var connection = new SqliteConnection(_connectionString);
                 await connection.OpenAsync();
 
                 using var transaction = connection.BeginTransaction();
 
-                foreach (var record in records)
+                // ✅ 优化：批量插入（每批100条）
+                const int batchSize = 100;
+                for (int i = 0; i < records.Count; i += batchSize)
                 {
-                    var insertCmd = connection.CreateCommand();
+                    var batch = records.Skip(i).Take(batchSize).ToList();
+
+                    await using var insertCmd = connection.CreateCommand();
                     insertCmd.Transaction = transaction;
-                    insertCmd.CommandText = @"
+
+                    // 构建批量INSERT语句
+                    var valueClauses = new List<string>();
+                    for (int j = 0; j < batch.Count; j++)
+                    {
+                        valueClauses.Add($"(@ts{j}, @oid{j}, @orig{j}, @trans{j}, @sl{j}, @tl{j}, @et{j}, @l{j}, @op{j})");
+
+                        var record = batch[j];
+                        insertCmd.Parameters.AddWithValue($"@ts{j}", record.Timestamp.ToString("o"));
+                        insertCmd.Parameters.AddWithValue($"@oid{j}", record.ObjectIdHandle);
+                        insertCmd.Parameters.AddWithValue($"@orig{j}", record.OriginalText);
+                        insertCmd.Parameters.AddWithValue($"@trans{j}", record.TranslatedText);
+                        insertCmd.Parameters.AddWithValue($"@sl{j}", record.SourceLanguage);
+                        insertCmd.Parameters.AddWithValue($"@tl{j}", record.TargetLanguage);
+                        insertCmd.Parameters.AddWithValue($"@et{j}", record.EntityType);
+                        insertCmd.Parameters.AddWithValue($"@l{j}", record.Layer);
+                        insertCmd.Parameters.AddWithValue($"@op{j}", record.Operation);
+                    }
+
+                    insertCmd.CommandText = $@"
                         INSERT INTO translation_history
                         (timestamp, object_id_handle, original_text, translated_text,
                          source_language, target_language, entity_type, layer, operation)
-                        VALUES
-                        (@timestamp, @object_id_handle, @original_text, @translated_text,
-                         @source_language, @target_language, @entity_type, @layer, @operation)
+                        VALUES {string.Join(", ", valueClauses)}
                     ";
-
-                    insertCmd.Parameters.AddWithValue("@timestamp", record.Timestamp.ToString("o"));
-                    insertCmd.Parameters.AddWithValue("@object_id_handle", record.ObjectIdHandle);
-                    insertCmd.Parameters.AddWithValue("@original_text", record.OriginalText);
-                    insertCmd.Parameters.AddWithValue("@translated_text", record.TranslatedText);
-                    insertCmd.Parameters.AddWithValue("@source_language", record.SourceLanguage);
-                    insertCmd.Parameters.AddWithValue("@target_language", record.TargetLanguage);
-                    insertCmd.Parameters.AddWithValue("@entity_type", record.EntityType);
-                    insertCmd.Parameters.AddWithValue("@layer", record.Layer);
-                    insertCmd.Parameters.AddWithValue("@operation", record.Operation);
 
                     await insertCmd.ExecuteNonQueryAsync();
                 }

@@ -117,22 +117,21 @@ namespace BiaogPlugin.UI
 
                 // 获取服务
                 var bailianClient = ServiceLocator.GetService<BailianApiClient>();
-                var configManager = ServiceLocator.GetService<ConfigManager>();
                 var cacheService = ServiceLocator.GetService<CacheService>();
 
-                if (bailianClient == null || configManager == null || cacheService == null)
+                if (bailianClient == null || cacheService == null)
                 {
                     throw new Exception("服务未初始化");
                 }
 
-                var engine = new TranslationEngine(bailianClient, configManager, cacheService);
+                var engine = new TranslationEngine(bailianClient, cacheService);
 
                 // 执行翻译
                 var translations = await engine.TranslateBatchWithCacheAsync(
                     new System.Collections.Generic.List<string> { _originalText },
-                    "auto",
                     _currentLanguageCode,
-                    null
+                    null,
+                    System.Threading.CancellationToken.None
                 );
 
                 if (translations.Count > 0 && !string.IsNullOrEmpty(translations[0]))
@@ -169,7 +168,7 @@ namespace BiaogPlugin.UI
         /// <summary>
         /// 应用翻译按钮
         /// </summary>
-        private void ApplyButton_Click(object sender, RoutedEventArgs e)
+        private async void ApplyButton_Click(object sender, RoutedEventArgs e)
         {
             try
             {
@@ -181,12 +180,13 @@ namespace BiaogPlugin.UI
 
                 // 应用翻译
                 var updater = new DwgTextUpdater();
-                var updateMap = new System.Collections.Generic.Dictionary<ObjectId, string>
-                {
-                    [_textObjectId] = _translatedText
-                };
+                var success = updater.UpdateText(_textObjectId, _translatedText);
 
-                updater.UpdateTexts(updateMap);
+                if (!success)
+                {
+                    MessageBox.Show("应用翻译失败", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
 
                 // 记录翻译历史
                 var configManager = ServiceLocator.GetService<ConfigManager>();
