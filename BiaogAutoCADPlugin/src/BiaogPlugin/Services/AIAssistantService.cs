@@ -54,7 +54,7 @@ namespace BiaogPlugin.Services
         {
             try
             {
-                onStreamChunk?.Invoke($"\n[标哥Agent] 正在分析您的需求...\n");
+                onStreamChunk?.Invoke($"\n[标哥AI助手] 正在分析您的需求...\n");
 
                 // ===== 第0步：场景检测 =====
                 var detectedScenario = ScenarioPromptManager.DetectScenario(userMessage);
@@ -62,7 +62,7 @@ namespace BiaogPlugin.Services
 
                 if (detectedScenario != ScenarioPromptManager.Scenario.General)
                 {
-                    onStreamChunk?.Invoke($"[标哥Agent] 场景识别: {GetScenarioDisplayName(detectedScenario)}\n");
+                    onStreamChunk?.Invoke($"[标哥AI助手] 场景识别: {GetScenarioDisplayName(detectedScenario)}\n");
                 }
 
                 // ===== 第1步：工具定义 =====
@@ -81,7 +81,7 @@ namespace BiaogPlugin.Services
                 var messages = BuildMessages(systemPrompt);
 
                 // ===== 第3步：Agent决策 =====
-                onStreamChunk?.Invoke($"[标哥Agent] 使用{AgentModel}进行决策...\n");
+                onStreamChunk?.Invoke($"[标哥AI助手] 正在智能分析...\n");
 
                 var agentDecision = await _bailianClient.ChatCompletionStreamAsync(
                     messages: messages,
@@ -106,7 +106,7 @@ namespace BiaogPlugin.Services
                 // ===== 第4步：工具执行 =====
                 if (agentDecision.ToolCalls.Count > 0)
                 {
-                    onStreamChunk?.Invoke($"\n[标哥Agent] 需要调用{agentDecision.ToolCalls.Count}个工具执行任务\n");
+                    onStreamChunk?.Invoke($"\n[标哥AI助手] 需要调用{agentDecision.ToolCalls.Count}个工具执行任务\n");
 
                     foreach (var toolCall in agentDecision.ToolCalls)
                     {
@@ -125,7 +125,7 @@ namespace BiaogPlugin.Services
                     }
 
                     // ===== 第5步：总结反馈 =====
-                    onStreamChunk?.Invoke($"\n[标哥Agent] 正在总结执行结果...\n");
+                    onStreamChunk?.Invoke($"\n[标哥AI助手] 正在总结执行结果...\n");
 
                     var summaryMessages = BuildMessages(systemPrompt);
                     var summary = await _bailianClient.ChatCompletionStreamAsync(
@@ -162,11 +162,11 @@ namespace BiaogPlugin.Services
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "标哥Agent执行失败");
+                Log.Error(ex, "标哥AI助手执行失败");
                 return new AssistantResponse
                 {
                     Success = false,
-                    Error = $"Agent执行失败: {ex.Message}"
+                    Error = $"AI助手执行失败: {ex.Message}"
                 };
             }
         }

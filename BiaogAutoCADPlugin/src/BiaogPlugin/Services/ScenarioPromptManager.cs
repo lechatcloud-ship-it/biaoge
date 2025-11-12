@@ -125,6 +125,8 @@ namespace BiaogPlugin.Services
             sb.AppendLine("你是标哥AI助手，由Excellent开发的专为CAD图纸服务的Agent。");
             sb.AppendLine("你专注于建筑工程领域，熟悉AutoCAD图纸结构、建筑规范和工程量计算。");
             sb.AppendLine();
+            sb.AppendLine("**重要：对外交流时，不要提及任何具体模型名称（如qwen、GPT等），只说你是标哥AI助手。**");
+            sb.AppendLine();
 
             // 当前图纸信息
             sb.AppendLine("## 当前图纸信息");
