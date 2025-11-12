@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text;
@@ -16,6 +17,13 @@ namespace BiaogPlugin.Services;
 /// 阿里云百炼API统一客户端
 /// 支持翻译、对话、深度思考、Function Calling等所有功能
 /// 一个API密钥调用所有模型
+///
+/// 基于官方最佳实践：
+/// - 指数退避重试机制
+/// - 错误分类处理
+/// - Token使用量跟踪
+/// - 并行工具调用
+/// - 流式增量输出
 /// </summary>
 public class BailianApiClient
 {
@@ -28,6 +36,15 @@ public class BailianApiClient
     private const string TranslationEndpoint = "/api/v1/services/translation/translate";
     private const string BatchTranslationEndpoint = "/api/v1/services/translation/batch-translate";
     private const string ChatCompletionEndpoint = "/compatible-mode/v1/chat/completions";
+
+    // 重试配置（阿里云官方推荐）
+    private const int MaxRetries = 3;
+    private const int InitialRetryDelayMs = 1000; // 1秒
+
+    // Token使用量统计
+    private long _totalInputTokens = 0;
+    private long _totalOutputTokens = 0;
+    private readonly object _tokenStatsLock = new();
 
     public BailianApiClient(
         HttpClient httpClient,
@@ -96,6 +113,188 @@ public class BailianApiClient
     }
 
     /// <summary>
+    /// 获取Token使用统计
+    /// </summary>
+    public (long inputTokens, long outputTokens, long totalTokens) GetTokenUsage()
+    {
+        lock (_tokenStatsLock)
+        {
+            return (_totalInputTokens, _totalOutputTokens, _totalInputTokens + _totalOutputTokens);
+        }
+    }
+
+    /// <summary>
+    /// 重置Token统计
+    /// </summary>
+    public void ResetTokenUsage()
+    {
+        lock (_tokenStatsLock)
+        {
+            _totalInputTokens = 0;
+            _totalOutputTokens = 0;
+            Log.Information("Token使用统计已重置");
+        }
+    }
+
+    /// <summary>
+    /// 记录Token使用量（线程安全）
+    /// </summary>
+    private void TrackTokenUsage(int inputTokens, int outputTokens)
+    {
+        lock (_tokenStatsLock)
+        {
+            _totalInputTokens += inputTokens;
+            _totalOutputTokens += outputTokens;
+        }
+    }
+
+    /// <summary>
+    /// 带重试的HTTP请求 - 基于阿里云官方最佳实践
+    ///
+    /// 重试策略：
+    /// - 5xx服务器错误 → 重试
+    /// - 429限流错误 → 重试
+    /// - 网络超时/连接错误 → 重试
+    /// - 4xx客户端错误（除429外）→ 不重试
+    /// - 指数退避：1s, 2s, 4s
+    /// </summary>
+    private async Task<HttpResponseMessage> SendWithRetryAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage? lastResponse = null;
+        Exception? lastException = null;
+
+        for (int attempt = 0; attempt <= MaxRetries; attempt++)
+        {
+            try
+            {
+                // 克隆请求（因为HttpRequestMessage只能发送一次）
+                var clonedRequest = await CloneHttpRequestAsync(request);
+
+                lastResponse = await _httpClient.SendAsync(clonedRequest, cancellationToken);
+
+                // 检查是否需要重试
+                if (lastResponse.IsSuccessStatusCode)
+                {
+                    return lastResponse; // 成功，返回
+                }
+
+                // 错误分类
+                var shouldRetry = ShouldRetryOnStatusCode(lastResponse.StatusCode);
+
+                if (!shouldRetry)
+                {
+                    // 不可重试的错误（如401、400），直接返回
+                    Log.Warning($"API请求失败（不重试）: {lastResponse.StatusCode}");
+                    return lastResponse;
+                }
+
+                // 可重试的错误（如5xx、429）
+                if (attempt < MaxRetries)
+                {
+                    var delayMs = InitialRetryDelayMs * (int)Math.Pow(2, attempt);
+                    Log.Warning($"API请求失败（第{attempt + 1}次重试，{delayMs}ms后）: {lastResponse.StatusCode}");
+                    await Task.Delay(delayMs, cancellationToken);
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                // 网络错误 → 重试
+                lastException = ex;
+                if (attempt < MaxRetries)
+                {
+                    var delayMs = InitialRetryDelayMs * (int)Math.Pow(2, attempt);
+                    Log.Warning(ex, $"API请求网络异常（第{attempt + 1}次重试，{delayMs}ms后）");
+                    await Task.Delay(delayMs, cancellationToken);
+                }
+            }
+            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                // 超时错误 → 重试
+                lastException = ex;
+                if (attempt < MaxRetries)
+                {
+                    var delayMs = InitialRetryDelayMs * (int)Math.Pow(2, attempt);
+                    Log.Warning($"API请求超时（第{attempt + 1}次重试，{delayMs}ms后）");
+                    await Task.Delay(delayMs, cancellationToken);
+                }
+            }
+        }
+
+        // 所有重试都失败
+        if (lastResponse != null)
+        {
+            Log.Error($"API请求最终失败: {lastResponse.StatusCode}");
+            return lastResponse;
+        }
+
+        if (lastException != null)
+        {
+            Log.Error(lastException, "API请求最终异常");
+            throw lastException;
+        }
+
+        throw new Exception("未知的API请求失败");
+    }
+
+    /// <summary>
+    /// 判断HTTP状态码是否应该重试
+    /// </summary>
+    private bool ShouldRetryOnStatusCode(HttpStatusCode statusCode)
+    {
+        return statusCode switch
+        {
+            // 5xx服务器错误 → 重试
+            HttpStatusCode.InternalServerError => true,
+            HttpStatusCode.BadGateway => true,
+            HttpStatusCode.ServiceUnavailable => true,
+            HttpStatusCode.GatewayTimeout => true,
+
+            // 429限流 → 重试
+            (HttpStatusCode)429 => true,
+
+            // 4xx客户端错误 → 不重试
+            HttpStatusCode.BadRequest => false,
+            HttpStatusCode.Unauthorized => false,
+            HttpStatusCode.Forbidden => false,
+            HttpStatusCode.NotFound => false,
+
+            // 其他错误 → 不重试
+            _ => false
+        };
+    }
+
+    /// <summary>
+    /// 克隆HttpRequestMessage（用于重试）
+    /// </summary>
+    private async Task<HttpRequestMessage> CloneHttpRequestAsync(HttpRequestMessage request)
+    {
+        var clone = new HttpRequestMessage(request.Method, request.RequestUri);
+
+        // 复制Headers
+        foreach (var header in request.Headers)
+        {
+            clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
+        }
+
+        // 复制Content
+        if (request.Content != null)
+        {
+            var contentBytes = await request.Content.ReadAsByteArrayAsync();
+            clone.Content = new ByteArrayContent(contentBytes);
+
+            // 复制Content Headers
+            foreach (var header in request.Content.Headers)
+            {
+                clone.Content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+        }
+
+        return clone;
+    }
+
+    /// <summary>
     /// 批量翻译
     /// </summary>
     public async Task<List<string>> TranslateBatchAsync(
@@ -149,7 +348,8 @@ public class BailianApiClient
                     httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
                 }
 
-                var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
+                // 使用带重试的HTTP请求
+                var response = await SendWithRetryAsync(httpRequest, cancellationToken);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -160,6 +360,12 @@ public class BailianApiClient
                     if (result?.Output?.Translations != null)
                     {
                         results.AddRange(result.Output.Translations);
+
+                        // 记录Token使用量
+                        if (result.Usage != null)
+                        {
+                            TrackTokenUsage(result.Usage.InputTokens, result.Usage.OutputTokens);
+                        }
                     }
                 }
                 else
@@ -225,7 +431,8 @@ public class BailianApiClient
                 httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
             }
 
-            var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
+            // 使用带重试的HTTP请求
+            var response = await SendWithRetryAsync(httpRequest, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
@@ -235,6 +442,12 @@ public class BailianApiClient
 
                 if (result?.Output?.Translation != null)
                 {
+                    // 记录Token使用量
+                    if (result.Usage != null)
+                    {
+                        TrackTokenUsage(result.Usage.InputTokens, result.Usage.OutputTokens);
+                    }
+
                     return result.Output.Translation;
                 }
             }
@@ -284,7 +497,8 @@ public class BailianApiClient
                 httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
             }
 
-            var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
+            // 使用带重试的HTTP请求
+            var response = await SendWithRetryAsync(httpRequest, cancellationToken);
 
             return response.IsSuccessStatusCode;
         }
@@ -304,6 +518,7 @@ public class BailianApiClient
     /// <param name="temperature">温度参数（0-2）</param>
     /// <param name="topP">Top-P参数（0-1）</param>
     /// <param name="thinkingBudget">深度思考token限制（用于推理模型）</param>
+    /// <param name="enableParallelToolCalls">启用并行工具调用（官方最佳实践）</param>
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>完整响应内容</returns>
     public async Task<ChatCompletionResult> ChatCompletionStreamAsync(
@@ -315,6 +530,7 @@ public class BailianApiClient
         double temperature = 0.7,
         double topP = 0.9,
         int? thinkingBudget = null,
+        bool enableParallelToolCalls = true,
         CancellationToken cancellationToken = default)
     {
         // 从配置读取模型，如果未指定则使用对话模型
@@ -334,10 +550,15 @@ public class BailianApiClient
             messages = messages.Select(m => new { role = m.Role, content = m.Content }).ToList(),
             tools = tools,
             stream = true,
-            stream_options = new { include_usage = true },
+            stream_options = new
+            {
+                include_usage = true,
+                incremental_output = true  // 阿里云官方推荐：增量输出优化
+            },
             temperature = temperature,
             top_p = topP,
-            thinking_budget = thinkingBudget
+            thinking_budget = thinkingBudget,
+            parallel_tool_calls = enableParallelToolCalls  // 阿里云官方推荐：并行工具调用
         };
 
         var jsonContent = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions
@@ -364,6 +585,8 @@ public class BailianApiClient
         var fullResponse = new StringBuilder();
         var fullReasoning = new StringBuilder();
         var toolCalls = new List<ToolCall>();
+        int inputTokens = 0;
+        int outputTokens = 0;
 
         await using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
         {
@@ -429,6 +652,19 @@ public class BailianApiClient
                                 }
                             }
                         }
+
+                        // 处理Token使用量（阿里云官方：最后一个chunk包含usage）
+                        if (chunk.TryGetProperty("usage", out var usage))
+                        {
+                            if (usage.TryGetProperty("input_tokens", out var input))
+                            {
+                                inputTokens = input.GetInt32();
+                            }
+                            if (usage.TryGetProperty("output_tokens", out var output))
+                            {
+                                outputTokens = output.GetInt32();
+                            }
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -438,12 +674,21 @@ public class BailianApiClient
             }
         }
 
+        // 记录Token使用量
+        if (inputTokens > 0 || outputTokens > 0)
+        {
+            TrackTokenUsage(inputTokens, outputTokens);
+            Log.Debug($"对话Token使用: 输入{inputTokens}, 输出{outputTokens}");
+        }
+
         return new ChatCompletionResult
         {
             Content = fullResponse.ToString(),
             ReasoningContent = fullReasoning.ToString(),
             ToolCalls = toolCalls,
-            Model = model
+            Model = model,
+            InputTokens = inputTokens,
+            OutputTokens = outputTokens
         };
     }
 
@@ -457,6 +702,7 @@ public class BailianApiClient
         double temperature = 0.7,
         double topP = 0.9,
         int? thinkingBudget = null,
+        bool enableParallelToolCalls = true,
         CancellationToken cancellationToken = default)
     {
         // 从配置读取模型，如果未指定则使用对话模型
@@ -478,7 +724,8 @@ public class BailianApiClient
             stream = false,
             temperature = temperature,
             top_p = topP,
-            thinking_budget = thinkingBudget
+            thinking_budget = thinkingBudget,
+            parallel_tool_calls = enableParallelToolCalls  // 阿里云官方推荐：并行工具调用
         };
 
         var jsonContent = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions
@@ -498,7 +745,8 @@ public class BailianApiClient
             httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
         }
 
-        var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
+        // 使用带重试的HTTP请求
+        var response = await SendWithRetryAsync(httpRequest, cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
@@ -532,12 +780,35 @@ public class BailianApiClient
             }
         }
 
+        // 记录Token使用量
+        int inputTokens = 0;
+        int outputTokens = 0;
+        if (result.TryGetProperty("usage", out var usage))
+        {
+            if (usage.TryGetProperty("input_tokens", out var input))
+            {
+                inputTokens = input.GetInt32();
+            }
+            if (usage.TryGetProperty("output_tokens", out var output))
+            {
+                outputTokens = output.GetInt32();
+            }
+
+            if (inputTokens > 0 || outputTokens > 0)
+            {
+                TrackTokenUsage(inputTokens, outputTokens);
+                Log.Debug($"对话Token使用: 输入{inputTokens}, 输出{outputTokens}");
+            }
+        }
+
         return new ChatCompletionResult
         {
             Content = content ?? "",
             ReasoningContent = reasoningContent ?? "",
             ToolCalls = toolCalls,
-            Model = model
+            Model = model,
+            InputTokens = inputTokens,
+            OutputTokens = outputTokens
         };
     }
 }
@@ -572,8 +843,9 @@ public record BailianUsage(
 /// </summary>
 public class ChatMessage
 {
-    public string Role { get; set; } = ""; // "user", "assistant", "system"
+    public string Role { get; set; } = ""; // "user", "assistant", "system", "tool"
     public string Content { get; set; } = "";
+    public string? Name { get; set; } // 工具名称（用于role="tool"的消息）
 }
 
 /// <summary>
@@ -585,6 +857,8 @@ public class ChatCompletionResult
     public string ReasoningContent { get; set; } = "";
     public List<ToolCall> ToolCalls { get; set; } = new();
     public string Model { get; set; } = "";
+    public int InputTokens { get; set; } = 0;
+    public int OutputTokens { get; set; } = 0;
 }
 
 /// <summary>

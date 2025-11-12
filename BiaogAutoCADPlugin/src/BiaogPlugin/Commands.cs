@@ -1079,6 +1079,8 @@ namespace BiaogPlugin
             ed.WriteMessage("\n  BIAOGE_CLEARCACHE     - 清除翻译缓存");
             ed.WriteMessage("\n  BIAOGE_DIAGNOSTIC     - 运行系统诊断");
             ed.WriteMessage("\n  BIAOGE_PERFORMANCE    - 显示性能报告");
+            ed.WriteMessage("\n  BIAOGE_TOKENUSAGE     - 显示API Token使用统计");
+            ed.WriteMessage("\n  BIAOGE_RESETTOKENS    - 重置Token统计");
             ed.WriteMessage("\n");
             ed.WriteMessage("\n详细文档: https://github.com/lechatcloud-ship-it/biaoge");
             ed.WriteMessage("\n");
@@ -1316,6 +1318,84 @@ namespace BiaogPlugin
             catch (Exception ex)
             {
                 Log.Error(ex, "重置性能统计失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 显示API Token使用统计（阿里云百炼API）
+        /// </summary>
+        [CommandMethod("BIAOGE_TOKENUSAGE", CommandFlags.Modal)]
+        public void ShowTokenUsage()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                var bailianClient = ServiceLocator.GetService<BailianApiClient>();
+                if (bailianClient == null)
+                {
+                    ed.WriteMessage("\n[警告] 百炼API客户端未初始化");
+                    return;
+                }
+
+                var (inputTokens, outputTokens, totalTokens) = bailianClient.GetTokenUsage();
+
+                ed.WriteMessage("\n╔═══════════════════════════════════════════════╗");
+                ed.WriteMessage("\n║      阿里云百炼API - Token使用统计            ║");
+                ed.WriteMessage("\n╠═══════════════════════════════════════════════╣");
+                ed.WriteMessage($"\n║  输入Token:   {inputTokens,12:N0} tokens     ║");
+                ed.WriteMessage($"\n║  输出Token:   {outputTokens,12:N0} tokens     ║");
+                ed.WriteMessage($"\n║  总计Token:   {totalTokens,12:N0} tokens     ║");
+                ed.WriteMessage("\n╠═══════════════════════════════════════════════╣");
+
+                // 估算成本（基于阿里云百炼官方定价）
+                // qwen-mt-flash: ¥0.002/1K tokens (输入+输出统一计费)
+                // qwen3-max-preview: ¥0.04/1K input, ¥0.12/1K output
+                var translationCost = totalTokens * 0.002 / 1000.0;
+                var conversationCost = (inputTokens * 0.04 + outputTokens * 0.12) / 1000.0;
+
+                ed.WriteMessage($"\n║  预估成本(翻译):   约 ¥{translationCost,6:F4}        ║");
+                ed.WriteMessage($"\n║  预估成本(对话):   约 ¥{conversationCost,6:F4}        ║");
+                ed.WriteMessage("\n╠═══════════════════════════════════════════════╣");
+                ed.WriteMessage("\n║  提示：使用 BIAOGE_RESETTOKENS 重置统计      ║");
+                ed.WriteMessage("\n╚═══════════════════════════════════════════════╝\n");
+
+                Log.Information($"显示Token使用统计: 输入{inputTokens}, 输出{outputTokens}");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "显示Token使用统计失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 重置Token使用统计
+        /// </summary>
+        [CommandMethod("BIAOGE_RESETTOKENS", CommandFlags.Modal)]
+        public void ResetTokenUsage()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                var bailianClient = ServiceLocator.GetService<BailianApiClient>();
+                if (bailianClient == null)
+                {
+                    ed.WriteMessage("\n[警告] 百炼API客户端未初始化");
+                    return;
+                }
+
+                bailianClient.ResetTokenUsage();
+                ed.WriteMessage("\n✓ Token使用统计已重置。");
+                Log.Information("Token使用统计已重置");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "重置Token使用统计失败");
                 ed.WriteMessage($"\n[错误] {ex.Message}");
             }
         }
