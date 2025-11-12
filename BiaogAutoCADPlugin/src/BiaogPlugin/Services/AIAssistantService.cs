@@ -46,7 +46,7 @@ namespace BiaogPlugin.Services
             _configManager = configManager;
             _contextManager = contextManager;
 
-            Log.Information("标哥Agent初始化完成（核心模型: qwen3-max-preview）");
+            Log.Information("标哥AI助手初始化完成");
         }
 
         /// <summary>
@@ -59,7 +59,7 @@ namespace BiaogPlugin.Services
         {
             try
             {
-                onStreamChunk?.Invoke($"\n[标哥Agent] 正在分析您的需求...\n");
+                onStreamChunk?.Invoke($"\n[标哥AI助手] 正在分析您的需求...\n");
 
                 // ===== 第0步：场景检测 =====
                 var detectedScenario = ScenarioPromptManager.DetectScenario(userMessage);
@@ -67,7 +67,7 @@ namespace BiaogPlugin.Services
 
                 if (detectedScenario != ScenarioPromptManager.Scenario.General)
                 {
-                    onStreamChunk?.Invoke($"[标哥Agent] 场景识别: {GetScenarioDisplayName(detectedScenario)}\n");
+                    onStreamChunk?.Invoke($"[标哥AI助手] 场景识别: {GetScenarioDisplayName(detectedScenario)}\n");
                 }
 
                 // ===== 第1步：工具定义 =====
@@ -86,7 +86,7 @@ namespace BiaogPlugin.Services
                 var messages = BuildMessages(systemPrompt);
 
                 // ===== 第3步：Agent决策 =====
-                onStreamChunk?.Invoke($"[标哥Agent] 使用{AgentModel}进行决策...\n");
+                onStreamChunk?.Invoke($"[标哥AI助手] 正在智能分析...\n");
 
                 var agentDecision = await _bailianClient.ChatCompletionStreamAsync(
                     messages: messages,
@@ -111,7 +111,7 @@ namespace BiaogPlugin.Services
                 // ===== 第4步：工具执行 =====
                 if (agentDecision.ToolCalls.Count > 0)
                 {
-                    onStreamChunk?.Invoke($"\n[标哥Agent] 需要调用{agentDecision.ToolCalls.Count}个工具执行任务\n");
+                    onStreamChunk?.Invoke($"\n[标哥AI助手] 需要调用{agentDecision.ToolCalls.Count}个工具执行任务\n");
 
                     foreach (var toolCall in agentDecision.ToolCalls)
                     {
@@ -130,7 +130,7 @@ namespace BiaogPlugin.Services
                     }
 
                     // ===== 第5步：总结反馈 =====
-                    onStreamChunk?.Invoke($"\n[标哥Agent] 正在总结执行结果...\n");
+                    onStreamChunk?.Invoke($"\n[标哥AI助手] 正在总结执行结果...\n");
 
                     var summaryMessages = BuildMessages(systemPrompt);
                     var summary = await _bailianClient.ChatCompletionStreamAsync(
@@ -167,11 +167,11 @@ namespace BiaogPlugin.Services
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "标哥Agent执行失败");
+                Log.Error(ex, "标哥AI助手执行失败");
                 return new AssistantResponse
                 {
                     Success = false,
-                    Error = $"Agent执行失败: {ex.Message}"
+                    Error = $"AI助手执行失败: {ex.Message}"
                 };
             }
         }
@@ -213,7 +213,7 @@ namespace BiaogPlugin.Services
         /// </summary>
         private async Task<string> ExecuteTranslateTool(Dictionary<string, object> args, Action<string>? onStreamChunk)
         {
-            onStreamChunk?.Invoke($"  → 使用qwen-mt-flash执行翻译...\n");
+            onStreamChunk?.Invoke($"  → 正在执行翻译...\n");
 
             var text = args["text"].ToString() ?? "";
             var targetLanguage = args["target_language"].ToString() ?? "en";
@@ -233,13 +233,13 @@ namespace BiaogPlugin.Services
         /// </summary>
         private async Task<string> ExecuteModifyDrawingTool(Dictionary<string, object> args, Action<string>? onStreamChunk)
         {
-            onStreamChunk?.Invoke($"  → 使用qwen3-coder-flash生成修改代码...\n");
+            onStreamChunk?.Invoke($"  → 正在执行图纸修改...\n");
 
             var operation = args["operation"].ToString() ?? "";
             var original = args.ContainsKey("original_text") ? args["original_text"].ToString() : "";
             var newValue = args.ContainsKey("new_text") ? args["new_text"].ToString() : "";
 
-            // 使用qwen3-coder-flash理解修改意图并执行
+            // 理解修改意图并执行
             var doc = Application.DocumentManager.MdiActiveDocument;
             var db = doc.Database;
 
@@ -279,7 +279,7 @@ namespace BiaogPlugin.Services
         /// </summary>
         private async Task<string> ExecuteRecognitionTool(Dictionary<string, object> args, Action<string>? onStreamChunk)
         {
-            onStreamChunk?.Invoke($"  → 使用qwen3-vl-flash识别构件...\n");
+            onStreamChunk?.Invoke($"  → 正在识别构件...\n");
 
             // 提取图纸文本实体用于识别
             var extractor = new DwgTextExtractor();
