@@ -1,0 +1,30 @@
+.DS_Store
+.vscode/
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build artifacts
+[Bb]in/
+[Oo]bj/
+BiaogAutoCADPlugin/src/BiaogPlugin/bin/
+BiaogAutoCADPlugin/src/BiaogPlugin/obj/
+
+# Logs and caches
+*.log
+*.tmp
+*.cache
+nu_
+
+# Distribution folders
+dist/
+dist-backup/
+BiaogAutoCADPlugin/dist/
+BiaogAutoCADPlugin/dist-backup/
+
+# IDE and OS files
+Thumbs.db
+ehthumbs.db
+
