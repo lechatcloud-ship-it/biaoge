@@ -1,4 +1,5 @@
 .DS_Store
+.trae/
 .vscode/
 .vs/
 *.suo
@@ -27,4 +28,3 @@ BiaogAutoCADPlugin/dist-backup/
 # IDE and OS files
 Thumbs.db
 ehthumbs.db
-
