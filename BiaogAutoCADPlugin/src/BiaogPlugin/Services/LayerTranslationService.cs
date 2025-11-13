@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -109,7 +109,7 @@ namespace BiaogPlugin.Services
 
                 Log.Information($"获取图层信息: 共 {layers.Count} 个图层");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "获取图层信息失败");
                 throw;
@@ -201,7 +201,7 @@ namespace BiaogPlugin.Services
 
                 Log.Information($"从图层提取文本: {layerNames.Count} 个图层，{textEntities.Count} 个文本");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "从图层提取文本失败");
                 throw;
@@ -240,28 +240,45 @@ namespace BiaogPlugin.Services
                 var configManager = ServiceLocator.GetService<ConfigManager>();
                 var cacheService = ServiceLocator.GetService<CacheService>();
 
-                var engine = new TranslationEngine(bailianClient!, configManager!, cacheService!);
+                var engine = new TranslationEngine(bailianClient!, cacheService!);
+
+                // 转换进度回调
+                var apiProgress = new Progress<double>(p =>
+                {
+                    progress?.Report(new TranslationProgress
+                    {
+                        Stage = "翻译中",
+                        Percentage = (int)p,
+                        ProcessedCount = (int)(textEntities.Count * p / 100.0),
+                        TotalCount = textEntities.Count
+                    });
+                });
 
                 var translations = await engine.TranslateBatchWithCacheAsync(
                     textEntities.Select(t => t.Content).ToList(),
-                    "auto",
                     targetLanguage,
-                    progress
+                    apiProgress,
+                    System.Threading.CancellationToken.None
                 );
 
-                // 3. 更新DWG
+                // 3. 更新DWG - 构建更新请求
                 var updater = new DwgTextUpdater();
-                var updateMap = new Dictionary<ObjectId, string>();
+                var updateRequests = new List<TextUpdateRequest>();
 
                 for (int i = 0; i < textEntities.Count && i < translations.Count; i++)
                 {
                     if (!string.IsNullOrEmpty(translations[i]))
                     {
-                        updateMap[textEntities[i].ObjectId] = translations[i];
+                        updateRequests.Add(new TextUpdateRequest
+                        {
+                            ObjectId = textEntities[i].ObjectId,
+                            OriginalContent = textEntities[i].Content,
+                            NewContent = translations[i]
+                        });
                     }
                 }
 
-                updater.UpdateTexts(updateMap);
+                var updateResult = updater.UpdateTexts(updateRequests);
 
                 // 记录翻译历史
                 if (configManager != null && configManager.Config.Translation.EnableHistory)
@@ -302,17 +319,16 @@ namespace BiaogPlugin.Services
                 {
                     TotalTextCount = textEntities.Count,
                     UniqueTextCount = textEntities.Select(t => t.Content).Distinct().Count(),
-                    SuccessCount = updateMap.Count,
-                    FailureCount = textEntities.Count - updateMap.Count,
-                    CacheHitRate = 0, // TODO: 从缓存服务获取
-                    ApiCallCount = 0  // TODO: 从API客户端获取
+                    SuccessCount = updateResult.SuccessCount,
+                    FailureCount = updateResult.FailCount,
+                    ApiCallCount = (int)Math.Ceiling(textEntities.Count / 50.0)
                 };
 
                 Log.Information($"图层翻译完成: {stats}");
 
                 return stats;
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "图层翻译失败");
                 throw;

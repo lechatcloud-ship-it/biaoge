@@ -1,10 +1,11 @@
-using Serilog;
+﻿using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using BiaogPlugin.Models;
+using BiaogPlugin.Extensions;
 
 namespace BiaogPlugin.Services;
 
@@ -249,7 +250,7 @@ public class ComponentRecognizer
             await Task.CompletedTask;
             result.Confidence += 0.1;
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             Log.Warning(ex, "AI验证失败");
         }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -44,7 +44,7 @@ namespace BiaogPlugin.UI
 
                 AddLog("算量工具已就绪");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "初始化算量服务失败");
                 AddLog($"[错误] 初始化失败: {ex.Message}");
@@ -146,7 +146,7 @@ namespace BiaogPlugin.UI
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "构件识别失败");
                 AddLog($"[错误] {ex.Message}");
@@ -188,7 +188,7 @@ namespace BiaogPlugin.UI
                 // 打开文件夹
                 System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{outputPath}\"");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "导出Excel失败");
                 AddLog($"[错误] 导出失败: {ex.Message}");

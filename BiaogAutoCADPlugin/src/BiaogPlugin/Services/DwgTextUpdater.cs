@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.DatabaseServices;
@@ -70,7 +70,7 @@ namespace BiaogPlugin.Services
                                     errors.Add($"ObjectId: {update.ObjectId}, 原文: {update.OriginalContent}");
                                 }
                             }
-                            catch (Exception ex)
+                            catch (System.Exception ex)
                             {
                                 Log.Warning(ex, $"更新文本失败: {update.ObjectId}");
                                 failCount++;
@@ -101,7 +101,7 @@ namespace BiaogPlugin.Services
 
                         return result;
                     }
-                    catch (Exception ex)
+                    catch (System.Exception ex)
                     {
                         Log.Error(ex, "批量更新文本时发生错误");
                         tr.Abort();
@@ -118,6 +118,25 @@ namespace BiaogPlugin.Services
         {
             try
             {
+                // ✅ P0修复: 添加ObjectId有效性检查
+                if (update.ObjectId.IsNull)
+                {
+                    Log.Warning("ObjectId为空，跳过更新");
+                    return false;
+                }
+
+                if (update.ObjectId.IsErased)
+                {
+                    Log.Warning($"ObjectId {update.ObjectId.Handle} 已被删除，跳过更新");
+                    return false;
+                }
+
+                if (!update.ObjectId.IsValid)
+                {
+                    Log.Warning($"ObjectId {update.ObjectId.Handle} 无效，跳过更新");
+                    return false;
+                }
+
                 var ent = tr.GetObject(update.ObjectId, OpenMode.ForWrite) as Entity;
                 if (ent == null) return false;
 
@@ -149,7 +168,7 @@ namespace BiaogPlugin.Services
                 Log.Warning($"不支持的实体类型: {ent.GetType().Name}");
                 return false;
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, $"更新单个文本失败: {update.ObjectId}");
                 return false;
@@ -172,6 +191,13 @@ namespace BiaogPlugin.Services
                 {
                     try
                     {
+                        // ✅ P0修复: 添加ObjectId有效性检查
+                        if (objectId.IsNull || objectId.IsErased || !objectId.IsValid)
+                        {
+                            Log.Warning($"ObjectId {objectId.Handle} 无效或已删除");
+                            return false;
+                        }
+
                         var ent = tr.GetObject(objectId, OpenMode.ForWrite) as Entity;
                         if (ent == null) return false;
 
@@ -202,7 +228,7 @@ namespace BiaogPlugin.Services
 
                         return false;
                     }
-                    catch (Exception ex)
+                    catch (System.Exception ex)
                     {
                         Log.Error(ex, "更新文本失败");
                         tr.Abort();
@@ -276,7 +302,7 @@ namespace BiaogPlugin.Services
 
                     tr.Commit();
                 }
-                catch (Exception ex)
+                catch (System.Exception ex)
                 {
                     Log.Error(ex, "验证更新结果失败");
                     tr.Abort();

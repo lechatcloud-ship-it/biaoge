@@ -1,4 +1,4 @@
-using Microsoft.Data.Sqlite;
+﻿using Microsoft.Data.Sqlite;
 using Serilog;
 using System;
 using System.IO;
@@ -48,10 +48,12 @@ public class CacheService
         {
             if (_initialized) return;
 
-            await using var connection = new SqliteConnection(_connectionString);
-            await connection.OpenAsync();
+            using (var connection = new SqliteConnection(_connectionString))
+            {
+                await connection.OpenAsync();
 
-            await using var command = connection.CreateCommand();
+            using (var command = connection.CreateCommand())
+            {
             command.CommandText = @"
                 CREATE TABLE IF NOT EXISTS translation_cache (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,9 +71,11 @@ public class CacheService
                 ON translation_cache(created_at);
             ";
             await command.ExecuteNonQueryAsync();
+            }
 
             _initialized = true;
             Log.Information("缓存数据库初始化完成: {DbPath}", _dbPath);
+            }
         }
         finally
         {
@@ -87,11 +91,13 @@ public class CacheService
     {
         await EnsureInitializedAsync();
 
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync();
+        using (var connection = new SqliteConnection(_connectionString))
+        {
+            await connection.OpenAsync();
 
-        await using var command = connection.CreateCommand();
-        command.CommandText = @"
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = @"
             SELECT translated_text, created_at
             FROM translation_cache
             WHERE source_text = $source_text AND target_language = $target_language
@@ -99,7 +105,8 @@ public class CacheService
         command.Parameters.AddWithValue("$source_text", sourceText);
         command.Parameters.AddWithValue("$target_language", targetLanguage);
 
-        await using var reader = await command.ExecuteReaderAsync();
+        using (var reader = await command.ExecuteReaderAsync())
+        {
         if (await reader.ReadAsync())
         {
             var translatedText = reader.GetString(0);
@@ -115,6 +122,9 @@ public class CacheService
 
             return translatedText;
         }
+        }
+        }
+        }
 
         return null;
     }
@@ -126,11 +136,13 @@ public class CacheService
     {
         await EnsureInitializedAsync();
 
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync();
+        using (var connection = new SqliteConnection(_connectionString))
+        {
+            await connection.OpenAsync();
 
-        await using var command = connection.CreateCommand();
-        command.CommandText = @"
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = @"
             INSERT OR REPLACE INTO translation_cache (source_text, target_language, translated_text, created_at)
             VALUES ($source_text, $target_language, $translated_text, $created_at)
         ";
@@ -140,6 +152,8 @@ public class CacheService
         command.Parameters.AddWithValue("$created_at", DateTimeOffset.UtcNow.ToUnixTimeSeconds());
 
         await command.ExecuteNonQueryAsync();
+        }
+        }
     }
 
     /// <summary>
@@ -149,12 +163,16 @@ public class CacheService
     {
         await EnsureInitializedAsync();
 
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync();
+        using (var connection = new SqliteConnection(_connectionString))
+        {
+            await connection.OpenAsync();
 
-        await using var command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM translation_cache";
-        await command.ExecuteNonQueryAsync();
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "DELETE FROM translation_cache";
+            await command.ExecuteNonQueryAsync();
+        }
+        }
 
         Log.Information("缓存已清空");
     }
@@ -166,19 +184,23 @@ public class CacheService
     {
         await EnsureInitializedAsync();
 
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync();
+        using (var connection = new SqliteConnection(_connectionString))
+        {
+            await connection.OpenAsync();
 
         var expirationTimestamp = DateTimeOffset.UtcNow.AddDays(-expirationDays).ToUnixTimeSeconds();
 
-        await using var command = connection.CreateCommand();
-        command.CommandText = "DELETE FROM translation_cache WHERE created_at < $expiration";
-        command.Parameters.AddWithValue("$expiration", expirationTimestamp);
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = "DELETE FROM translation_cache WHERE created_at < $expiration";
+            command.Parameters.AddWithValue("$expiration", expirationTimestamp);
 
-        var deletedCount = await command.ExecuteNonQueryAsync();
-        Log.Information($"清理过期缓存: 删除 {deletedCount} 条记录（超过 {expirationDays} 天）");
+            var deletedCount = await command.ExecuteNonQueryAsync();
+            Log.Information($"清理过期缓存: 删除 {deletedCount} 条记录（超过 {expirationDays} 天）");
 
-        return deletedCount;
+            return deletedCount;
+        }
+        }
     }
 
     /// <summary>
@@ -188,18 +210,21 @@ public class CacheService
     {
         await EnsureInitializedAsync();
 
-        await using var connection = new SqliteConnection(_connectionString);
-        await connection.OpenAsync();
+        using (var connection = new SqliteConnection(_connectionString))
+        {
+            await connection.OpenAsync();
 
-        await using var command = connection.CreateCommand();
-        command.CommandText = @"
+        using (var command = connection.CreateCommand())
+        {
+            command.CommandText = @"
             SELECT
                 COUNT(*) as TotalCount,
                 COUNT(DISTINCT target_language) as LanguageCount
             FROM translation_cache
         ";
 
-        await using var reader = await command.ExecuteReaderAsync();
+        using (var reader = await command.ExecuteReaderAsync())
+        {
         if (await reader.ReadAsync())
         {
             return new CacheStatistics
@@ -207,6 +232,9 @@ public class CacheService
                 TotalCount = reader.GetInt32(0),
                 LanguageCount = reader.GetInt32(1)
             };
+        }
+        }
+        }
         }
 
         return new CacheStatistics();

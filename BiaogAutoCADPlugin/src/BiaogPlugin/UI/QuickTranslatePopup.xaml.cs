@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -108,8 +108,8 @@ namespace BiaogPlugin.UI
             try
             {
                 // 显示加载状态
-                LoadingPanel.Visibility = Visibility.Visible;
-                TranslatedTextBlock.Visibility = Visibility.Collapsed;
+                LoadingPanel.Visibility = System.Windows.Visibility.Visible;
+                TranslatedTextBlock.Visibility = System.Windows.Visibility.Collapsed;
                 ApplyButton.IsEnabled = false;
                 StatusTextBlock.Text = "翻译中...";
 
@@ -148,7 +148,7 @@ namespace BiaogPlugin.UI
                     throw new Exception("翻译结果为空");
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "快速翻译失败");
                 TranslatedTextBlock.Text = $"翻译失败: {ex.Message}";
@@ -160,8 +160,8 @@ namespace BiaogPlugin.UI
             finally
             {
                 // 隐藏加载状态
-                LoadingPanel.Visibility = Visibility.Collapsed;
-                TranslatedTextBlock.Visibility = Visibility.Visible;
+                LoadingPanel.Visibility = System.Windows.Visibility.Collapsed;
+                TranslatedTextBlock.Visibility = System.Windows.Visibility.Visible;
             }
         }
 
@@ -251,7 +251,7 @@ namespace BiaogPlugin.UI
                     Dispatcher.Invoke(() => Close());
                 });
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "应用翻译失败");
                 MessageBox.Show($"应用翻译失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -288,7 +288,7 @@ namespace BiaogPlugin.UI
                     Log.Information("译文已复制到剪贴板");
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "复制译文失败");
                 MessageBox.Show($"复制失败: {ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);

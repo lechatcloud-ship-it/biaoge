@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Serilog;
 
@@ -95,7 +95,7 @@ namespace BiaogPlugin.Services
                             disposable.Dispose();
                             Log.Debug($"服务已释放: {service.GetType().Name}");
                         }
-                        catch (Exception ex)
+                        catch (System.Exception ex)
                         {
                             Log.Error(ex, $"释放服务失败: {service.GetType().Name}");
                         }
@@ -130,7 +130,7 @@ namespace BiaogPlugin.Services
 
                 Log.Information("服务初始化完成");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "服务初始化失败");
                 throw;

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Autodesk.AutoCAD.ApplicationServices;
@@ -64,7 +64,7 @@ namespace BiaogPlugin.Services
                     Log.Information($"成功提取 {texts.Count} 个文本实体");
                     ed.WriteMessage($"\n成功提取 {texts.Count} 个文本实体");
                 }
-                catch (Exception ex)
+                catch (System.Exception ex)
                 {
                     Log.Error(ex, "提取文本时发生错误");
                     tr.Abort();
@@ -92,7 +92,7 @@ namespace BiaogPlugin.Services
                     Layer = dbText.Layer,
                     Height = dbText.Height,
                     Rotation = dbText.Rotation,
-                    ColorIndex = dbText.ColorIndex
+                    ColorIndex = (short)dbText.ColorIndex
                 };
             }
 
@@ -108,7 +108,7 @@ namespace BiaogPlugin.Services
                     Layer = mText.Layer,
                     Height = mText.TextHeight,
                     Rotation = mText.Rotation,
-                    ColorIndex = mText.ColorIndex,
+                    ColorIndex = (short)mText.ColorIndex,
                     Width = mText.Width
                 };
             }
@@ -125,7 +125,7 @@ namespace BiaogPlugin.Services
                     Layer = attDef.Layer,
                     Height = attDef.Height,
                     Rotation = attDef.Rotation,
-                    ColorIndex = attDef.ColorIndex,
+                    ColorIndex = (short)attDef.ColorIndex,
                     Tag = attDef.Tag
                 };
             }
@@ -160,12 +160,12 @@ namespace BiaogPlugin.Services
                                 Layer = attRef.Layer,
                                 Height = attRef.Height,
                                 Rotation = attRef.Rotation,
-                                ColorIndex = attRef.ColorIndex,
+                                ColorIndex = (short)attRef.ColorIndex,
                                 Tag = attRef.Tag,
                                 BlockName = blockRef.Name
                             });
                         }
-                        catch (Exception ex)
+                        catch (System.Exception ex)
                         {
                             Log.Warning(ex, $"提取块属性失败: {attId}");
                         }

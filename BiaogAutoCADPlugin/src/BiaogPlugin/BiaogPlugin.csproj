@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <!-- 目标：AutoCAD 2018-2024 兼容性 -->
+    <!-- 使用 .NET Framework 4.8 实现最大兼容性 -->
     <TargetFramework>net48</TargetFramework>
     <PlatformTarget>x64</PlatformTarget>
     <LangVersion>latest</LangVersion>
@@ -9,10 +11,13 @@
     <UseWPF>true</UseWPF>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <!-- 禁用部分引用冲突警告 -->
+    <ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>None</ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
   </PropertyGroup>
 
   <PropertyGroup>
-    <AssemblyTitle>表哥 - AutoCAD翻译插件</AssemblyTitle>
+    <AssemblyTitle>标哥 - AutoCAD翻译插件</AssemblyTitle>
     <Product>BiaogPlugin</Product>
     <Company>Your Company</Company>
     <Copyright>Copyright © 2025</Copyright>
@@ -20,37 +25,120 @@
     <FileVersion>1.0.0.0</FileVersion>
   </PropertyGroup>
 
-  <!-- AutoCAD程序集引用 (AutoCAD 2024) -->
-  <ItemGroup>
+  <!-- 自动检测AutoCAD版本和路径 (支持2018-2024) -->
+  <PropertyGroup>
+    <!-- 方法1: 使用环境变量 -->
+    <AcadPathFromEnv Condition="'$(AUTOCAD_PATH)' != ''">$(AUTOCAD_PATH)</AcadPathFromEnv>
+
+    <!-- 方法2: 自动检测 (优先2021，最佳兼容) -->
+    <!-- AutoCAD 2021 (R24.1) - 最佳编译目标，二进制兼容2021-2024 -->
+    <AcadVersion Condition="'$(AcadVersion)' == '' And Exists('C:\Program Files\Autodesk\AutoCAD 2021\acdbmgd.dll')">2021</AcadVersion>
+    <AcadPath Condition="'$(AcadVersion)' == '2021'">C:\Program Files\Autodesk\AutoCAD 2021</AcadPath>
+    <AcadVersion Condition="'$(AcadVersion)' == '' And Exists('D:\Program Files\Autodesk\AutoCAD 2021\acdbmgd.dll')">2021</AcadVersion>
+    <AcadPath Condition="'$(AcadVersion)' == '2021' And '$(AcadPath)' == ''">D:\Program Files\Autodesk\AutoCAD 2021</AcadPath>
+
+    <!-- AutoCAD 2024 (R24.3) -->
+    <AcadVersion Condition="'$(AcadVersion)' == '' And Exists('C:\Program Files\Autodesk\AutoCAD 2024\acdbmgd.dll')">2024</AcadVersion>
+    <AcadPath Condition="'$(AcadVersion)' == '2024'">C:\Program Files\Autodesk\AutoCAD 2024</AcadPath>
+    <AcadVersion Condition="'$(AcadVersion)' == '' And Exists('D:\Program Files\Autodesk\AutoCAD 2024\acdbmgd.dll')">2024</AcadVersion>
+    <AcadPath Condition="'$(AcadVersion)' == '2024' And '$(AcadPath)' == ''">D:\Program Files\Autodesk\AutoCAD 2024</AcadPath>
+
+    <!-- AutoCAD 2022 (R24.2) -->
+    <AcadVersion Condition="'$(AcadVersion)' == '' And Exists('C:\Program Files\Autodesk\AutoCAD 2022\acdbmgd.dll')">2022</AcadVersion>
+    <AcadPath Condition="'$(AcadVersion)' == '2022'">C:\Program Files\Autodesk\AutoCAD 2022</AcadPath>
+    <AcadVersion Condition="'$(AcadVersion)' == '' And Exists('D:\Program Files\Autodesk\AutoCAD 2022\acdbmgd.dll')">2022</AcadVersion>
+    <AcadPath Condition="'$(AcadVersion)' == '2022' And '$(AcadPath)' == ''">D:\Program Files\Autodesk\AutoCAD 2022</AcadPath>
+
+    <!-- AutoCAD 2023 (R24.3) -->
+    <AcadVersion Condition="'$(AcadVersion)' == '' And Exists('C:\Program Files\Autodesk\AutoCAD 2023\acdbmgd.dll')">2023</AcadVersion>
+    <AcadPath Condition="'$(AcadVersion)' == '2023'">C:\Program Files\Autodesk\AutoCAD 2023</AcadPath>
+    <AcadVersion Condition="'$(AcadVersion)' == '' And Exists('D:\Program Files\Autodesk\AutoCAD 2023\acdbmgd.dll')">2023</AcadVersion>
+    <AcadPath Condition="'$(AcadVersion)' == '2023' And '$(AcadPath)' == ''">D:\Program Files\Autodesk\AutoCAD 2023</AcadPath>
+
+    <!-- AutoCAD 2020 (R24.0) -->
+    <AcadVersion Condition="'$(AcadVersion)' == '' And Exists('C:\Program Files\Autodesk\AutoCAD 2020\acdbmgd.dll')">2020</AcadVersion>
+    <AcadPath Condition="'$(AcadVersion)' == '2020'">C:\Program Files\Autodesk\AutoCAD 2020</AcadPath>
+    <AcadVersion Condition="'$(AcadVersion)' == '' And Exists('D:\Program Files\Autodesk\AutoCAD 2020\acdbmgd.dll')">2020</AcadVersion>
+    <AcadPath Condition="'$(AcadVersion)' == '2020' And '$(AcadPath)' == ''">D:\Program Files\Autodesk\AutoCAD 2020</AcadPath>
+
+    <!-- AutoCAD 2019 (R23.0) -->
+    <AcadVersion Condition="'$(AcadVersion)' == '' And Exists('C:\Program Files\Autodesk\AutoCAD 2019\acdbmgd.dll')">2019</AcadVersion>
+    <AcadPath Condition="'$(AcadVersion)' == '2019'">C:\Program Files\Autodesk\AutoCAD 2019</AcadPath>
+    <AcadVersion Condition="'$(AcadVersion)' == '' And Exists('D:\Program Files\Autodesk\AutoCAD 2019\acdbmgd.dll')">2019</AcadVersion>
+    <AcadPath Condition="'$(AcadVersion)' == '2019' And '$(AcadPath)' == ''">D:\Program Files\Autodesk\AutoCAD 2019</AcadPath>
+
+    <!-- AutoCAD 2018 (R22.0) -->
+    <AcadVersion Condition="'$(AcadVersion)' == '' And Exists('C:\Program Files\Autodesk\AutoCAD 2018\acdbmgd.dll')">2018</AcadVersion>
+    <AcadPath Condition="'$(AcadVersion)' == '2018'">C:\Program Files\Autodesk\AutoCAD 2018</AcadPath>
+    <AcadVersion Condition="'$(AcadVersion)' == '' And Exists('D:\Program Files\Autodesk\AutoCAD 2018\acdbmgd.dll')">2018</AcadVersion>
+    <AcadPath Condition="'$(AcadVersion)' == '2018' And '$(AcadPath)' == ''">D:\Program Files\Autodesk\AutoCAD 2018</AcadPath>
+
+    <!-- 如果设置了环境变量，优先使用 -->
+    <AcadPath Condition="'$(AcadPathFromEnv)' != ''">$(AcadPathFromEnv)</AcadPath>
+  </PropertyGroup>
+
+  <!-- 如果找不到AutoCAD，显示警告 -->
+  <Target Name="CheckAutoCAD" BeforeTargets="BeforeBuild">
+    <Warning Condition="'$(AcadVersion)' == ''" Text="未检测到AutoCAD 2018-2024安装。请安装AutoCAD后重新构建。" />
+    <Message Condition="'$(AcadVersion)' != ''" Text="检测到AutoCAD $(AcadVersion)，使用路径: $(AcadPath)" Importance="high" />
+    <Message Condition="'$(AcadVersion)' != ''" Text="目标框架: .NET Framework 4.8，兼容AutoCAD 2018-2024" Importance="high" />
+  </Target>
+
+  <!-- AutoCAD程序集引用 (自适应版本) -->
+  <ItemGroup Condition="'$(AcadVersion)' != ''">
     <Reference Include="acdbmgd">
-      <HintPath>C:\Program Files\Autodesk\AutoCAD 2024\acdbmgd.dll</HintPath>
+      <HintPath>$(AcadPath)\acdbmgd.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="acmgd">
-      <HintPath>C:\Program Files\Autodesk\AutoCAD 2024\acmgd.dll</HintPath>
+      <HintPath>$(AcadPath)\acmgd.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="AcCoreMgd">
-      <HintPath>C:\Program Files\Autodesk\AutoCAD 2024\AcCoreMgd.dll</HintPath>
+      <HintPath>$(AcadPath)\AcCoreMgd.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Autodesk.AutoCAD.Interop">
-      <HintPath>C:\Program Files\Autodesk\AutoCAD 2024\Autodesk.AutoCAD.Interop.dll</HintPath>
+      <HintPath>$(AcadPath)\Autodesk.AutoCAD.Interop.dll</HintPath>
       <EmbedInteropTypes>True</EmbedInteropTypes>
+    </Reference>
+    <!-- Ribbon API -->
+    <Reference Include="AdWindows">
+      <HintPath>$(AcadPath)\AdWindows.dll</HintPath>
+      <Private>False</Private>
     </Reference>
   </ItemGroup>
 
   <!-- NuGet包 -->
   <ItemGroup>
     <!-- HTTP客户端 -->
-    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
+    <!-- ✅ 修复：降级到6.0版本以解决.NET Framework 4.8兼容性问题 -->
+    <PackageReference Include="Microsoft.Extensions.Http" Version="6.0.0" />
 
-    <!-- JSON处理 -->
-    <PackageReference Include="System.Text.Json" Version="8.0.0" />
+    <!-- JSON处理 - .NET Framework 4.8兼容版本 -->
+    <!-- ✅ 修复：降级System.Text.Json以解决类型初始化异常 -->
+    <PackageReference Include="System.Text.Json" Version="6.0.10" />
+    <PackageReference Include="System.Net.Http.Json" Version="6.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 
+    <!-- C# 9+ init accessor support for .NET Framework 4.8 -->
+    <PackageReference Include="IsExternalInit" Version="1.0.3">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+
+    <!-- Windows Forms (用于对话框) - .NET Framework 4.8自动包含 -->
+    <Reference Include="System.Windows.Forms" />
+
+    <!-- WindowsFormsIntegration (用于WPF/WinForms互操作) -->
+    <!-- 使用$(SystemRoot)环境变量，自动适配Windows安装位置 -->
+    <Reference Include="WindowsFormsIntegration">
+      <HintPath>$(SystemRoot)\Microsoft.NET\Framework64\v4.0.30319\WPF\WindowsFormsIntegration.dll</HintPath>
+    </Reference>
+
     <!-- SQLite数据库 -->
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+    <!-- ✅ 修复：降级到6.0版本以提高兼容性 -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="6.0.33" />
 
     <!-- Excel导出 -->
     <PackageReference Include="EPPlus" Version="7.0.10" />
@@ -61,14 +149,15 @@
     <PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
 
     <!-- 配置 -->
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <!-- ✅ 修复：降级到6.0版本以提高兼容性 -->
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="6.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="6.0.0" />
   </ItemGroup>
 
-  <!-- 调试配置 -->
-  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+  <!-- 调试配置 (使用检测到的AutoCAD版本) -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug' And '$(AcadVersion)' != ''">
     <StartAction>Program</StartAction>
-    <StartProgram>C:\Program Files\Autodesk\AutoCAD 2024\acad.exe</StartProgram>
+    <StartProgram>$(AcadPath)\acad.exe</StartProgram>
     <StartArguments>/nologo</StartArguments>
   </PropertyGroup>
 

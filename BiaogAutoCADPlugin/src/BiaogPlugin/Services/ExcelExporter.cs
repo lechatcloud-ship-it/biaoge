@@ -1,10 +1,11 @@
-using OfficeOpenXml;
+﻿using OfficeOpenXml;
 using OfficeOpenXml.Style;
 using Serilog;
 using System;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using BiaogPlugin.Extensions;
 
 namespace BiaogPlugin.Services;
 
@@ -41,7 +42,7 @@ public class ExcelExporter
 
             Log.Information("Excel导出成功: {Path}", outputPath);
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             Log.Error(ex, "Excel导出失败");
             throw;

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using Autodesk.AutoCAD.ApplicationServices;
 using Serilog;
@@ -46,7 +46,7 @@ namespace BiaogPlugin.Services
                     doc.Editor.WriteMessage($"\n[提示] {commandName} 已取消");
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 // 所有其他未预期异常
                 Log.Fatal(ex, "命令执行时发生未处理的异常: {CommandName}", commandName);
@@ -97,7 +97,7 @@ namespace BiaogPlugin.Services
                     doc.Editor.WriteMessage($"\n[错误] {commandName} 执行失败: {acEx.Message}");
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Fatal(ex, "命令执行时发生未处理的异常: {CommandName}", commandName);
 
@@ -118,7 +118,7 @@ namespace BiaogPlugin.Services
             {
                 return await action();
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "命令执行失败: {CommandName}", commandName);
 

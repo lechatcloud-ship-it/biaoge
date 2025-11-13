@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -67,10 +67,12 @@ namespace BiaogPlugin.Services
             {
                 if (_initialized) return;
 
-                await using var connection = new SqliteConnection(_connectionString);
-                await connection.OpenAsync();
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    await connection.OpenAsync();
 
-                await using var createTableCmd = connection.CreateCommand();
+                using (var createTableCmd = connection.CreateCommand())
+                {
                 createTableCmd.CommandText = @"
                     CREATE TABLE IF NOT EXISTS translation_history (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,11 +92,13 @@ namespace BiaogPlugin.Services
                     CREATE INDEX IF NOT EXISTS idx_operation ON translation_history(operation);
                 ";
                 await createTableCmd.ExecuteNonQueryAsync();
+                }
 
                 _initialized = true;
                 Log.Information("翻译历史数据库初始化成功: {DbPath}", _dbPath);
+                }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "初始化翻译历史数据库失败");
                 throw;
@@ -114,10 +118,12 @@ namespace BiaogPlugin.Services
             {
                 await EnsureInitializedAsync();
 
-                await using var connection = new SqliteConnection(_connectionString);
-                await connection.OpenAsync();
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    await connection.OpenAsync();
 
-                await using var insertCmd = connection.CreateCommand();
+                using (var insertCmd = connection.CreateCommand())
+                {
                 insertCmd.CommandText = @"
                     INSERT INTO translation_history
                     (timestamp, object_id_handle, original_text, translated_text,
@@ -138,13 +144,15 @@ namespace BiaogPlugin.Services
                 insertCmd.Parameters.AddWithValue("@operation", record.Operation);
 
                 await insertCmd.ExecuteNonQueryAsync();
+                }
 
                 // 清理旧记录
                 await CleanupOldRecordsAsync(connection);
+                }
 
                 Log.Debug($"添加翻译历史记录: {record.OriginalText} -> {record.TranslatedText}");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "添加翻译历史记录失败");
             }
@@ -161,18 +169,20 @@ namespace BiaogPlugin.Services
             {
                 await EnsureInitializedAsync();
 
-                await using var connection = new SqliteConnection(_connectionString);
-                await connection.OpenAsync();
+                using (var connection = new SqliteConnection(_connectionString))
+                {
+                    await connection.OpenAsync();
 
-                using var transaction = connection.BeginTransaction();
-
+                using (var transaction = connection.BeginTransaction())
+                {
                 // ✅ 优化：批量插入（每批100条）
                 const int batchSize = 100;
                 for (int i = 0; i < records.Count; i += batchSize)
                 {
                     var batch = records.Skip(i).Take(batchSize).ToList();
 
-                    await using var insertCmd = connection.CreateCommand();
+                    using (var insertCmd = connection.CreateCommand())
+                    {
                     insertCmd.Transaction = transaction;
 
                     // 构建批量INSERT语句
@@ -201,16 +211,19 @@ namespace BiaogPlugin.Services
                     ";
 
                     await insertCmd.ExecuteNonQueryAsync();
+                    }
                 }
 
                 transaction.Commit();
+                }
 
                 // 清理旧记录
                 await CleanupOldRecordsAsync(connection);
+                }
 
                 Log.Information($"批量添加翻译历史记录: {records.Count} 条");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "批量添加翻译历史记录失败");
             }
@@ -256,7 +269,7 @@ namespace BiaogPlugin.Services
                     });
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "获取翻译历史记录失败");
             }
@@ -304,7 +317,7 @@ namespace BiaogPlugin.Services
                     });
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "根据ObjectId查询历史记录失败");
             }
@@ -336,7 +349,7 @@ namespace BiaogPlugin.Services
                     Log.Debug($"清理旧翻译历史记录: {deletedCount} 条");
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "清理旧翻译历史记录失败");
             }
@@ -395,7 +408,7 @@ namespace BiaogPlugin.Services
                     stats["FirstRecord"] = DateTime.Parse(firstTimestamp.ToString()!);
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "获取翻译历史统计信息失败");
             }
@@ -419,7 +432,7 @@ namespace BiaogPlugin.Services
 
                 Log.Information("已清除所有翻译历史记录");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "清除翻译历史记录失败");
                 throw;

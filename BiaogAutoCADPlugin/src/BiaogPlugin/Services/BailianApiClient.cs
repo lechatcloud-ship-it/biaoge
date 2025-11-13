@@ -1,4 +1,4 @@
-using Serilog;
+﻿using Serilog;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -10,6 +10,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using BiaogPlugin.Extensions;
 
 namespace BiaogPlugin.Services;
 
@@ -32,9 +33,7 @@ public class BailianApiClient
     private readonly ConfigManager _configManager;
     private string? _apiKey;
 
-    // API端点
-    private const string TranslationEndpoint = "/api/v1/services/translation/translate";
-    private const string BatchTranslationEndpoint = "/api/v1/services/translation/batch-translate";
+    // API端点 - 统一使用 OpenAI 兼容模式（2025官方推荐）
     private const string ChatCompletionEndpoint = "/compatible-mode/v1/chat/completions";
 
     // 重试配置（阿里云官方推荐）
@@ -45,6 +44,37 @@ public class BailianApiClient
     private long _totalInputTokens = 0;
     private long _totalOutputTokens = 0;
     private readonly object _tokenStatsLock = new();
+
+    // 语言代码映射表（zh -> Chinese, en -> English）
+    // 阿里云百炼要求使用英文全称
+    private static readonly Dictionary<string, string> LanguageCodeMap = new()
+    {
+        ["zh"] = "Chinese",
+        ["zh-cn"] = "Chinese",
+        ["zh-tw"] = "Traditional Chinese",
+        ["en"] = "English",
+        ["ja"] = "Japanese",
+        ["ko"] = "Korean",
+        ["fr"] = "French",
+        ["de"] = "German",
+        ["es"] = "Spanish",
+        ["it"] = "Italian",
+        ["pt"] = "Portuguese",
+        ["ru"] = "Russian",
+        ["ar"] = "Arabic",
+        ["th"] = "Thai",
+        ["vi"] = "Vietnamese",
+        ["id"] = "Indonesian",
+        ["ms"] = "Malay",
+        ["hi"] = "Hindi",
+        ["tr"] = "Turkish",
+        ["pl"] = "Polish",
+        ["nl"] = "Dutch",
+        ["sv"] = "Swedish",
+        ["da"] = "Danish",
+        ["no"] = "Norwegian",
+        ["fi"] = "Finnish"
+    };
 
     public BailianApiClient(
         HttpClient httpClient,
@@ -134,6 +164,36 @@ public class BailianApiClient
             _totalOutputTokens = 0;
             Log.Information("Token使用统计已重置");
         }
+    }
+
+    /// <summary>
+    /// 转换语言代码为英文全称
+    /// 例如: "zh" -> "Chinese", "en" -> "English"
+    /// </summary>
+    private string ConvertLanguageCode(string languageCode)
+    {
+        if (string.IsNullOrEmpty(languageCode))
+        {
+            return "auto"; // 自动识别
+        }
+
+        var code = languageCode.ToLower().Trim();
+
+        // 如果已经是英文全称，直接返回
+        if (LanguageCodeMap.ContainsValue(languageCode))
+        {
+            return languageCode;
+        }
+
+        // 如果是语言代码，转换为英文全称
+        if (LanguageCodeMap.TryGetValue(code, out var fullName))
+        {
+            return fullName;
+        }
+
+        // 未知语言代码，返回原值并记录警告
+        Log.Warning($"未知的语言代码: {languageCode}，将直接使用原值");
+        return languageCode;
     }
 
     /// <summary>
@@ -295,12 +355,20 @@ public class BailianApiClient
     }
 
     /// <summary>
-    /// 批量翻译
+    /// 批量翻译 - 使用 OpenAI 兼容模式（2025官方推荐）
+    ///
+    /// 策略：逐条翻译，每条一个API请求
+    /// 优势：
+    /// 1. qwen-mt-flash支持流式增量输出，适合单条处理
+    /// 2. 更好的错误隔离（一条失败不影响其他）
+    /// 3. 更准确的进度报告
+    /// 4. 单条并发支持1000 QPS，99.8%成功率（官方性能数据）
     /// </summary>
     public async Task<List<string>> TranslateBatchAsync(
         List<string> texts,
         string targetLanguage,
         string? model = null,
+        string? sourceLanguage = null,
         IProgress<double>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -309,91 +377,150 @@ public class BailianApiClient
         {
             model = _configManager.GetString(
                 "Bailian:TextTranslationModel",
-                BailianModelSelector.Models.QwenMTFlash // 2025 Flash：术语定制+格式还原
+                BailianModelSelector.Models.QwenMTFlash // qwen-mt-flash：术语定制+格式还原
             );
         }
 
-        Log.Debug($"翻译使用模型: {model}");
+        Log.Information($"批量翻译: {texts.Count}条文本，使用模型: {model}");
 
         var results = new List<string>();
-        const int batchSize = 50;
+        var totalCount = texts.Count;
 
-        var batches = texts.Chunk(batchSize).ToList();
+        // 转换语言代码
+        var sourceLang = string.IsNullOrEmpty(sourceLanguage) ? "auto" : ConvertLanguageCode(sourceLanguage);
+        var targetLang = ConvertLanguageCode(targetLanguage);
 
-        for (int i = 0; i < batches.Length; i++)
+        // 并发控制 - 限制同时进行的请求数量（避免触发限流）
+        var semaphore = new SemaphoreSlim(10); // 最多10个并发请求
+        var tasks = new List<Task<(int index, string result)>>();
+
+        for (int i = 0; i < texts.Count; i++)
         {
-            var batch = batches[i].ToList();
+            var index = i;
+            var text = texts[i];
 
-            try
+            var task = Task.Run(async () =>
             {
-                var request = new
+                await semaphore.WaitAsync(cancellationToken);
+                try
                 {
-                    model = model,
-                    input = new
+                    // OpenAI 兼容模式请求格式
+                    var requestBody = new
                     {
-                        source_language = "zh",
-                        target_language = targetLanguage,
-                        source_texts = batch
-                    }
-                };
-
-                // 创建带Authorization头的请求（线程安全）
-                var apiKey = GetApiKey();
-                var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/services/translation/batch-translate")
-                {
-                    Content = JsonContent.Create(request)
-                };
-                if (!string.IsNullOrEmpty(apiKey))
-                {
-                    httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
-                }
-
-                // 使用带重试的HTTP请求
-                var response = await SendWithRetryAsync(httpRequest, cancellationToken);
-
-                if (response.IsSuccessStatusCode)
-                {
-                    var result = await response.Content.ReadFromJsonAsync<BailianBatchResponse>(
-                        cancellationToken: cancellationToken
-                    );
-
-                    if (result?.Output?.Translations != null)
-                    {
-                        results.AddRange(result.Output.Translations);
-
-                        // 记录Token使用量
-                        if (result.Usage != null)
+                        model = model,
+                        messages = new[]
                         {
-                            TrackTokenUsage(result.Usage.InputTokens, result.Usage.OutputTokens);
+                            new
+                            {
+                                role = "user",
+                                content = text
+                            }
+                        },
+                        extra_body = new
+                        {
+                            translation_options = new
+                            {
+                                source_lang = sourceLang,
+                                target_lang = targetLang
+                            }
                         }
-                    }
-                }
-                else
-                {
-                    var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                    Log.Warning("批量翻译失败: {StatusCode}, {Error}", response.StatusCode, errorContent);
-                    results.AddRange(batch); // 失败时返回原文
-                }
+                    };
 
-                progress?.Report((i + 1.0) / batches.Length * 100);
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "批量翻译异常");
-                results.AddRange(batch);
-            }
+                    var apiKey = GetApiKey();
+                    var httpRequest = new HttpRequestMessage(HttpMethod.Post, ChatCompletionEndpoint)
+                    {
+                        Content = JsonContent.Create(requestBody)
+                    };
+                    if (!string.IsNullOrEmpty(apiKey))
+                    {
+                        httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
+                    }
+
+                    var response = await SendWithRetryAsync(httpRequest, cancellationToken);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var responseJson = await response.Content.ReadAsStringAsync();
+                        using var doc = JsonDocument.Parse(responseJson);
+                        var root = doc.RootElement;
+
+                        if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+                        {
+                            var firstChoice = choices[0];
+                            if (firstChoice.TryGetProperty("message", out var message))
+                            {
+                                if (message.TryGetProperty("content", out var content))
+                                {
+                                    var translatedText = content.GetString() ?? text;
+
+                                    // 记录Token使用量
+                                    if (root.TryGetProperty("usage", out var usage))
+                                    {
+                                        var inputTokens = usage.TryGetProperty("prompt_tokens", out var pt) ? pt.GetInt32() : 0;
+                                        var outputTokens = usage.TryGetProperty("completion_tokens", out var ct) ? ct.GetInt32() : 0;
+                                        TrackTokenUsage(inputTokens, outputTokens);
+                                    }
+
+                                    return (index, translatedText);
+                                }
+                            }
+                        }
+
+                        Log.Warning($"翻译响应格式异常 (索引{index})");
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        Log.Warning($"翻译失败 (索引{index}): {response.StatusCode}, {errorContent}");
+                    }
+
+                    return (index, text); // 失败时返回原文
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Error(ex, $"翻译异常 (索引{index})");
+                    return (index, text);
+                }
+                finally
+                {
+                    semaphore.Release();
+
+                    // 报告进度
+                    var completedCount = Interlocked.Increment(ref _batchProgressCounter);
+                    progress?.Report((double)completedCount / totalCount * 100);
+                }
+            }, cancellationToken);
+
+            tasks.Add(task);
         }
 
+        // 等待所有任务完成
+        var taskResults = await Task.WhenAll(tasks);
+
+        // 按照原始顺序排列结果
+        results = taskResults
+            .OrderBy(r => r.index)
+            .Select(r => r.result)
+            .ToList();
+
+        // 重置进度计数器
+        _batchProgressCounter = 0;
+
+        Log.Information($"批量翻译完成: {results.Count}/{texts.Count}条");
         return results;
     }
 
+    // 批量翻译进度计数器
+    private int _batchProgressCounter = 0;
+
     /// <summary>
-    /// 单文本翻译
+    /// 单文本翻译 - 使用 OpenAI 兼容模式（2025官方推荐）
     /// </summary>
     public async Task<string> TranslateAsync(
         string text,
         string targetLanguage,
         string? model = null,
+        string? sourceLanguage = null,
         CancellationToken cancellationToken = default)
     {
         // 从配置读取模型，如果未指定则使用最优翻译模型
@@ -401,7 +528,7 @@ public class BailianApiClient
         {
             model = _configManager.GetString(
                 "Bailian:TextTranslationModel",
-                BailianModelSelector.Models.QwenMTFlash // 2025 Flash：术语定制+格式还原
+                BailianModelSelector.Models.QwenMTFlash // qwen-mt-flash：术语定制+格式还原
             );
         }
 
@@ -409,59 +536,91 @@ public class BailianApiClient
 
         try
         {
-            var request = new
+            // 转换语言代码为英文全称
+            var sourceLang = string.IsNullOrEmpty(sourceLanguage) ? "auto" : ConvertLanguageCode(sourceLanguage);
+            var targetLang = ConvertLanguageCode(targetLanguage);
+
+            // OpenAI 兼容模式请求格式
+            var requestBody = new
             {
                 model = model,
-                input = new
+                messages = new[]
                 {
-                    source_language = "zh",
-                    target_language = targetLanguage,
-                    source_text = text
+                    new
+                    {
+                        role = "user",
+                        content = text
+                    }
+                },
+                extra_body = new
+                {
+                    translation_options = new
+                    {
+                        source_lang = sourceLang,
+                        target_lang = targetLang
+                    }
                 }
             };
 
             // 创建带Authorization头的请求（线程安全）
             var apiKey = GetApiKey();
-            var httpRequest = new HttpRequestMessage(HttpMethod.Post, "/api/v1/services/translation/translate")
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, ChatCompletionEndpoint)
             {
-                Content = JsonContent.Create(request)
+                Content = JsonContent.Create(requestBody)
             };
             if (!string.IsNullOrEmpty(apiKey))
             {
                 httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
             }
 
+            Log.Debug($"翻译请求: {sourceLang} -> {targetLang}, 文本长度: {text.Length}");
+
             // 使用带重试的HTTP请求
             var response = await SendWithRetryAsync(httpRequest, cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {
-                var result = await response.Content.ReadFromJsonAsync<BailianTranslateResponse>(
-                    cancellationToken: cancellationToken
-                );
+                var responseJson = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(responseJson);
+                var root = doc.RootElement;
 
-                if (result?.Output?.Translation != null)
+                // 解析 OpenAI 格式响应
+                if (root.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
                 {
-                    // 记录Token使用量
-                    if (result.Usage != null)
+                    var firstChoice = choices[0];
+                    if (firstChoice.TryGetProperty("message", out var message))
                     {
-                        TrackTokenUsage(result.Usage.InputTokens, result.Usage.OutputTokens);
-                    }
+                        if (message.TryGetProperty("content", out var content))
+                        {
+                            var translatedText = content.GetString() ?? text;
 
-                    return result.Output.Translation;
+                            // 记录Token使用量
+                            if (root.TryGetProperty("usage", out var usage))
+                            {
+                                var inputTokens = usage.TryGetProperty("prompt_tokens", out var pt) ? pt.GetInt32() : 0;
+                                var outputTokens = usage.TryGetProperty("completion_tokens", out var ct) ? ct.GetInt32() : 0;
+                                TrackTokenUsage(inputTokens, outputTokens);
+                            }
+
+                            Log.Debug($"翻译成功: {text.Substring(0, Math.Min(20, text.Length))}... -> {translatedText.Substring(0, Math.Min(20, translatedText.Length))}...");
+                            return translatedText;
+                        }
+                    }
                 }
+
+                Log.Warning("翻译响应格式异常: {Response}", responseJson);
             }
             else
             {
-                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                var errorContent = await response.Content.ReadAsStringAsync();
                 Log.Warning("翻译失败: {StatusCode}, {Error}", response.StatusCode, errorContent);
             }
 
             return text; // 失败时返回原文
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
-            Log.Error(ex, "翻译异常: {Text}", text);
+            Log.Error(ex, "翻译异常: {Text}", text.Substring(0, Math.Min(50, text.Length)));
             return text;
         }
     }
@@ -473,37 +632,59 @@ public class BailianApiClient
     {
         try
         {
-            var model = _configManager.GetString("Bailian:TextTranslationModel", "qwen-mt-plus");
+            var apiKey = GetApiKey();
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                Log.Warning("API密钥为空");
+                return false;
+            }
 
-            var request = new
+            // 使用2025年推荐的OpenAI兼容模式测试连接
+            var model = "qwen-turbo"; // 使用基础模型进行测试
+
+            var requestBody = new
             {
                 model = model,
-                input = new
+                messages = new[]
                 {
-                    source_language = "zh",
-                    target_language = "en",
-                    source_text = "测试"
+                    new
+                    {
+                        role = "user",
+                        content = "你好"
+                    }
                 }
             };
 
-            // 创建带Authorization头的请求（线程安全）
-            var apiKey = GetApiKey();
-            var httpRequest = new HttpRequestMessage(HttpMethod.Post, TranslationEndpoint)
+            // 创建HTTP请求（使用OpenAI兼容端点）
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, ChatCompletionEndpoint)
             {
-                Content = JsonContent.Create(request)
+                Content = JsonContent.Create(requestBody)
             };
-            if (!string.IsNullOrEmpty(apiKey))
+            httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
+
+            Log.Debug("测试API连接: {Model}, 端点: {Endpoint}", model, ChatCompletionEndpoint);
+
+            // 发送请求（不使用重试，快速失败）
+            var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
+
+            if (response.IsSuccessStatusCode)
             {
-                httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
+                var responseContent = await response.Content.ReadAsStringAsync();
+                Log.Information("API连接测试成功: {StatusCode}, 响应预览: {Preview}",
+                    response.StatusCode,
+                    responseContent.Length > 100 ? responseContent.Substring(0, 100) : responseContent);
+                return true;
             }
-
-            // 使用带重试的HTTP请求
-            var response = await SendWithRetryAsync(httpRequest, cancellationToken);
-
-            return response.IsSuccessStatusCode;
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                Log.Warning("API连接测试失败: {StatusCode}, 完整响应: {Error}", response.StatusCode, errorContent);
+                return false;
+            }
         }
-        catch
+        catch (System.Exception ex)
         {
+            Log.Error(ex, "API连接测试异常");
             return false;
         }
     }
@@ -530,6 +711,7 @@ public class BailianApiClient
         double temperature = 0.7,
         double topP = 0.9,
         int? thinkingBudget = null,
+        bool enableThinking = true,  // ✅ 添加enable_thinking参数（混合思考模型需要）
         bool enableParallelToolCalls = true,
         CancellationToken cancellationToken = default)
     {
@@ -557,6 +739,7 @@ public class BailianApiClient
             },
             temperature = temperature,
             top_p = topP,
+            enable_thinking = enableThinking,  // ✅ 控制是否启用思考模式（混合思考模型）
             thinking_budget = thinkingBudget,
             parallel_tool_calls = enableParallelToolCalls  // 阿里云官方推荐：并行工具调用
         };
@@ -588,7 +771,7 @@ public class BailianApiClient
         int inputTokens = 0;
         int outputTokens = 0;
 
-        await using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken))
+        using (var stream = await response.Content.ReadAsStreamAsync())
         {
             using (var reader = new StreamReader(stream))
             {
@@ -666,7 +849,7 @@ public class BailianApiClient
                             }
                         }
                     }
-                    catch (Exception ex)
+                    catch (System.Exception ex)
                     {
                         Log.Warning(ex, $"解析流式响应失败: {data}");
                     }
@@ -702,6 +885,7 @@ public class BailianApiClient
         double temperature = 0.7,
         double topP = 0.9,
         int? thinkingBudget = null,
+        bool enableThinking = true,  // ✅ 添加enable_thinking参数
         bool enableParallelToolCalls = true,
         CancellationToken cancellationToken = default)
     {
@@ -724,6 +908,7 @@ public class BailianApiClient
             stream = false,
             temperature = temperature,
             top_p = topP,
+            enable_thinking = enableThinking,  // ✅ 控制是否启用思考模式
             thinking_budget = thinkingBudget,
             parallel_tool_calls = enableParallelToolCalls  // 阿里云官方推荐：并行工具调用
         };
@@ -813,31 +998,7 @@ public class BailianApiClient
     }
 }
 
-// 翻译API数据模型
-public record BailianBatchResponse(
-    BailianOutput Output,
-    BailianUsage Usage
-);
-
-public record BailianOutput(
-    List<string> Translations
-);
-
-public record BailianTranslateResponse(
-    BailianTranslateOutput Output,
-    BailianUsage Usage
-);
-
-public record BailianTranslateOutput(
-    string Translation
-);
-
-public record BailianUsage(
-    int InputTokens,
-    int OutputTokens
-);
-
-// 对话API数据模型
+// 对话API数据模型（已统一使用 OpenAI 兼容格式，无需自定义响应模型）
 /// <summary>
 /// 聊天消息
 /// </summary>

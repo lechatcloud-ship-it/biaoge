@@ -1,7 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Autodesk.AutoCAD.ApplicationServices;
 using Serilog;
@@ -222,12 +223,12 @@ namespace BiaogPlugin.Services
                                 historyRecords.Add(new TranslationHistory.HistoryRecord
                                 {
                                     Timestamp = DateTime.Now,
-                                    ObjectIdHandle = textEntity.ObjectId.Handle.ToString(),
+                                    ObjectIdHandle = textEntity.Id.Handle.ToString(),
                                     OriginalText = textEntity.Content,
                                     TranslatedText = translatedText,
                                     SourceLanguage = "auto",
                                     TargetLanguage = targetLanguage,
-                                    EntityType = textEntity.Type,
+                                    EntityType = textEntity.Type.ToString(),
                                     Layer = textEntity.Layer,
                                     Operation = "translate"
                                 });
@@ -258,7 +259,7 @@ namespace BiaogPlugin.Services
 
                 return statistics;
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "翻译过程中发生错误");
                 ed.WriteMessage($"\n[错误] 翻译失败: {ex.Message}");

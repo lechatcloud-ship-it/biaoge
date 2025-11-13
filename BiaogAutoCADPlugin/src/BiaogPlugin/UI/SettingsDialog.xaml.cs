@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -39,12 +39,7 @@ namespace BiaogPlugin.UI
                     ApiKeyPasswordBox.Password = apiKey;
                 }
 
-                // 加载模型配置（Flash系列）
-                LoadModelSelection("Bailian:TextTranslationModel", TranslationModelComboBox, BailianModelSelector.Models.QwenMTFlash);
-                LoadModelSelection("Bailian:ConversationModel", ConversationModelComboBox, BailianModelSelector.Models.Qwen3MaxPreview);
-                LoadModelSelection("Bailian:VisionModel", VisionModelComboBox, BailianModelSelector.Models.Qwen3VLFlash);
-                LoadModelSelection("Bailian:ToolCallingModel", ToolCallingModelComboBox, BailianModelSelector.Models.Qwen3CoderFlash);
-                LoadModelSelection("Bailian:MultimodalModel", MultimodalModelComboBox, BailianModelSelector.Models.Qwen3OmniFlash);
+                // 模型配置已内置，无需用户修改（对外隐藏）
 
                 // 加载翻译设置
                 UseCacheCheckBox.IsChecked = _configManager.GetBool("Translation:UseCache", true);
@@ -61,7 +56,7 @@ namespace BiaogPlugin.UI
 
                 Log.Debug("设置已加载");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "加载设置失败");
                 MessageBox.Show($"加载设置失败: {ex.Message}", "错误",
@@ -89,36 +84,59 @@ namespace BiaogPlugin.UI
                 var apiKey = ApiKeyPasswordBox.Password;
                 if (!string.IsNullOrWhiteSpace(apiKey))
                 {
+                    Log.Information("开始保存API密钥，长度: {Length}", apiKey.Length);
                     _configManager.SetConfig("Bailian:ApiKey", apiKey);
 
                     // 刷新BailianApiClient的API密钥
                     _bailianClient.RefreshApiKey();
+
+                    // ✅ 验证密钥是否真的保存成功
+                    var savedKey = _configManager.GetString("Bailian:ApiKey");
+                    if (string.IsNullOrEmpty(savedKey))
+                    {
+                        throw new System.Exception("API密钥保存后读取为空！");
+                    }
+                    Log.Information("✅ API密钥保存成功，验证读取长度: {Length}", savedKey.Length);
                 }
 
-                // 保存模型配置（Flash系列）
-                SaveModelSelection("Bailian:TextTranslationModel", TranslationModelComboBox);
-                SaveModelSelection("Bailian:ConversationModel", ConversationModelComboBox);
-                SaveModelSelection("Bailian:VisionModel", VisionModelComboBox);
-                SaveModelSelection("Bailian:ToolCallingModel", ToolCallingModelComboBox);
-                SaveModelSelection("Bailian:MultimodalModel", MultimodalModelComboBox);
+                // 模型配置已内置，无需用户修改（对外隐藏）
 
                 // 保存翻译设置
                 _configManager.SetConfig("Translation:UseCache", UseCacheCheckBox.IsChecked ?? true);
                 _configManager.SetConfig("Translation:SkipNumbers", SkipNumbersCheckBox.IsChecked ?? true);
                 _configManager.SetConfig("Translation:SkipShortText", SkipShortTextCheckBox.IsChecked ?? true);
 
-                Log.Information("设置已保存");
-                MessageBox.Show("设置保存成功！所有模型配置已更新。", "成功",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                Log.Information("✅ 所有设置已保存");
+
+                // 显示配置文件路径，帮助用户验证
+                var configPath = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    ".biaoge",
+                    "config.json"
+                );
+
+                MessageBox.Show(
+                    $"设置保存成功！\n\n" +
+                    $"配置文件位置：\n{configPath}\n\n" +
+                    $"提示：重启AutoCAD后不会再弹出密钥输入框。",
+                    "保存成功",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
 
                 DialogResult = true;
                 Close();
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
-                Log.Error(ex, "保存设置失败");
-                MessageBox.Show($"保存设置失败: {ex.Message}", "错误",
-                    MessageBoxButton.OK, MessageBoxImage.Error);
+                Log.Error(ex, "❌ 保存设置失败");
+                MessageBox.Show(
+                    $"保存设置失败！\n\n" +
+                    $"错误信息：{ex.Message}\n\n" +
+                    $"请查看日志文件获取详细信息：\n" +
+                    $"{Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)}\\.biaoge\\logs\\",
+                    "保存失败",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
 
@@ -174,7 +192,7 @@ namespace BiaogPlugin.UI
                     Log.Warning("API连接测试失败");
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 TestResultText.Text = $"✗ 测试失败: {ex.Message}";
                 TestResultText.Foreground = System.Windows.Media.Brushes.Red;

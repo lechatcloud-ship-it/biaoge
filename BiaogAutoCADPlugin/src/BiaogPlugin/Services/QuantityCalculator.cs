@@ -1,7 +1,8 @@
-using Serilog;
+﻿using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BiaogPlugin.Extensions;
 
 namespace BiaogPlugin.Services;
 

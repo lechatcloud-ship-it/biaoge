@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Autodesk.AutoCAD.Runtime;
 using Autodesk.AutoCAD.ApplicationServices;
 using Serilog;
@@ -29,6 +29,11 @@ namespace BiaogPlugin
         {
             try
             {
+                // ✅ 关键修复：注册程序集解析事件，解决System.Memory等依赖加载问题
+                // 当AutoCAD尝试加载依赖DLL时，如果在默认路径找不到，会触发此事件
+                // 我们手动从插件所在目录加载依赖
+                AppDomain.CurrentDomain.AssemblyResolve += OnAssemblyResolve;
+
                 // 配置日志系统
                 ConfigureLogging();
 
@@ -64,21 +69,41 @@ namespace BiaogPlugin
                 // 初始化UI面板
                 UI.PaletteManager.Initialize();
 
-                // 注册右键上下文菜单
+                // 注册右键上下文菜单（先注销避免重复注册）
+                try
+                {
+                    Extensions.ContextMenuManager.UnregisterContextMenus();
+                }
+                catch { /* 忽略未注册的错误 */ }
                 Extensions.ContextMenuManager.RegisterContextMenus();
 
-                // 加载Ribbon工具栏
+                // 加载Ribbon工具栏（先卸载避免重复）
+                try
+                {
+                    UI.Ribbon.RibbonManager.UnloadRibbon();
+                }
+                catch { /* 忽略未加载的错误 */ }
                 UI.Ribbon.RibbonManager.LoadRibbon();
 
-                // 启用双击翻译功能
+                // 启用双击翻译功能（先禁用避免重复）
+                try
+                {
+                    Extensions.DoubleClickHandler.Disable();
+                }
+                catch { /* 忽略未启用的错误 */ }
                 Extensions.DoubleClickHandler.Enable();
 
-                // 启用智能输入法切换
+                // 启用智能输入法切换（先禁用避免重复）
+                try
+                {
+                    Services.InputMethodManager.Disable();
+                }
+                catch { /* 忽略未启用的错误 */ }
                 Services.InputMethodManager.Enable();
 
                 Log.Information("插件初始化成功");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "插件初始化失败");
 
@@ -91,6 +116,74 @@ namespace BiaogPlugin
         }
 
         /// <summary>
+        /// 首次启动时弹出API密钥设置对话框
+        /// 使用Idle事件确保AutoCAD完全初始化后再弹窗
+        /// </summary>
+        private void OnFirstTimeApiKeySetup(object sender, System.EventArgs e)
+        {
+            // 移除事件处理器，只执行一次
+            Application.Idle -= OnFirstTimeApiKeySetup;
+
+            try
+            {
+                Log.Information("显示首次配置对话框");
+
+                // 弹出设置对话框
+                var settingsDialog = new UI.SettingsDialog();
+                var result = settingsDialog.ShowDialog();
+
+                var doc = Application.DocumentManager.MdiActiveDocument;
+                if (doc != null)
+                {
+                    var ed = doc.Editor;
+                    if (result == true)
+                    {
+                        // 用户配置了密钥
+                        var bailianClient = Services.ServiceLocator.GetService<Services.BailianApiClient>();
+                        if (bailianClient != null && bailianClient.HasApiKey)
+                        {
+                            ed.WriteMessage("\n✓ API密钥配置成功！现在可以使用翻译功能了。");
+                            ed.WriteMessage("\n");
+                            ed.WriteMessage("\n快速开始:");
+                            ed.WriteMessage("\n  BIAOGE_TRANSLATE_ZH - 一键翻译为中文");
+                            ed.WriteMessage("\n  BIAOGE_AI         - 启动AI助手");
+                            ed.WriteMessage("\n  BIAOGE_HELP       - 查看完整命令列表");
+                            ed.WriteMessage("\n");
+                            Log.Information("用户已配置API密钥");
+                        }
+                        else
+                        {
+                            ed.WriteMessage("\n⚠ 未检测到API密钥，请确认已正确保存配置。");
+                            ed.WriteMessage("\n可随时运行 BIAOGE_SETTINGS 重新配置。");
+                            ed.WriteMessage("\n");
+                            Log.Warning("用户关闭对话框但未配置API密钥");
+                        }
+                    }
+                    else
+                    {
+                        // 用户取消了配置
+                        ed.WriteMessage("\n您取消了API密钥配置。");
+                        ed.WriteMessage("\n插件的翻译和AI功能需要配置密钥才能使用。");
+                        ed.WriteMessage("\n运行 BIAOGE_SETTINGS 命令可随时配置。");
+                        ed.WriteMessage("\n");
+                        Log.Information("用户取消了API密钥配置");
+                    }
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "显示首次配置对话框失败");
+
+                var doc = Application.DocumentManager.MdiActiveDocument;
+                if (doc != null)
+                {
+                    doc.Editor.WriteMessage($"\n[错误] 无法打开设置对话框: {ex.Message}");
+                    doc.Editor.WriteMessage("\n请运行 BIAOGE_SETTINGS 命令手动配置。");
+                }
+            }
+        }
+
+        /// <summary>
         /// 插件终止 - AutoCAD卸载插件时调用
         /// </summary>
         public void Terminate()
@@ -98,6 +191,9 @@ namespace BiaogPlugin
             try
             {
                 Log.Information("标哥插件正在卸载...");
+
+                // ✅ 取消注册程序集解析事件，避免内存泄漏
+                AppDomain.CurrentDomain.AssemblyResolve -= OnAssemblyResolve;
 
                 // 注销右键上下文菜单
                 Extensions.ContextMenuManager.UnregisterContextMenus();
@@ -120,9 +216,61 @@ namespace BiaogPlugin
                 Log.Information("插件卸载成功");
                 Log.CloseAndFlush();
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "插件卸载时发生错误");
+            }
+        }
+
+        /// <summary>
+        /// 程序集解析事件处理器 - 解决依赖DLL加载问题
+        /// 当AutoCAD无法找到依赖程序集（如System.Memory.dll）时，此方法会被调用
+        /// </summary>
+        /// <param name="sender">事件发送者</param>
+        /// <param name="args">包含请求程序集信息的参数</param>
+        /// <returns>找到的程序集，如果未找到返回null</returns>
+        private static System.Reflection.Assembly OnAssemblyResolve(object sender, ResolveEventArgs args)
+        {
+            try
+            {
+                // 获取请求的程序集名称（例如："System.Memory, Version=4.0.1.1, Culture=neutral, PublicKeyToken=..."）
+                var assemblyName = new System.Reflection.AssemblyName(args.Name);
+                var simpleName = assemblyName.Name; // 提取简单名称，例如："System.Memory"
+
+                // 获取当前插件DLL所在的目录
+                // 例如：C:\ProgramData\Autodesk\ApplicationPlugins\BiaogPlugin.bundle\Contents\2021\
+                var assemblyLocation = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                var pluginDirectory = System.IO.Path.GetDirectoryName(assemblyLocation);
+
+                if (string.IsNullOrEmpty(pluginDirectory))
+                {
+                    Log.Warning($"无法确定插件目录，程序集解析失败: {simpleName}");
+                    return null;
+                }
+
+                // 构造依赖DLL的完整路径
+                var dependencyPath = System.IO.Path.Combine(pluginDirectory, simpleName + ".dll");
+
+                // 检查文件是否存在
+                if (System.IO.File.Exists(dependencyPath))
+                {
+                    // 从文件加载程序集
+                    var assembly = System.Reflection.Assembly.LoadFrom(dependencyPath);
+                    Log.Debug($"成功加载依赖程序集: {simpleName} 从 {dependencyPath}");
+                    return assembly;
+                }
+                else
+                {
+                    // 文件不存在，返回null让系统继续尝试默认查找
+                    Log.Debug($"依赖程序集不存在: {dependencyPath}");
+                    return null;
+                }
+            }
+            catch (System.Exception ex)
+            {
+                // 记录错误但不抛出异常，避免影响AutoCAD
+                Log.Error(ex, $"程序集解析失败: {args.Name}");
+                return null;
             }
         }
 
@@ -210,13 +358,46 @@ namespace BiaogPlugin
 
                 Log.Information("所有服务初始化完成");
 
-                // 检查API密钥配置
-                if (!bailianClient.HasApiKey)
+                // ✅ UX改进: 检查是否曾经配置过API密钥（只有完全没配置过才弹出首次设置）
+                // 注意：不检查密钥是否有效，只检查是否曾经保存过，避免每次重启都弹出
+                var savedApiKey = configManager.GetString("Bailian:ApiKey");
+                if (string.IsNullOrWhiteSpace(savedApiKey))
                 {
-                    Log.Warning("未配置百炼API密钥，请使用BIAOGE_SETTINGS命令配置");
+                    Log.Warning("检测到首次使用，未配置百炼API密钥，弹出设置对话框");
+
+                    var doc = Application.DocumentManager.MdiActiveDocument;
+                    if (doc != null)
+                    {
+                        var ed = doc.Editor;
+                        ed.WriteMessage("\n");
+                        ed.WriteMessage("\n╔══════════════════════════════════════════════════╗");
+                        ed.WriteMessage("\n║  欢迎使用标哥AutoCAD插件！                      ║");
+                        ed.WriteMessage("\n║                                                  ║");
+                        ed.WriteMessage("\n║  首次使用需要配置百炼API密钥                    ║");
+                        ed.WriteMessage("\n║  配置窗口即将打开...                            ║");
+                        ed.WriteMessage("\n╚══════════════════════════════════════════════════╝");
+                        ed.WriteMessage("\n");
+                    }
+
+                    // 使用Application.Idle事件确保在AutoCAD完全初始化后弹出对话框
+                    // 这样可以避免在初始化期间弹窗导致的问题
+                    Application.Idle += OnFirstTimeApiKeySetup;
+                }
+                else
+                {
+                    // 已配置过密钥，但需要验证是否有效
+                    if (!bailianClient.HasApiKey)
+                    {
+                        Log.Warning("API密钥配置无效，请在设置中重新配置");
+                        var doc = Application.DocumentManager.MdiActiveDocument;
+                        if (doc != null)
+                        {
+                            doc.Editor.WriteMessage("\n⚠ 警告：当前API密钥无效，请运行 BIAOGE_SETTINGS 重新配置\n");
+                        }
+                    }
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "服务初始化失败");
                 throw;

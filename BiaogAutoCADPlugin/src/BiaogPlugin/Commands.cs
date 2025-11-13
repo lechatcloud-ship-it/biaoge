@@ -1,12 +1,18 @@
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Autodesk.AutoCAD.Runtime;
 using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.EditorInput;
+using Autodesk.AutoCAD.DatabaseServices;
+using Autodesk.AutoCAD.Geometry;
 using Serilog;
 using BiaogPlugin.Services;
 using BiaogPlugin.UI;
+using BiaogPlugin.Models;
+using BiaogPlugin.Extensions;
 
 namespace BiaogPlugin
 {
@@ -21,7 +27,7 @@ namespace BiaogPlugin
         /// 翻译当前图纸的命令
         /// </summary>
         [CommandMethod("BIAOGE_TRANSLATE", CommandFlags.Modal)]
-        public async void TranslateDrawing()
+        public void TranslateDrawing()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
             var ed = doc.Editor;
@@ -35,7 +41,7 @@ namespace BiaogPlugin
 
                 ed.WriteMessage("\n翻译面板已打开，请在右侧面板中选择目标语言并开始翻译。");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "显示翻译面板失败");
                 ed.WriteMessage($"\n[错误] {ex.Message}");
@@ -249,15 +255,20 @@ namespace BiaogPlugin
 
                 ed.WriteMessage("\n更新DWG文件...");
 
-                // 更新DWG文本
+                // 更新DWG文本 - 构建更新请求列表
                 var updater = new DwgTextUpdater();
-                var updateMap = new Dictionary<Autodesk.AutoCAD.DatabaseServices.ObjectId, string>();
+                var updateRequests = new List<TextUpdateRequest>();
 
                 for (int i = 0; i < textEntities.Count; i++)
                 {
                     if (i < translations.Count && !string.IsNullOrEmpty(translations[i]))
                     {
-                        updateMap[textEntities[i].ObjectId] = translations[i];
+                        updateRequests.Add(new TextUpdateRequest
+                        {
+                            ObjectId = textEntities[i].ObjectId,
+                            OriginalContent = textEntities[i].Content,
+                            NewContent = translations[i]
+                        });
                         translatedCount++;
                     }
                     else
@@ -266,7 +277,7 @@ namespace BiaogPlugin
                     }
                 }
 
-                updater.UpdateTexts(updateMap);
+                var updateResult = updater.UpdateTexts(updateRequests);
 
                 // 记录翻译历史
                 var configManager2 = ServiceLocator.GetService<ConfigManager>();
@@ -333,12 +344,7 @@ namespace BiaogPlugin
             {
                 Log.Information("执行图层翻译命令");
 
-                ed.WriteMessage("\n╔══════════════════════════════════════════════╗");
-                ed.WriteMessage("\n║  标哥插件 - 图层翻译功能                    ║");
-                ed.WriteMessage("\n╚══════════════════════════════════════════════╝");
-                ed.WriteMessage("\n");
-
-                // 1. 获取所有图层及文本统计
+                // ✅ UI改进：使用图形对话框选择图层
                 ed.WriteMessage("\n正在分析图层...");
                 var layers = LayerTranslationService.GetAllLayersWithTextCount();
 
@@ -348,84 +354,25 @@ namespace BiaogPlugin
                     return;
                 }
 
-                // 2. 显示图层列表
-                ed.WriteMessage($"\n\n图层列表（共 {layers.Count} 个图层）：");
-                ed.WriteMessage("\n" + new string('─', 70));
-                ed.WriteMessage("\n序号  图层名称                     文本数量  颜色        状态");
-                ed.WriteMessage("\n" + new string('─', 70));
+                // 显示图层选择对话框
+                var layerDialog = new UI.LayerSelectionDialog();
+                layerDialog.SetLayers(layers);
+                var dialogResult = layerDialog.ShowDialog();
 
-                int index = 1;
-                foreach (var layer in layers.Take(20)) // 只显示前20个
-                {
-                    var status = "";
-                    if (layer.IsLocked) status += "锁定 ";
-                    if (layer.IsOff) status += "关闭 ";
-                    if (layer.IsFrozen) status += "冻结 ";
-                    if (string.IsNullOrEmpty(status)) status = "正常";
-
-                    ed.WriteMessage($"\n{index,4}  {layer.LayerName,-28} {layer.TextCount,8}  {layer.ColorName,-10} {status}");
-                    index++;
-                }
-
-                if (layers.Count > 20)
-                {
-                    ed.WriteMessage($"\n... 还有 {layers.Count - 20} 个图层（未显示）");
-                }
-
-                ed.WriteMessage("\n" + new string('─', 70));
-
-                // 3. 提示用户输入图层名称
-                ed.WriteMessage("\n\n请输入要翻译的图层名称（多个图层用逗号分隔）：");
-                ed.WriteMessage("\n提示：");
-                ed.WriteMessage("\n  - 输入 'all' 翻译所有图层");
-                ed.WriteMessage("\n  - 输入图层名称，例如: 墙体,门窗");
-                ed.WriteMessage("\n  - 输入 '*文字*' 翻译包含'文字'的所有图层");
-                ed.WriteMessage("\n");
-
-                var layerInputResult = ed.GetString("\n图层名称: ");
-                if (layerInputResult.Status != PromptStatus.OK || string.IsNullOrWhiteSpace(layerInputResult.StringResult))
+                if (dialogResult != true || layerDialog.SelectedLayerNames.Count == 0)
                 {
                     ed.WriteMessage("\n操作已取消。");
                     return;
                 }
 
-                var layerInput = layerInputResult.StringResult.Trim();
-
-                // 4. 解析图层选择
-                List<string> selectedLayers;
-
-                if (layerInput.ToLower() == "all")
-                {
-                    selectedLayers = layers.Where(l => l.TextCount > 0).Select(l => l.LayerName).ToList();
-                }
-                else if (layerInput.StartsWith("*") && layerInput.EndsWith("*"))
-                {
-                    var keyword = layerInput.Trim('*');
-                    selectedLayers = layers
-                        .Where(l => l.LayerName.Contains(keyword) && l.TextCount > 0)
-                        .Select(l => l.LayerName)
-                        .ToList();
-                }
-                else
-                {
-                    selectedLayers = layerInput.Split(',')
-                        .Select(s => s.Trim())
-                        .Where(s => !string.IsNullOrEmpty(s))
-                        .ToList();
-                }
-
-                if (selectedLayers.Count == 0)
-                {
-                    ed.WriteMessage("\n未选择任何图层或选择的图层不存在。");
-                    return;
-                }
+                List<string> selectedLayers = layerDialog.SelectedLayerNames;
 
                 // 统计选中图层的文本数量
                 int totalTexts = layers
                     .Where(l => selectedLayers.Contains(l.LayerName))
                     .Sum(l => l.TextCount);
 
-                ed.WriteMessage($"\n\n已选择 {selectedLayers.Count} 个图层，共 {totalTexts} 个文本实体");
+                ed.WriteMessage($"\n已选择 {selectedLayers.Count} 个图层，共 {totalTexts} 个文本实体");
                 ed.WriteMessage("\n选中的图层: " + string.Join(", ", selectedLayers));
 
                 // 5. 选择目标语言（默认中文）
@@ -536,7 +483,7 @@ namespace BiaogPlugin
                 ed.WriteMessage($"\n翻译完成！");
                 Log.Information($"翻译完成: {languageName}");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, $"翻译失败: {languageName}");
                 ed.WriteMessage($"\n[错误] 翻译失败: {ex.Message}");
@@ -565,7 +512,7 @@ namespace BiaogPlugin
 
                 ed.WriteMessage("\n算量面板已打开，请在右侧面板中选择识别模式。");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "显示算量面板失败");
                 ed.WriteMessage($"\n[错误] {ex.Message}");
@@ -590,11 +537,11 @@ namespace BiaogPlugin
                 Log.Information("打开设置对话框");
 
                 var settingsDialog = new SettingsDialog();
-                Application.ShowModalDialog(settingsDialog);
+                settingsDialog.ShowDialog();
 
                 ed.WriteMessage("\n设置已保存。");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "打开设置对话框失败");
                 ed.WriteMessage($"\n[错误] {ex.Message}");
@@ -734,7 +681,7 @@ namespace BiaogPlugin
         /// 启动标哥AI助手 - 支持图纸问答和修改
         /// </summary>
         [CommandMethod("BIAOGE_AI", CommandFlags.Modal)]
-        public async void StartAIAssistant()
+        public void StartAIAssistant()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
             var ed = doc.Editor;
@@ -743,93 +690,92 @@ namespace BiaogPlugin
             {
                 Log.Information("启动AI助手");
 
-                ed.WriteMessage("\n╔══════════════════════════════════════════════════════════╗");
-                ed.WriteMessage("\n║  标哥AI助手 - 智能Agent架构（qwen3-max-preview）      ║");
-                ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝");
-                ed.WriteMessage("\n");
-                ed.WriteMessage("\n正在初始化Agent系统...");
-                ed.WriteMessage("\n  ✓ 核心Agent: qwen3-max-preview（思考模式融合）");
-                ed.WriteMessage("\n  ✓ 翻译工具: qwen-mt-flash（92语言，术语定制）");
-                ed.WriteMessage("\n  ✓ 代码工具: qwen3-coder-flash（仓库级别理解）");
-                ed.WriteMessage("\n  ✓ 视觉工具: qwen3-vl-flash（空间感知+2D/3D定位）");
-                ed.WriteMessage("\n");
-                ed.WriteMessage("\n正在分析当前图纸...");
+                // 显示AI助手面板
+                PaletteManager.ShowAIPalette();
 
-                // 初始化服务 - 使用统一的Bailian客户端
-                var configManager = ServiceLocator.GetService<ConfigManager>();
-                var bailianClient = ServiceLocator.GetService<BailianApiClient>();
-                var contextManager = new DrawingContextManager();
-                var aiService = new AIAssistantService(bailianClient!, configManager!, contextManager);
-
-                ed.WriteMessage("\n图纸分析完成！Agent已就绪，可智能调用专用模型完成任务。");
-                ed.WriteMessage("\n");
-                ed.WriteMessage("\n示例任务：");
-                ed.WriteMessage("\n  - 帮我翻译图纸中的\"外墙\"为英文（自动调用qwen-mt-flash）");
-                ed.WriteMessage("\n  - 将所有的\"C30\"修改为\"C35\"（自动调用qwen3-coder-flash）");
-                ed.WriteMessage("\n  - 识别图纸中的梁构件（自动调用qwen3-vl-flash）");
-                ed.WriteMessage("\n  - 这张图纸有哪些图层？（直接查询图纸上下文）");
-                ed.WriteMessage("\n");
-                ed.WriteMessage("\n输入 'exit' 退出，输入 'clear' 清除历史，输入 'deep' 启用深度思考");
-                ed.WriteMessage("\n" + new string('─', 60));
-
-                bool deepThinking = false;
-
-                // 对话循环
-                while (true)
-                {
-                    ed.WriteMessage("\n\n您: ");
-                    var userInput = await Task.Run(() =>
-                    {
-                        var result = ed.GetString(new PromptStringOptions(""));
-                        return result.Status == PromptStatus.OK ? result.StringResult : null;
-                    });
-
-                    if (string.IsNullOrWhiteSpace(userInput))
-                        continue;
-
-                    // 处理命令
-                    if (userInput.ToLower() == "exit")
-                    {
-                        ed.WriteMessage("\n再见！感谢使用标哥AI助手。");
-                        break;
-                    }
-                    else if (userInput.ToLower() == "clear")
-                    {
-                        aiService.ClearHistory();
-                        ed.WriteMessage("\n对话历史已清除。");
-                        continue;
-                    }
-                    else if (userInput.ToLower() == "deep")
-                    {
-                        deepThinking = !deepThinking;
-                        ed.WriteMessage($"\n深度思考模式: {(deepThinking ? "已启用 🧠" : "已关闭")}");
-                        continue;
-                    }
-
-                    // AI回复
-                    ed.WriteMessage("\n\n标哥AI: ");
-
-                    var response = await aiService.ChatStreamAsync(
-                        userInput,
-                        deepThinking,
-                        chunk => ed.WriteMessage(chunk) // 流式输出到命令行
-                    );
-
-                    if (!response.Success)
-                    {
-                        ed.WriteMessage($"\n[错误] {response.Error}");
-                    }
-
-                    ed.WriteMessage("\n" + new string('─', 60));
-                }
-
-                Log.Information("AI助手会话结束");
+                ed.WriteMessage("\nAI助手面板已打开，请在右侧面板中开始对话。");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
-                Log.Error(ex, "AI助手启动失败");
+                Log.Error(ex, "显示AI助手面板失败");
                 ed.WriteMessage($"\n[错误] {ex.Message}");
                 ed.WriteMessage("\n请确保已在设置中配置百炼API密钥（BIAOGE_SETTINGS）");
+            }
+        }
+
+        #endregion
+
+        #region 面板Toggle命令
+
+        /// <summary>
+        /// 切换翻译面板显示状态（快捷键友好）
+        /// </summary>
+        [CommandMethod("BIAOGE_TOGGLE_TRANSLATE", CommandFlags.Modal)]
+        public void ToggleTranslationPalette()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                Log.Debug("切换翻译面板显示状态");
+                PaletteManager.ToggleTranslationPalette();
+
+                var status = PaletteManager.IsTranslationPaletteVisible ? "已显示" : "已隐藏";
+                ed.WriteMessage($"\n翻译面板{status}");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "切换翻译面板失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 切换算量面板显示状态（快捷键友好）
+        /// </summary>
+        [CommandMethod("BIAOGE_TOGGLE_CALCULATE", CommandFlags.Modal)]
+        public void ToggleCalculationPalette()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                Log.Debug("切换算量面板显示状态");
+                PaletteManager.ToggleCalculationPalette();
+
+                var status = PaletteManager.IsCalculationPaletteVisible ? "已显示" : "已隐藏";
+                ed.WriteMessage($"\n算量面板{status}");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "切换算量面板失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 切换AI助手面板显示状态（快捷键友好）
+        /// </summary>
+        [CommandMethod("BIAOGE_TOGGLE_AI", CommandFlags.Modal)]
+        public void ToggleAIPalette()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                Log.Debug("切换AI助手面板显示状态");
+                PaletteManager.ToggleAIPalette();
+
+                var status = PaletteManager.IsAIPaletteVisible ? "已显示" : "已隐藏";
+                ed.WriteMessage($"\nAI助手面板{status}");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "切换AI助手面板失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
             }
         }
 
@@ -838,7 +784,7 @@ namespace BiaogPlugin
         #region 快捷键管理命令
 
         /// <summary>
-        /// 显示快捷键配置指南
+        /// 打开快捷键管理对话框
         /// </summary>
         [CommandMethod("BIAOGE_KEYS", CommandFlags.Modal)]
         public void ShowKeybindings()
@@ -848,14 +794,16 @@ namespace BiaogPlugin
 
             try
             {
-                var guide = KeybindingsManager.GetKeybindingsGuide();
-                ed.WriteMessage("\n" + guide);
+                Log.Information("打开快捷键管理对话框");
 
-                Log.Information("显示快捷键配置指南");
+                var dialog = new UI.KeybindingsManagerDialog();
+                dialog.ShowDialog();
+
+                ed.WriteMessage("\n快捷键管理对话框已关闭。");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
-                Log.Error(ex, "显示快捷键指南失败");
+                Log.Error(ex, "打开快捷键管理对话框失败");
                 ed.WriteMessage($"\n[错误] {ex.Message}");
             }
         }
@@ -890,7 +838,7 @@ namespace BiaogPlugin
 
                 Log.Information($"快捷键配置已导出: {filePath}");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "导出快捷键配置失败");
                 ed.WriteMessage($"\n[错误] 导出失败: {ex.Message}");
@@ -952,7 +900,7 @@ namespace BiaogPlugin
                     Log.Warning($"快捷键自动安装失败: {message}");
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "安装快捷键失败");
                 ed.WriteMessage($"\n[错误] 安装失败: {ex.Message}");
@@ -1027,63 +975,36 @@ namespace BiaogPlugin
             var doc = Application.DocumentManager.MdiActiveDocument;
             var ed = doc.Editor;
 
-            ed.WriteMessage("\n╔══════════════════════════════════════════════════════════╗");
-            ed.WriteMessage("\n║  标哥 - 建筑工程CAD翻译工具 v1.0 - 帮助                ║");
-            ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝");
-            ed.WriteMessage("\n");
-            ed.WriteMessage("\n【翻译功能】");
-            ed.WriteMessage("\n  BIAOGE_TRANSLATE           - 打开翻译面板（全图翻译）");
-            ed.WriteMessage("\n  BIAOGE_TRANSLATE_SELECTED  - 框选翻译（仅翻译选中文本）");
-            ed.WriteMessage("\n  BIAOGE_TRANSLATE_ZH        - 快速翻译为中文（推荐）");
-            ed.WriteMessage("\n  BIAOGE_TRANSLATE_EN        - 快速翻译为英语");
-            ed.WriteMessage("\n  BIAOGE_TRANSLATE_LAYER     - 按图层选择性翻译");
-            ed.WriteMessage("\n");
-            ed.WriteMessage("\n【高级功能 - Phase 3】");
-            ed.WriteMessage("\n  BIAOGE_HISTORY             - 查看翻译历史记录和统计");
-            ed.WriteMessage("\n  BIAOGE_UNDO_TRANSLATION    - 撤销最近的翻译操作");
-            ed.WriteMessage("\n  BIAOGE_CLEAR_HISTORY       - 清除所有翻译历史");
-            ed.WriteMessage("\n  BIAOGE_SMART_REPLACE       - 批量智能替换（支持AI建议）");
-            ed.WriteMessage("\n");
-            ed.WriteMessage("\n【算量功能】");
-            ed.WriteMessage("\n  BIAOGE_CALCULATE      - 打开算量面板");
-            ed.WriteMessage("\n  BIAOGE_EXPORTEXCEL    - 快速导出Excel清单");
-            ed.WriteMessage("\n  BIAOGE_QUICKCOUNT     - 快速统计构件数量");
-            ed.WriteMessage("\n");
-            ed.WriteMessage("\n【AI助手】");
-            ed.WriteMessage("\n  BIAOGE_AI             - 启动标哥AI助手（智能Agent架构）");
-            ed.WriteMessage("\n                          核心: qwen3-max-preview（思考模式融合）");
-            ed.WriteMessage("\n                          智能调用: 翻译/代码/视觉专用模型");
-            ed.WriteMessage("\n                          支持: 深度思考、流式输出、工具调用");
-            ed.WriteMessage("\n");
-            ed.WriteMessage("\n【用户体验增强 - Phase 2】");
-            ed.WriteMessage("\n  双击文本翻译       - 双击文本实体快速翻译");
-            ed.WriteMessage("\n  智能输入法切换     - 命令模式自动切换英文/中文");
-            ed.WriteMessage("\n  右键菜单翻译       - 右键文本实体快速翻译");
-            ed.WriteMessage("\n  Ribbon工具栏       - 专业的工具栏界面");
-            ed.WriteMessage("\n");
-            ed.WriteMessage("\n【设置与工具】");
-            ed.WriteMessage("\n  BIAOGE_SETTINGS       - 打开设置对话框");
-            ed.WriteMessage("\n  BIAOGE_STATUS         - 显示功能状态");
-            ed.WriteMessage("\n  BIAOGE_TOGGLE_DOUBLECLICK  - 切换双击翻译");
-            ed.WriteMessage("\n  BIAOGE_TOGGLE_IME     - 切换智能输入法");
-            ed.WriteMessage("\n  BIAOGE_ABOUT          - 关于插件");
-            ed.WriteMessage("\n");
-            ed.WriteMessage("\n【快捷键】");
-            ed.WriteMessage("\n  BIAOGE_KEYS           - 显示快捷键配置指南");
-            ed.WriteMessage("\n  BIAOGE_EXPORT_KEYS    - 导出快捷键配置到桌面");
-            ed.WriteMessage("\n  BIAOGE_INSTALL_KEYS   - 自动安装快捷键");
-            ed.WriteMessage("\n");
-            ed.WriteMessage("\n【诊断工具】");
-            ed.WriteMessage("\n  BIAOGE_HELP           - 显示此帮助信息");
-            ed.WriteMessage("\n  BIAOGE_VERSION        - 显示版本信息");
-            ed.WriteMessage("\n  BIAOGE_CLEARCACHE     - 清除翻译缓存");
-            ed.WriteMessage("\n  BIAOGE_DIAGNOSTIC     - 运行系统诊断");
-            ed.WriteMessage("\n  BIAOGE_PERFORMANCE    - 显示性能报告");
-            ed.WriteMessage("\n  BIAOGE_TOKENUSAGE     - 显示API Token使用统计");
-            ed.WriteMessage("\n  BIAOGE_RESETTOKENS    - 重置Token统计");
-            ed.WriteMessage("\n");
-            ed.WriteMessage("\n详细文档: https://github.com/lechatcloud-ship-it/biaoge");
-            ed.WriteMessage("\n");
+            try
+            {
+                Log.Information("显示帮助对话框");
+
+                // ✅ UI改进：使用图形对话框代替命令行输出
+                var helpDialog = new UI.HelpDialog();
+                helpDialog.ShowDialog();
+
+                ed.WriteMessage("\n帮助对话框已显示。");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "显示帮助对话框失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+
+                // 降级到命令行输出
+                ed.WriteMessage("\n╔══════════════════════════════════════════════════════════╗");
+                ed.WriteMessage("\n║  标哥 - 建筑工程CAD翻译工具 v1.0 - 帮助                ║");
+                ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝");
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n【翻译功能】");
+                ed.WriteMessage("\n  BIAOGE_TRANSLATE_ZH   - 快速翻译为中文（推荐）");
+                ed.WriteMessage("\n  BIAOGE_TRANSLATE      - 打开翻译面板");
+                ed.WriteMessage("\n  BIAOGE_AI             - 启动AI助手");
+                ed.WriteMessage("\n  BIAOGE_CALCULATE      - 打开算量面板");
+                ed.WriteMessage("\n  BIAOGE_SETTINGS       - 打开设置对话框");
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n详细文档: https://github.com/lechatcloud-ship-it/biaoge");
+                ed.WriteMessage("\n");
+            }
         }
 
         /// <summary>
@@ -1117,62 +1038,62 @@ namespace BiaogPlugin
             var doc = Application.DocumentManager.MdiActiveDocument;
             var ed = doc.Editor;
 
-            ShowVersion();
+            try
+            {
+                Log.Information("显示关于对话框");
 
-            ed.WriteMessage("\n【核心功能】");
-            ed.WriteMessage("\n  ✓ 标哥AI助手 (Agent架构，智能调度专用模型)");
-            ed.WriteMessage("\n  ✓ AI智能翻译 (qwen-mt-flash，92语言)");
-            ed.WriteMessage("\n  ✓ 构件识别算量 (qwen3-vl-flash，超高精度)");
-            ed.WriteMessage("\n  ✓ 多格式导出 (Excel/PDF)");
-            ed.WriteMessage("\n  ✓ 智能缓存 (90%+命中率)");
-            ed.WriteMessage("\n");
-            ed.WriteMessage("\n【技术优势】");
-            ed.WriteMessage("\n  ✓ 100%准确的DWG读取 (AutoCAD官方引擎)");
-            ed.WriteMessage("\n  ✓ 无缝集成AutoCAD工作流");
-            ed.WriteMessage("\n  ✓ 符合建筑行业标准");
-            ed.WriteMessage("\n");
+                // ✅ UI改进：使用图形对话框代替命令行输出
+                var aboutDialog = new UI.AboutDialog();
+                aboutDialog.ShowDialog();
+
+                ed.WriteMessage("\n关于对话框已显示。");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "显示关于对话框失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+
+                // 降级到命令行输出
+                ed.WriteMessage("\n");
+                ShowVersion();
+                ed.WriteMessage("\n【核心功能】");
+                ed.WriteMessage("\n  ✓ 标哥AI助手 (Agent架构，智能调度专用模型)");
+                ed.WriteMessage("\n  ✓ AI智能翻译 (qwen-mt-flash，92语言)");
+                ed.WriteMessage("\n  ✓ 构件识别算量 (qwen3-vl-flash，超高精度)");
+                ed.WriteMessage("\n  ✓ 多格式导出 (Excel/PDF)");
+                ed.WriteMessage("\n  ✓ 智能缓存 (90%+命中率)");
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n【技术优势】");
+                ed.WriteMessage("\n  ✓ 100%准确的DWG读取 (AutoCAD官方引擎)");
+                ed.WriteMessage("\n  ✓ 无缝集成AutoCAD工作流");
+                ed.WriteMessage("\n  ✓ 符合建筑行业标准");
+                ed.WriteMessage("\n");
+            }
         }
 
         /// <summary>
         /// 清除翻译缓存
         /// </summary>
         [CommandMethod("BIAOGE_CLEARCACHE", CommandFlags.Modal)]
-        public async void ClearCache()
+        public void ClearCache()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
             var ed = doc.Editor;
 
             try
             {
-                // 提示用户确认
-                var options = new PromptKeywordOptions("\n确定要清除所有翻译缓存吗? [是(Y)/否(N)]")
-                {
-                    Keywords = { "Y", "N" },
-                    AllowNone = false
-                };
-                options.Keywords.Default = "N";
+                Log.Information("打开缓存管理对话框");
 
-                var result = ed.GetKeywords(options);
-                if (result.Status != PromptStatus.OK || result.StringResult != "Y")
-                {
-                    ed.WriteMessage("\n操作已取消。");
-                    return;
-                }
+                // ✅ UI改进：使用缓存管理对话框
+                var cacheDialog = new UI.CacheManagementDialog();
+                cacheDialog.ShowDialog();
 
-                // 清除缓存
-                var cacheService = ServiceLocator.GetService<CacheService>();
-                if (cacheService != null)
-                {
-                    await cacheService.ClearCacheAsync();
-                }
-
-                ed.WriteMessage("\n缓存已清除。");
-                Log.Information("用户清除了翻译缓存");
+                ed.WriteMessage("\n缓存管理对话框已关闭。");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
-                Log.Error(ex, "清除缓存失败");
-                ed.WriteMessage($"\n[错误] 清除缓存失败: {ex.Message}");
+                Log.Error(ex, "打开缓存管理对话框失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
             }
         }
 
@@ -1219,7 +1140,7 @@ namespace BiaogPlugin
                 ed.WriteMessage($"\n诊断报告已保存到: {reportPath}");
                 Log.Information($"诊断报告已保存: {reportPath}");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "运行诊断失败");
                 ed.WriteMessage($"\n[错误] 诊断失败: {ex.Message}");
@@ -1286,7 +1207,7 @@ namespace BiaogPlugin
 
                 Log.Information("显示性能报告");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "显示性能报告失败");
                 ed.WriteMessage($"\n[错误] {ex.Message}");
@@ -1315,7 +1236,7 @@ namespace BiaogPlugin
                 ed.WriteMessage("\n性能统计已重置。");
                 Log.Information("性能统计已重置");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "重置性能统计失败");
                 ed.WriteMessage($"\n[错误] {ex.Message}");
@@ -1364,7 +1285,7 @@ namespace BiaogPlugin
 
                 Log.Information($"显示Token使用统计: 输入{inputTokens}, 输出{outputTokens}");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "显示Token使用统计失败");
                 ed.WriteMessage($"\n[错误] {ex.Message}");
@@ -1393,7 +1314,7 @@ namespace BiaogPlugin
                 ed.WriteMessage("\n✓ Token使用统计已重置。");
                 Log.Information("Token使用统计已重置");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "重置Token使用统计失败");
                 ed.WriteMessage($"\n[错误] {ex.Message}");
@@ -1415,8 +1336,20 @@ namespace BiaogPlugin
 
             try
             {
+                // ✅ UI改进：先弹出导出选项对话框
+                var optionsDialog = new UI.ExportExcelOptionsDialog();
+                var dialogResult = optionsDialog.ShowDialog();
+
+                if (dialogResult != true)
+                {
+                    ed.WriteMessage("\n操作已取消。");
+                    return;
+                }
+
+                var options = optionsDialog.Options;
+
                 ed.WriteMessage("\n开始快速识别构件...");
-                Log.Information("执行快速Excel导出");
+                Log.Information("执行Excel导出，路径: {Path}", options.FilePath);
 
                 // 提取文本
                 var extractor = new DwgTextExtractor();
@@ -1437,25 +1370,36 @@ namespace BiaogPlugin
                 var summary = calculator.CalculateSummary(results);
 
                 // 导出Excel
-                var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-                var fileName = $"工程量清单_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
-                var outputPath = System.IO.Path.Combine(desktopPath, fileName);
-
                 var exporter = new ExcelExporter();
-                exporter.ExportSummary(summary, outputPath);
+                exporter.ExportSummary(summary, options.FilePath);
 
-                ed.WriteMessage($"\n\nExcel清单已导出到: {outputPath}");
+                ed.WriteMessage($"\n\nExcel清单已导出到: {options.FilePath}");
                 ed.WriteMessage($"\n  构件总数: {summary.TotalComponents}");
                 ed.WriteMessage($"\n  总成本: ¥{summary.TotalCost:N2}");
 
-                // 打开文件夹
-                System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{outputPath}\"");
+                // 根据用户选择执行完成后操作
+                switch (options.AfterExportAction)
+                {
+                    case UI.AfterExportAction.OpenFile:
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = options.FilePath,
+                            UseShellExecute = true
+                        });
+                        break;
+                    case UI.AfterExportAction.OpenFolder:
+                        System.Diagnostics.Process.Start("explorer.exe", $"/select,\"{options.FilePath}\"");
+                        break;
+                    case UI.AfterExportAction.DoNothing:
+                        // 什么都不做
+                        break;
+                }
 
-                Log.Information($"Excel导出完成: {outputPath}");
+                Log.Information($"Excel导出完成: {options.FilePath}");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
-                Log.Error(ex, "快速导出Excel失败");
+                Log.Error(ex, "导出Excel失败");
                 ed.WriteMessage($"\n[错误] 导出失败: {ex.Message}");
             }
         }
@@ -1482,38 +1426,21 @@ namespace BiaogPlugin
                 var recognizer = new ComponentRecognizer(bailianClient);
                 var results = await recognizer.RecognizeFromTextEntitiesAsync(textEntities, useAiVerification: false);
 
-                // 按类型分组
-                var grouped = results
-                    .Where(r => r.Confidence >= 0.7)
-                    .GroupBy(r => r.Type)
-                    .OrderByDescending(g => g.Count())
-                    .ToList();
+                // ✅ UI改进：使用图形对话框显示结果
+                var resultDialog = new UI.QuickCountResultDialog();
+                resultDialog.SetResults(results);
+                resultDialog.ShowDialog();
 
-                ed.WriteMessage("\n\n╔══════════════════════════════════════════════════════════╗");
-                ed.WriteMessage("\n║  构件统计（置信度≥70%）                                ║");
-                ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝\n");
-
-                foreach (var group in grouped.Take(15))
-                {
-                    var totalQty = group.Sum(r => r.Quantity);
-                    var avgConf = group.Average(r => r.Confidence);
-                    ed.WriteMessage($"\n  {group.Key,-20} × {totalQty,4}  (置信度: {avgConf:P0})");
-                }
-
-                if (grouped.Count > 15)
-                {
-                    ed.WriteMessage($"\n  ... 还有 {grouped.Count - 15} 种构件类型");
-                }
-
-                ed.WriteMessage($"\n\n  总计: {results.Count(r => r.Confidence >= 0.7)} 个构件");
-                ed.WriteMessage("\n");
-
+                ed.WriteMessage("\n快速统计完成，结果已显示在对话框中。");
                 Log.Information("快速统计完成");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "快速统计失败");
                 ed.WriteMessage($"\n[错误] {ex.Message}");
+
+                // 降级到命令行输出
+                ed.WriteMessage("\n请运行 BIAOGE_CALCULATE 打开算量面板进行详细分析。");
             }
         }
 
@@ -1562,7 +1489,7 @@ namespace BiaogPlugin
 
                 Log.Information($"文本统计完成: {texts.Count} 个实体");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "统计文本失败");
                 ed.WriteMessage($"\n[错误] {ex.Message}");
@@ -1613,7 +1540,7 @@ namespace BiaogPlugin
 
                 Log.Information("显示图层信息");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "显示图层信息失败");
                 ed.WriteMessage($"\n[错误] {ex.Message}");
@@ -1652,7 +1579,7 @@ namespace BiaogPlugin
                 ed.WriteMessage($"\n图纸已备份到: {backupPath}");
                 Log.Information($"图纸已备份: {backupPath}");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "备份图纸失败");
                 ed.WriteMessage($"\n[错误] 备份失败: {ex.Message}");
@@ -1695,7 +1622,7 @@ namespace BiaogPlugin
                     ed.WriteMessage($"\n  ... 还有 {texts.Count - 10} 个文本");
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "测试提取失败");
                 ed.WriteMessage($"\n[错误] {ex.Message}");
@@ -2049,9 +1976,13 @@ namespace BiaogPlugin
 
                     try
                     {
-                        var aiResponse = await bailianClient.ChatAsync(prompt, "qwen3-max-preview");
+                        var messages = new List<ChatMessage>
+                        {
+                            new ChatMessage { Role = "user", Content = prompt }
+                        };
+                        var aiResult = await bailianClient.ChatCompletionAsync(messages, "qwen3-max-preview");
                         ed.WriteMessage($"\n\nAI建议:");
-                        ed.WriteMessage($"\n{aiResponse}");
+                        ed.WriteMessage($"\n{aiResult.Content}");
                         ed.WriteMessage("\n");
 
                         // 让用户确认或输入自己的替换文本
@@ -2064,7 +1995,7 @@ namespace BiaogPlugin
                         if (confirmResult.Status == PromptStatus.OK)
                         {
                             replaceText = string.IsNullOrWhiteSpace(confirmResult.StringResult)
-                                ? ExtractReplacementFromAI(aiResponse, findText)
+                                ? ExtractReplacementFromAI(aiResult.Content, findText)
                                 : confirmResult.StringResult.Trim();
                         }
                         else
@@ -2072,7 +2003,7 @@ namespace BiaogPlugin
                             return;
                         }
                     }
-                    catch (Exception ex)
+                    catch (System.Exception ex)
                     {
                         Log.Error(ex, "AI建议失败");
                         ed.WriteMessage($"\n[警告] AI建议失败: {ex.Message}");
@@ -2132,7 +2063,7 @@ namespace BiaogPlugin
                     {
                         try
                         {
-                            var obj = tr.GetObject(entity.ObjectId, OpenMode.ForWrite);
+                            var obj = tr.GetObject(entity.Id, OpenMode.ForWrite);
                             var newContent = entity.Content.Replace(findText, replaceText, StringComparison.OrdinalIgnoreCase);
 
                             if (obj is DBText dbText)
@@ -2151,9 +2082,9 @@ namespace BiaogPlugin
                                 successCount++;
                             }
                         }
-                        catch (Exception ex)
+                        catch (System.Exception ex)
                         {
-                            Log.Warning(ex, $"替换失败: {entity.ObjectId}");
+                            Log.Warning(ex, $"替换失败: {entity.Id}");
                         }
                     }
 
@@ -2201,12 +2132,139 @@ namespace BiaogPlugin
                     }
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Warning(ex, "提取AI建议失败");
             }
 
             return originalText; // 默认返回原文
+        }
+
+        #endregion
+
+        #region UI管理命令
+
+        /// <summary>
+        /// 重新加载Ribbon工具栏
+        /// </summary>
+        [CommandMethod("BIAOGE_RELOAD_RIBBON", CommandFlags.Modal)]
+        public void ReloadRibbon()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                Log.Information("手动重新加载Ribbon工具栏");
+
+                ed.WriteMessage("\n正在重新加载Ribbon工具栏...");
+
+                // 卸载旧的Ribbon
+                try
+                {
+                    UI.Ribbon.RibbonManager.UnloadRibbon();
+                    ed.WriteMessage("\n✓ 旧Ribbon已卸载");
+                }
+                catch (System.Exception ex)
+                {
+                    ed.WriteMessage($"\n⚠ 卸载旧Ribbon时出现警告: {ex.Message}");
+                }
+
+                // 加载新的Ribbon
+                try
+                {
+                    UI.Ribbon.RibbonManager.LoadRibbon();
+                    ed.WriteMessage("\n✓ Ribbon加载成功");
+                    ed.WriteMessage("\n\n请检查AutoCAD顶部是否出现【标哥工具】选项卡");
+                }
+                catch (System.Exception ex)
+                {
+                    ed.WriteMessage($"\n✗ Ribbon加载失败: {ex.Message}");
+                    Log.Error(ex, "重新加载Ribbon失败");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "重新加载Ribbon命令失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 显示UI状态信息
+        /// </summary>
+        [CommandMethod("BIAOGE_UI_STATUS", CommandFlags.Modal)]
+        public void ShowUIStatus()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                ed.WriteMessage("\n╔══════════════════════════════════════════════╗");
+                ed.WriteMessage("\n║  标哥插件 - UI状态检查                      ║");
+                ed.WriteMessage("\n╚══════════════════════════════════════════════╝");
+                ed.WriteMessage("\n");
+
+                // 检查Ribbon状态
+                try
+                {
+                    var ribbonControl = Autodesk.Windows.ComponentManager.Ribbon;
+                    if (ribbonControl != null)
+                    {
+                        ed.WriteMessage("\n✓ AutoCAD Ribbon 控件可用");
+
+                        // 检查是否有标哥Tab
+                        bool hasTab = false;
+                        foreach (var tab in ribbonControl.Tabs)
+                        {
+                            if (tab is Autodesk.Windows.RibbonTab ribbonTab && ribbonTab.Id == "BIAOGE_TAB")
+                            {
+                                hasTab = true;
+                                ed.WriteMessage($"\n✓ 找到【标哥工具】选项卡 (ID: {ribbonTab.Id})");
+                                ed.WriteMessage($"\n  - 标题: {ribbonTab.Title}");
+                                ed.WriteMessage($"\n  - 面板数量: {ribbonTab.Panels.Count}");
+                                break;
+                            }
+                        }
+
+                        if (!hasTab)
+                        {
+                            ed.WriteMessage("\n✗ 未找到【标哥工具】选项卡");
+                            ed.WriteMessage("\n\n解决方案:");
+                            ed.WriteMessage("\n  1. 运行命令: BIAOGE_RELOAD_RIBBON");
+                            ed.WriteMessage("\n  2. 或重新加载插件（NETLOAD）");
+                        }
+                    }
+                    else
+                    {
+                        ed.WriteMessage("\n✗ AutoCAD Ribbon 控件不可用");
+                        ed.WriteMessage("\n  可能原因：AutoCAD未完全启动或不支持Ribbon");
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    ed.WriteMessage($"\n✗ 检查Ribbon状态时出错: {ex.Message}");
+                }
+
+                // 检查面板状态
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n面板状态:");
+                ed.WriteMessage("\n  - PaletteManager: 已初始化");
+
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n可用UI命令:");
+                ed.WriteMessage("\n  BIAOGE_RELOAD_RIBBON  - 重新加载工具栏");
+                ed.WriteMessage("\n  BIAOGE_TRANSLATE      - 打开翻译面板");
+                ed.WriteMessage("\n  BIAOGE_CALCULATE      - 打开算量面板");
+                ed.WriteMessage("\n  BIAOGE_SETTINGS       - 打开设置对话框");
+                ed.WriteMessage("\n");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "显示UI状态失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+            }
         }
 
         #endregion

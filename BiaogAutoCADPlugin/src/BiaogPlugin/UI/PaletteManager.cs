@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Autodesk.AutoCAD.Windows;
 using Serilog;
 
@@ -12,9 +12,11 @@ namespace BiaogPlugin.UI
     {
         private static PaletteSet? _translationPaletteSet;
         private static PaletteSet? _calculationPaletteSet;
+        private static PaletteSet? _aiPaletteSet;
 
         private static TranslationPalette? _translationPalette;
         private static CalculationPalette? _calculationPalette;
+        private static AIPalette? _aiPalette;
 
         /// <summary>
         /// 初始化所有面板
@@ -28,10 +30,11 @@ namespace BiaogPlugin.UI
                 // 预创建面板（但不显示）
                 InitializeTranslationPalette();
                 InitializeCalculationPalette();
+                InitializeAIPalette();
 
                 Log.Information("UI面板初始化完成");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "初始化UI面板失败");
             }
@@ -55,7 +58,15 @@ namespace BiaogPlugin.UI
                 };
 
                 _translationPalette = new TranslationPalette();
-                _translationPaletteSet.Add("翻译", _translationPalette);
+
+                // 使用ElementHost包装WPF控件
+                var elementHost = new System.Windows.Forms.Integration.ElementHost
+                {
+                    Dock = System.Windows.Forms.DockStyle.Fill,
+                    Child = _translationPalette
+                };
+
+                _translationPaletteSet.Add("翻译", elementHost);
 
                 // 设置样式
                 _translationPaletteSet.Style = PaletteSetStyles.ShowPropertiesMenu |
@@ -85,7 +96,7 @@ namespace BiaogPlugin.UI
                     Log.Debug("翻译面板已显示");
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "显示翻译面板失败");
                 throw;
@@ -124,7 +135,15 @@ namespace BiaogPlugin.UI
                 };
 
                 _calculationPalette = new CalculationPalette();
-                _calculationPaletteSet.Add("算量", _calculationPalette);
+
+                // 使用ElementHost包装WPF控件
+                var elementHost2 = new System.Windows.Forms.Integration.ElementHost
+                {
+                    Dock = System.Windows.Forms.DockStyle.Fill,
+                    Child = _calculationPalette
+                };
+
+                _calculationPaletteSet.Add("算量", elementHost2);
 
                 _calculationPaletteSet.Style = PaletteSetStyles.ShowPropertiesMenu |
                                                PaletteSetStyles.ShowAutoHideButton |
@@ -153,7 +172,7 @@ namespace BiaogPlugin.UI
                     Log.Debug("算量面板已显示");
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "显示算量面板失败");
                 throw;
@@ -169,6 +188,83 @@ namespace BiaogPlugin.UI
             {
                 _calculationPaletteSet.Visible = false;
                 Log.Debug("算量面板已隐藏");
+            }
+        }
+
+        #endregion
+
+        #region AI助手面板
+
+        /// <summary>
+        /// 初始化AI助手面板
+        /// </summary>
+        private static void InitializeAIPalette()
+        {
+            if (_aiPaletteSet == null)
+            {
+                _aiPaletteSet = new PaletteSet("标哥 - AI助手")
+                {
+                    // ✅ 增加默认高度，更适合AI对话界面
+                    Size = new System.Drawing.Size(450, 850),
+                    MinimumSize = new System.Drawing.Size(400, 600),
+                    DockEnabled = (DockSides)((int)DockSides.Left | (int)DockSides.Right),
+                    Visible = false
+                };
+
+                _aiPalette = new AIPalette();
+
+                // 使用ElementHost包装WPF控件
+                var elementHost = new System.Windows.Forms.Integration.ElementHost
+                {
+                    Dock = System.Windows.Forms.DockStyle.Fill,
+                    Child = _aiPalette
+                };
+
+                _aiPaletteSet.Add("AI助手", elementHost);
+
+                _aiPaletteSet.Style = PaletteSetStyles.ShowPropertiesMenu |
+                                      PaletteSetStyles.ShowAutoHideButton |
+                                      PaletteSetStyles.ShowCloseButton;
+
+                Log.Debug("AI助手面板已创建");
+            }
+        }
+
+        /// <summary>
+        /// 显示AI助手面板
+        /// </summary>
+        public static void ShowAIPalette()
+        {
+            try
+            {
+                if (_aiPaletteSet == null)
+                {
+                    InitializeAIPalette();
+                }
+
+                if (_aiPaletteSet != null)
+                {
+                    _aiPaletteSet.Visible = true;
+                    _aiPaletteSet.Activate(0);
+                    Log.Debug("AI助手面板已显示");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "显示AI助手面板失败");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// 隐藏AI助手面板
+        /// </summary>
+        public static void HideAIPalette()
+        {
+            if (_aiPaletteSet != null)
+            {
+                _aiPaletteSet.Visible = false;
+                Log.Debug("AI助手面板已隐藏");
             }
         }
 
@@ -205,9 +301,19 @@ namespace BiaogPlugin.UI
                     Log.Debug("算量面板已清理");
                 }
 
+                // 关闭并释放AI助手面板
+                if (_aiPaletteSet != null)
+                {
+                    _aiPaletteSet.Visible = false;
+                    _aiPaletteSet.Dispose();
+                    _aiPaletteSet = null;
+                    _aiPalette = null;
+                    Log.Debug("AI助手面板已清理");
+                }
+
                 Log.Information("UI面板清理完成");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "清理UI面板时发生错误");
             }
@@ -228,6 +334,12 @@ namespace BiaogPlugin.UI
         /// </summary>
         public static bool IsCalculationPaletteVisible =>
             _calculationPaletteSet?.Visible ?? false;
+
+        /// <summary>
+        /// 检查AI助手面板是否可见
+        /// </summary>
+        public static bool IsAIPaletteVisible =>
+            _aiPaletteSet?.Visible ?? false;
 
         /// <summary>
         /// 切换翻译面板显示状态
@@ -256,6 +368,21 @@ namespace BiaogPlugin.UI
             else
             {
                 ShowCalculationPalette();
+            }
+        }
+
+        /// <summary>
+        /// 切换AI助手面板显示状态
+        /// </summary>
+        public static void ToggleAIPalette()
+        {
+            if (IsAIPaletteVisible)
+            {
+                HideAIPalette();
+            }
+            else
+            {
+                ShowAIPalette();
             }
         }
 

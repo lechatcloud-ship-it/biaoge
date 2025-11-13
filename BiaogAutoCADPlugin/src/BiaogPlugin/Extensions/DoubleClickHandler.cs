@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
@@ -46,7 +46,7 @@ namespace BiaogPlugin.Extensions
                 _isEnabled = true;
                 Log.Information("双击翻译功能已启用");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "启用双击翻译失败");
                 throw;
@@ -79,7 +79,7 @@ namespace BiaogPlugin.Extensions
                 _isEnabled = false;
                 Log.Information("双击翻译功能已禁用");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "禁用双击翻译失败");
             }
@@ -97,7 +97,7 @@ namespace BiaogPlugin.Extensions
                     RegisterDocumentEvents(e.Document);
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "注册文档事件失败");
             }
@@ -118,7 +118,7 @@ namespace BiaogPlugin.Extensions
 
                 Log.Debug($"已为文档 {doc.Name} 注册双击事件");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, $"注册文档 {doc.Name} 事件失败");
             }
@@ -134,7 +134,7 @@ namespace BiaogPlugin.Extensions
                 doc.ImpliedSelectionChanged -= OnImpliedSelectionChanged;
                 Log.Debug($"已为文档 {doc.Name} 注销双击事件");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, $"注销文档 {doc.Name} 事件失败");
             }
@@ -198,7 +198,7 @@ namespace BiaogPlugin.Extensions
                     _lastClickedObjectId = currentObjectId;
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "处理选择改变事件失败");
             }
@@ -245,7 +245,7 @@ namespace BiaogPlugin.Extensions
                     ShowQuickTranslatePopup(objId, textContent);
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "处理双击失败");
                 doc.Editor.WriteMessage($"\n[错误] 快速翻译失败: {ex.Message}");
@@ -265,7 +265,7 @@ namespace BiaogPlugin.Extensions
                 var popup = new QuickTranslatePopup(textObjectId, originalText);
                 popup.Show();
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "显示快速翻译弹窗失败");
             }

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -30,6 +30,11 @@ namespace BiaogPlugin.Services
             public const string Calculate = "BC";                 // BC = Biaoge Calculate
             public const string QuickRecognize = "BQ";            // BQ = Biaoge Quick recognize
             public const string ExportExcel = "BE";               // BE = Biaoge Export
+
+            // 面板Toggle（快捷键激活/隐藏面板）
+            public const string ToggleTranslate = "BTT";          // BTT = Biaoge Toggle Translate
+            public const string ToggleCalculate = "BCT";          // BCT = Biaoge toggle Calculate
+            public const string ToggleAI = "BAT";                 // BAT = Biaoge toggle AI
 
             // 设置和工具
             public const string Settings = "BS";                  // BS = Biaoge Settings
@@ -68,6 +73,11 @@ namespace BiaogPlugin.Services
             sb.AppendLine($"{RecommendedKeybindings.QuickRecognize},       *BIAOGE_QUICKCOUNT         ; 快速统计构件");
             sb.AppendLine($"{RecommendedKeybindings.ExportExcel},          *BIAOGE_EXPORTEXCEL        ; 导出Excel清单");
             sb.AppendLine();
+            sb.AppendLine("; === 面板快捷键（Toggle显示/隐藏）===");
+            sb.AppendLine($"{RecommendedKeybindings.ToggleTranslate},      *BIAOGE_TOGGLE_TRANSLATE   ; 切换翻译面板");
+            sb.AppendLine($"{RecommendedKeybindings.ToggleCalculate},      *BIAOGE_TOGGLE_CALCULATE   ; 切换算量面板");
+            sb.AppendLine($"{RecommendedKeybindings.ToggleAI},             *BIAOGE_TOGGLE_AI          ; 切换AI助手面板");
+            sb.AppendLine();
             sb.AppendLine("; === 设置和工具 ===");
             sb.AppendLine($"{RecommendedKeybindings.Settings},             *BIAOGE_SETTINGS           ; 打开设置");
             sb.AppendLine($"{RecommendedKeybindings.Help},                 *BIAOGE_HELP               ; 显示帮助");
@@ -99,7 +109,7 @@ namespace BiaogPlugin.Services
                 Log.Information($"快捷键配置已保存到: {filePath}");
                 return filePath;
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "保存快捷键配置失败");
                 throw;
@@ -114,8 +124,7 @@ namespace BiaogPlugin.Services
             try
             {
                 // 尝试从AutoCAD应用程序获取Support路径
-                var app = Autodesk.AutoCAD.ApplicationServices.Application;
-                var supportPath = (string)app.GetSystemVariable("SUPPORTPATH");
+                var supportPath = (string)Autodesk.AutoCAD.ApplicationServices.Application.GetSystemVariable("SUPPORTPATH");
 
                 // Support路径是用分号分隔的多个路径，取第一个
                 var paths = supportPath.Split(';');
@@ -130,7 +139,7 @@ namespace BiaogPlugin.Services
 
                 return defaultPath;
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "获取AutoCAD Support路径失败");
                 return string.Empty;
@@ -184,7 +193,7 @@ namespace BiaogPlugin.Services
                 Log.Information($"快捷键自动安装成功: {pgpPath}");
                 return true;
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 message = $"自动安装失败: {ex.Message}\n建议手动复制配置文件";
                 Log.Error(ex, "自动安装快捷键失败");
@@ -218,6 +227,11 @@ namespace BiaogPlugin.Services
             sb.AppendLine($"  {RecommendedKeybindings.Calculate,-6} → 打开算量面板     (BIAOGE_CALCULATE)");
             sb.AppendLine($"  {RecommendedKeybindings.QuickRecognize,-6} → 快速统计构件     (BIAOGE_QUICKCOUNT)");
             sb.AppendLine($"  {RecommendedKeybindings.ExportExcel,-6} → 导出Excel清单    (BIAOGE_EXPORTEXCEL)");
+            sb.AppendLine();
+            sb.AppendLine("面板快捷键（Toggle显示/隐藏）:");
+            sb.AppendLine($"  {RecommendedKeybindings.ToggleTranslate,-6} → 切换翻译面板     (BIAOGE_TOGGLE_TRANSLATE)");
+            sb.AppendLine($"  {RecommendedKeybindings.ToggleCalculate,-6} → 切换算量面板     (BIAOGE_TOGGLE_CALCULATE)");
+            sb.AppendLine($"  {RecommendedKeybindings.ToggleAI,-6} → 切换AI助手面板    (BIAOGE_TOGGLE_AI)");
             sb.AppendLine();
             sb.AppendLine("设置和工具:");
             sb.AppendLine($"  {RecommendedKeybindings.Settings,-6} → 打开设置         (BIAOGE_SETTINGS)");
@@ -271,6 +285,11 @@ namespace BiaogPlugin.Services
                 ["BIAOGE_CALCULATE"] = (RecommendedKeybindings.Calculate, "打开算量面板"),
                 ["BIAOGE_QUICKCOUNT"] = (RecommendedKeybindings.QuickRecognize, "快速统计构件"),
                 ["BIAOGE_EXPORTEXCEL"] = (RecommendedKeybindings.ExportExcel, "导出Excel清单"),
+
+                // 面板Toggle
+                ["BIAOGE_TOGGLE_TRANSLATE"] = (RecommendedKeybindings.ToggleTranslate, "切换翻译面板"),
+                ["BIAOGE_TOGGLE_CALCULATE"] = (RecommendedKeybindings.ToggleCalculate, "切换算量面板"),
+                ["BIAOGE_TOGGLE_AI"] = (RecommendedKeybindings.ToggleAI, "切换AI助手面板"),
 
                 // 设置和工具
                 ["BIAOGE_SETTINGS"] = (RecommendedKeybindings.Settings, "打开设置"),

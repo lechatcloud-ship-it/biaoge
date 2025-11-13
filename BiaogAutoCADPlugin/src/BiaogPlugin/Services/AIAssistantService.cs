@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -7,6 +7,7 @@ using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Serilog;
+using BiaogPlugin.Extensions;
 
 namespace BiaogPlugin.Services
 {
@@ -25,6 +26,7 @@ namespace BiaogPlugin.Services
         private readonly BailianApiClient _bailianClient;
         private readonly ConfigManager _configManager;
         private readonly DrawingContextManager _contextManager;
+        private readonly ContextLengthManager _contextLengthManager;
 
         // Agent核心模型配置
         private const string AgentModel = "qwen3-max-preview";
@@ -40,6 +42,7 @@ namespace BiaogPlugin.Services
             _bailianClient = bailianClient;
             _configManager = configManager;
             _contextManager = contextManager;
+            _contextLengthManager = new ContextLengthManager();
 
             Log.Information("标哥AI助手初始化完成");
         }
@@ -54,15 +57,17 @@ namespace BiaogPlugin.Services
         {
             try
             {
-                onStreamChunk?.Invoke($"\n[标哥AI助手] 正在分析您的需求...\n");
+                // ✅ 移除重复的状态消息，使用日志记录即可
+                Log.Information("开始处理用户消息: {Message}", userMessage);
 
                 // ===== 第0步：场景检测 =====
                 var detectedScenario = ScenarioPromptManager.DetectScenario(userMessage);
                 Log.Information($"检测到场景: {detectedScenario}");
 
+                // ✅ 场景识别信息也不通过流式输出，避免干扰AI回复
                 if (detectedScenario != ScenarioPromptManager.Scenario.General)
                 {
-                    onStreamChunk?.Invoke($"[标哥AI助手] 场景识别: {GetScenarioDisplayName(detectedScenario)}\n");
+                    Log.Information($"场景识别: {GetScenarioDisplayName(detectedScenario)}");
                 }
 
                 // ===== 第1步：工具定义 =====
@@ -81,7 +86,8 @@ namespace BiaogPlugin.Services
                 var messages = BuildMessages(systemPrompt);
 
                 // ===== 第3步：Agent决策 =====
-                onStreamChunk?.Invoke($"[标哥AI助手] 正在智能分析...\n");
+                // ✅ 移除状态消息，直接开始流式输出AI回复
+                Log.Information("开始Agent决策...");
 
                 var agentDecision = await _bailianClient.ChatCompletionStreamAsync(
                     messages: messages,
@@ -93,7 +99,8 @@ namespace BiaogPlugin.Services
                         : null,
                     temperature: 0.7,
                     topP: 0.9,
-                    thinkingBudget: useDeepThinking ? 10000 : null
+                    thinkingBudget: useDeepThinking ? 10000 : null,
+                    enableThinking: useDeepThinking  // ✅ 传递enable_thinking参数
                 );
 
                 // 添加Agent回复到历史
@@ -160,7 +167,7 @@ namespace BiaogPlugin.Services
                     ToolCalls = new List<AssistantToolCall>()
                 };
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "标哥AI助手执行失败");
                 return new AssistantResponse
@@ -196,7 +203,7 @@ namespace BiaogPlugin.Services
                         return $"✗ 未知工具: {toolCall.Name}";
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, $"工具执行失败: {toolCall.Name}");
                 return $"✗ 工具执行失败: {ex.Message}";
@@ -248,7 +255,7 @@ namespace BiaogPlugin.Services
 
                 foreach (var textEntity in allTexts)
                 {
-                    var obj = tr.GetObject(textEntity.ObjectId, OpenMode.ForWrite);
+                    var obj = tr.GetObject(textEntity.Id, OpenMode.ForWrite);
 
                     if (obj is DBText dbText && dbText.TextString.Contains(original ?? ""))
                     {
@@ -280,7 +287,8 @@ namespace BiaogPlugin.Services
             var extractor = new DwgTextExtractor();
             var textEntities = extractor.ExtractAllText();
 
-            var recognizer = new ComponentRecognizer();
+            var bailianClient = ServiceLocator.GetService<BailianApiClient>();
+            var recognizer = new ComponentRecognizer(bailianClient!);
             var components = await recognizer.RecognizeFromTextEntitiesAsync(textEntities);
 
             var summary = $"✓ 识别完成：共识别{components.Count}个构件\n";
@@ -449,14 +457,19 @@ namespace BiaogPlugin.Services
         /// </summary>
         private List<BiaogPlugin.Services.ChatMessage> BuildMessages(string systemPrompt)
         {
+            // ✅ 使用ContextLengthManager智能裁剪，防止超过252K输入限制
+            var trimmedHistory = _contextLengthManager.TrimMessages(_chatHistory, systemPrompt);
+
             var messages = new List<BiaogPlugin.Services.ChatMessage>
             {
                 new BiaogPlugin.Services.ChatMessage { Role = "system", Content = systemPrompt }
             };
 
-            // 保留最近20轮对话（官方推荐维护消息历史）
-            var recentHistory = _chatHistory.TakeLast(20).ToList();
-            messages.AddRange(recentHistory);
+            messages.AddRange(trimmedHistory);
+
+            // 记录Token使用情况
+            int estimatedTokens = _contextLengthManager.EstimateTokens(messages, "");
+            Log.Debug($"消息构建完成: {messages.Count}条消息, 约{estimatedTokens:N0} tokens");
 
             return messages;
         }

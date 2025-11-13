@@ -1,4 +1,4 @@
-using Serilog;
+﻿using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -31,6 +31,14 @@ public class TranslationEngine
         string targetLanguage,
         CancellationToken cancellationToken = default)
     {
+        // ✅ P0修复: 添加API密钥验证
+        if (!_apiClient.HasApiKey)
+        {
+            var errorMsg = "未配置百炼API密钥，请运行 BIAOGE_SETTINGS 命令配置";
+            Log.Error(errorMsg);
+            throw new InvalidOperationException(errorMsg);
+        }
+
         if (string.IsNullOrWhiteSpace(text))
             return text;
 
@@ -64,6 +72,14 @@ public class TranslationEngine
         IProgress<double>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        // ✅ P0修复: 添加API密钥验证
+        if (!_apiClient.HasApiKey)
+        {
+            var errorMsg = "未配置百炼API密钥，请运行 BIAOGE_SETTINGS 命令配置";
+            Log.Error(errorMsg);
+            throw new InvalidOperationException(errorMsg);
+        }
+
         var results = new List<string>();
         var uncachedTexts = new List<string>();
         var uncachedIndices = new List<int>();

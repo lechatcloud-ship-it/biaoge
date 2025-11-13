@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows;
 using System.Windows.Controls;
 using Serilog;
@@ -81,7 +81,7 @@ namespace BiaogPlugin.UI
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "翻译失败");
                 AddLog($"[错误] {ex.Message}");
@@ -152,7 +152,7 @@ namespace BiaogPlugin.UI
                         AddLog("[警告] 缓存服务未初始化");
                     }
                 }
-                catch (Exception ex)
+                catch (System.Exception ex)
                 {
                     Log.Error(ex, "清除缓存失败");
                     AddLog($"[错误] 清除缓存失败: {ex.Message}");
@@ -173,7 +173,7 @@ namespace BiaogPlugin.UI
                 AddLog($"日志已导出: {logPath}");
                 MessageBox.Show($"日志已导出到:\n{logPath}", "成功", MessageBoxButton.OK, MessageBoxImage.Information);
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "导出日志失败");
                 MessageBox.Show($"导出日志失败:\n{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);

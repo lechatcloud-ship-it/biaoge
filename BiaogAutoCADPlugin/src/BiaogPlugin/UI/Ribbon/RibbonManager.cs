@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -15,15 +15,16 @@ namespace BiaogPlugin.UI.Ribbon
     {
         private static RibbonTab? _biaogTab;
         private static bool _isLoaded = false;
+        private static bool _isInitializing = false;
 
         /// <summary>
         /// 加载Ribbon工具栏
         /// </summary>
         public static void LoadRibbon()
         {
-            if (_isLoaded)
+            if (_isLoaded || _isInitializing)
             {
-                Log.Warning("Ribbon已加载，跳过重复加载");
+                Log.Warning("Ribbon已加载或正在初始化，跳过");
                 return;
             }
 
@@ -31,7 +32,48 @@ namespace BiaogPlugin.UI.Ribbon
             {
                 Log.Information("正在加载Ribbon工具栏...");
 
-                // 获取Ribbon控件
+                // 检查Ribbon是否可用
+                if (ComponentManager.Ribbon == null)
+                {
+                    // Ribbon未就绪，注册事件延迟加载
+                    Log.Information("Ribbon未就绪，注册延迟加载事件");
+                    _isInitializing = true;
+                    ComponentManager.ItemInitialized += ComponentManager_ItemInitialized;
+                }
+                else
+                {
+                    // Ribbon已就绪，直接创建
+                    CreateRibbon();
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "加载Ribbon工具栏失败");
+                _isInitializing = false;
+            }
+        }
+
+        /// <summary>
+        /// 处理Ribbon初始化完成事件
+        /// </summary>
+        private static void ComponentManager_ItemInitialized(object? sender, RibbonItemEventArgs e)
+        {
+            // Ribbon已初始化，创建Tab
+            if (ComponentManager.Ribbon != null)
+            {
+                ComponentManager.ItemInitialized -= ComponentManager_ItemInitialized;
+                _isInitializing = false;
+                CreateRibbon();
+            }
+        }
+
+        /// <summary>
+        /// 创建Ribbon工具栏（AutoCAD主线程上调用）
+        /// </summary>
+        private static void CreateRibbon()
+        {
+            try
+            {
                 RibbonControl ribbonControl = ComponentManager.Ribbon;
                 if (ribbonControl == null)
                 {
@@ -67,11 +109,39 @@ namespace BiaogPlugin.UI.Ribbon
                 ribbonControl.Tabs.Add(_biaogTab);
 
                 _isLoaded = true;
-                Log.Information("Ribbon工具栏加载成功");
+                Log.Information("Ribbon工具栏已创建");
+
+                // ✅ 关键修复：使用Idle事件延迟激活Tab
+                // 原因：AutoCAD启动时，Ribbon可能还未完全就绪，直接设置IsActive会被覆盖
+                // 解决方案：等待AutoCAD进入空闲状态（完全启动完成）后再激活
+                Autodesk.AutoCAD.ApplicationServices.Application.Idle += OnIdleActivateTab;
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
-                Log.Error(ex, "加载Ribbon工具栏失败");
+                Log.Error(ex, "创建Ribbon失败: {Message}", ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// AutoCAD空闲时激活标哥Tab（只执行一次）
+        /// </summary>
+        private static void OnIdleActivateTab(object? sender, System.EventArgs e)
+        {
+            try
+            {
+                // 移除事件处理器，只执行一次
+                Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnIdleActivateTab;
+
+                if (_biaogTab != null && ComponentManager.Ribbon != null)
+                {
+                    // 激活标哥Tab，使其显示出来
+                    _biaogTab.IsActive = true;
+                    Log.Information("✅ Ribbon Tab已激活显示");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "激活Ribbon Tab失败: {Message}", ex.Message);
             }
         }
 
@@ -80,6 +150,13 @@ namespace BiaogPlugin.UI.Ribbon
         /// </summary>
         public static void UnloadRibbon()
         {
+            try
+            {
+                // 移除Idle事件（如果还未触发）
+                Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnIdleActivateTab;
+            }
+            catch { /* 忽略移除事件的错误 */ }
+
             if (!_isLoaded || _biaogTab == null)
             {
                 return;
@@ -87,6 +164,7 @@ namespace BiaogPlugin.UI.Ribbon
 
             try
             {
+                // 直接在AutoCAD主线程上操作Ribbon
                 RibbonControl ribbonControl = ComponentManager.Ribbon;
                 if (ribbonControl != null && ribbonControl.Tabs.Contains(_biaogTab))
                 {
@@ -97,7 +175,7 @@ namespace BiaogPlugin.UI.Ribbon
                 _isLoaded = false;
                 Log.Information("Ribbon工具栏卸载成功");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "卸载Ribbon工具栏失败");
             }
@@ -121,9 +199,8 @@ namespace BiaogPlugin.UI.Ribbon
             // === 大按钮：快速翻译为中文（推荐） ===
             RibbonButton translateZH = new RibbonButton
             {
-                Text = "翻译为中文\n(推荐)",
+                Text = "翻译为中文\n(推荐)★",
                 ShowText = true,
-                ShowImage = true,
                 Size = RibbonItemSize.Large,
                 Orientation = System.Windows.Controls.Orientation.Vertical,
                 CommandParameter = "BIAOGE_TRANSLATE_ZH ",
@@ -337,6 +414,19 @@ namespace BiaogPlugin.UI.Ribbon
             // === 第一行 ===
             RibbonRowPanel row1 = new RibbonRowPanel();
 
+            // 测试按钮（用于调试）
+            RibbonButton testButton = new RibbonButton
+            {
+                Text = "测试",
+                ShowText = true,
+                Size = RibbonItemSize.Standard,
+                Orientation = System.Windows.Controls.Orientation.Horizontal,
+                CommandParameter = "TEST_RIBBON_CLICK ",
+                CommandHandler = new RibbonTestHandler(),
+                ToolTip = "测试Ribbon按钮是否工作"
+            };
+            row1.Items.Add(testButton);
+
             // 插件设置
             RibbonButton settings = new RibbonButton
             {
@@ -401,6 +491,49 @@ namespace BiaogPlugin.UI.Ribbon
     }
 
     /// <summary>
+    /// Ribbon测试处理器（用于调试）
+    /// </summary>
+    public class RibbonTestHandler : System.Windows.Input.ICommand
+    {
+        public event EventHandler? CanExecuteChanged;
+
+        public bool CanExecute(object? parameter)
+        {
+            return true;
+        }
+
+        public void Execute(object? parameter)
+        {
+            try
+            {
+                // 显示消息框确认按钮被点击
+                System.Windows.MessageBox.Show(
+                    "Ribbon按钮点击成功！\n\n" +
+                    "如果您看到这个消息，说明Ribbon按钮工作正常。\n" +
+                    "现在问题可能出在命令执行部分。\n\n" +
+                    $"参数: {parameter}",
+                    "标哥插件 - Ribbon测试",
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information
+                );
+
+                Log.Information($"Ribbon测试按钮被点击，参数: {parameter}");
+
+                // 尝试在命令行显示消息
+                var doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
+                if (doc != null)
+                {
+                    doc.Editor.WriteMessage("\n[成功] Ribbon测试按钮已触发！");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "Ribbon测试按钮执行失败");
+            }
+        }
+    }
+
+    /// <summary>
     /// Ribbon命令处理器
     /// 将Ribbon按钮点击转换为AutoCAD命令执行
     /// </summary>
@@ -417,23 +550,68 @@ namespace BiaogPlugin.UI.Ribbon
         {
             try
             {
-                if (parameter is string commandStr && !string.IsNullOrEmpty(commandStr))
+                // 获取活动文档
+                var doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
+                if (doc == null)
                 {
-                    // 在AutoCAD命令行中执行命令
+                    Log.Warning("无法获取活动文档");
+                    return;
+                }
+
+                // 从CommandParameter获取命令字符串
+                string commandStr = string.Empty;
+
+                // parameter 可能是字符串（CommandParameter）或 RibbonButton
+                if (parameter is string str)
+                {
+                    commandStr = str;
+                }
+                else if (parameter is Autodesk.Windows.RibbonButton ribbonBtn && ribbonBtn.CommandParameter is string cmdParam)
+                {
+                    commandStr = cmdParam;
+                }
+
+                if (string.IsNullOrWhiteSpace(commandStr))
+                {
+                    Log.Warning($"无效的命令参数: {parameter?.GetType().Name}");
+                    doc.Editor.WriteMessage("\n[警告] Ribbon按钮没有有效的命令参数");
+                    return;
+                }
+
+                // 清理命令字符串
+                string cleanCommand = commandStr.Trim();
+
+                // 重要：添加 ^C^C 前缀来取消当前命令（AutoCAD最佳实践）
+                // 这确保命令在干净的状态下执行
+                string fullCommand = "^C^C" + cleanCommand + " ";
+
+                Log.Information($"Ribbon执行命令: {cleanCommand}");
+
+                // 发送命令到AutoCAD命令行
+                // 参数说明：
+                // - command: 要执行的命令字符串
+                // - activate: true = 激活文档窗口
+                // - wrapUpInactiveDoc: false = 不等待非活动文档
+                // - echoCommand: true = 在命令行显示命令
+                doc.SendStringToExecute(fullCommand, true, false, true);
+
+                // 在命令行确认
+                doc.Editor.WriteMessage($"\n[Ribbon] → {cleanCommand}");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "Ribbon命令执行失败");
+
+                // 显示错误消息
+                try
+                {
                     var doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
                     if (doc != null)
                     {
-                        // 使用SendStringToExecute方法执行命令
-                        // 注意：命令字符串末尾需要空格来触发回车
-                        doc.SendStringToExecute(commandStr, true, false, false);
-
-                        Log.Debug($"Ribbon执行命令: {commandStr}");
+                        doc.Editor.WriteMessage($"\n[错误] Ribbon命令执行失败: {ex.Message}");
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Ribbon命令执行失败");
+                catch { }
             }
         }
     }

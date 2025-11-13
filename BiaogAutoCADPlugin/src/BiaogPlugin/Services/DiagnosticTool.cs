@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -112,7 +112,7 @@ public class DiagnosticTool
             check.Message = "配置正常";
             check.Details = $"API密钥已配置，翻译模型: {model}";
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             check.Status = CheckStatus.Fail;
             check.Message = "配置检查失败";
@@ -157,7 +157,7 @@ public class DiagnosticTool
                 check.Recommendation = "检查API密钥是否正确，确认网络连接正常";
             }
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             check.Status = CheckStatus.Fail;
             check.Message = "API连接测试异常";
@@ -196,7 +196,7 @@ public class DiagnosticTool
                 check.Recommendation = "建议清理旧缓存以释放空间，运行 BIAOGE_CLEARCACHE 命令";
             }
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             check.Status = CheckStatus.Fail;
             check.Message = "缓存系统异常";
@@ -259,7 +259,7 @@ public class DiagnosticTool
                 check.Message = "文件系统权限正常";
             }
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             check.Status = CheckStatus.Fail;
             check.Message = "权限检查失败";
@@ -309,7 +309,7 @@ public class DiagnosticTool
                 check.Message = $"磁盘空间充足: {freeSpaceGB:F2}GB";
             }
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             check.Status = CheckStatus.Warning;
             check.Message = "磁盘空间检查异常";
@@ -347,7 +347,7 @@ public class DiagnosticTool
                 check.Message = $"网络响应异常: {response.StatusCode}";
             }
         }
-        catch (Exception ex)
+        catch (System.Exception ex)
         {
             check.Status = CheckStatus.Fail;
             check.Message = "网络连接失败";

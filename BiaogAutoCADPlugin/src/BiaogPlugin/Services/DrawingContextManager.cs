@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -57,7 +57,7 @@ namespace BiaogPlugin.Services
 
                 Log.Information($"成功提取图纸上下文: {context.TextEntities.Count} 个文本实体, {context.Layers.Count} 个图层");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "提取图纸上下文失败");
                 context.ErrorMessage = $"提取图纸信息失败: {ex.Message}";
@@ -193,7 +193,7 @@ namespace BiaogPlugin.Services
                     metadata["Comments"] = summaryInfo.Comments ?? "";
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Warning(ex, "提取元数据失败");
             }

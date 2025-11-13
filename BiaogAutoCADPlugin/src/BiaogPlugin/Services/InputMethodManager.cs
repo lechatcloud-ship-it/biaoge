@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using Autodesk.AutoCAD.ApplicationServices;
 using Serilog;
@@ -65,7 +65,7 @@ namespace BiaogPlugin.Services
                 _isEnabled = true;
                 Log.Information("输入法自动切换已启用");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "启用输入法自动切换失败");
                 throw;
@@ -98,7 +98,7 @@ namespace BiaogPlugin.Services
                 _isEnabled = false;
                 Log.Information("输入法自动切换已禁用");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "禁用输入法自动切换失败");
             }
@@ -116,7 +116,7 @@ namespace BiaogPlugin.Services
                     RegisterDocumentEvents(e.Document);
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "注册文档事件失败");
             }
@@ -143,7 +143,7 @@ namespace BiaogPlugin.Services
 
                 Log.Debug($"已为文档 {doc.Name} 注册输入法切换事件");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, $"注册文档 {doc.Name} 事件失败");
             }
@@ -163,7 +163,7 @@ namespace BiaogPlugin.Services
 
                 Log.Debug($"已为文档 {doc.Name} 注销输入法切换事件");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, $"注销文档 {doc.Name} 事件失败");
             }
@@ -187,7 +187,7 @@ namespace BiaogPlugin.Services
                 SwitchToEnglish();
                 Log.Debug($"命令开始: {e.GlobalCommandName}，已切换到英文输入法");
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "切换输入法失败");
             }
@@ -215,7 +215,7 @@ namespace BiaogPlugin.Services
                     Log.Debug($"文本编辑命令结束: {e.GlobalCommandName}，已切换到中文输入法");
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "切换输入法失败");
             }
@@ -278,7 +278,7 @@ namespace BiaogPlugin.Services
                     ImmReleaseContext(hWnd, hIMC);
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "切换到英文输入法失败");
             }
@@ -314,7 +314,7 @@ namespace BiaogPlugin.Services
                     ImmReleaseContext(hWnd, hIMC);
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "切换到中文输入法失败");
             }
@@ -352,7 +352,7 @@ namespace BiaogPlugin.Services
                     ImmReleaseContext(hWnd, hIMC);
                 }
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Log.Error(ex, "获取输入法状态失败");
                 return false;

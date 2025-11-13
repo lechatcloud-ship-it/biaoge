@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -554,14 +554,14 @@ namespace BiaogPlugin.Services
             /// <summary>
             /// 生成标准构件编号
             /// </summary>
-            public static string GenerateComponentName(string componentType, int序号)
+            public static string GenerateComponentName(string componentType, int serialNumber)
             {
                 // 查找对应的前缀
                 var prefix = ComponentPrefixes.FirstOrDefault(kvp => kvp.Value == componentType).Key;
                 if (string.IsNullOrEmpty(prefix))
                     prefix = "UN"; // Unknown
 
-                return $"{prefix}-{序号}";
+                return $"{prefix}-{serialNumber}";
             }
         }
 
