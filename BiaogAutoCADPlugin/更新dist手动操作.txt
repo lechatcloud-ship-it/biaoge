@@ -1,0 +1,44 @@
+# 手动更新dist目录 - 操作步骤
+
+## 问题
+dist/BiaogPlugin.bundle 中的DLL是旧版本（06:20），需要更新为最新编译版本（07:02）
+
+## 操作步骤
+
+### 方法1：手动复制（最简单，推荐）
+
+1. 打开源文件夹（最新编译）：
+   \\Mac\Home\Desktop\biaoge\BiaogAutoCADPlugin\src\BiaogPlugin\bin\Release
+
+2. **全选所有文件**（Ctrl+A）
+
+3. **复制**（Ctrl+C）
+
+4. 打开目标文件夹1：
+   \\Mac\Home\Desktop\biaoge\BiaogAutoCADPlugin\dist\BiaogPlugin.bundle\Contents\2021
+
+5. **粘贴并覆盖**（Ctrl+V，选择"替换所有"）
+
+6. 打开目标文件夹2：
+   \\Mac\Home\Desktop\biaoge\BiaogAutoCADPlugin\dist\BiaogPlugin.bundle\Contents\2018
+
+7. **再次粘贴并覆盖**（Ctrl+V，选择"替换所有"）
+
+### 方法2：删除重建（备选）
+
+1. 删除整个文件夹：
+   \\Mac\Home\Desktop\biaoge\BiaogAutoCADPlugin\dist\BiaogPlugin.bundle
+
+2. 然后使用PowerShell运行构建脚本：
+   cd "\\Mac\Home\Desktop\biaoge\BiaogAutoCADPlugin"
+   .\build-bundle.bat
+
+## 验证更新成功
+
+检查以下文件的修改时间应该是 **07:02**：
+- dist\BiaogPlugin.bundle\Contents\2021\BiaogPlugin.dll
+- dist\BiaogPlugin.bundle\Contents\2018\BiaogPlugin.dll
+
+## 完成后
+
+重新安装或测试插件，AI助手和智能算量面板应该可以正常弹出。

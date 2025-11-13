@@ -118,7 +118,7 @@ Write-Host ""
 Write-Host "dist/ 目录结构:" -ForegroundColor Cyan
 Write-Host ""
 
-Get-ChildItem -Path $distPath | Sort-Object PSIsContainer -Descending, Name | ForEach-Object {
+Get-ChildItem -Path $distPath | Sort-Object -Property @{Expression="PSIsContainer"; Descending=$true}, Name | ForEach-Object {
     if ($_.PSIsContainer) {
         $itemSize = [math]::Round((Get-ChildItem -Path $_.FullName -Recurse -File | Measure-Object -Property Length -Sum).Sum / 1MB, 2)
         Write-Host "  📁 $($_.Name)\" -NoNewline -ForegroundColor Yellow
