@@ -21,6 +21,46 @@ namespace BiaogPlugin
     /// </summary>
     public class Commands
     {
+        #region 初始化命令
+
+        /// <summary>
+        /// 插件启动时的初始化命令
+        /// 在PackageContents.xml中设置 StartupCommand="True"，插件加载时自动执行
+        /// 关键作用：确保Ribbon工具栏正确加载和显示
+        /// </summary>
+        [CommandMethod("BIAOGE_INITIALIZE", CommandFlags.Modal | CommandFlags.NoInternalLock)]
+        public void InitializePlugin()
+        {
+            try
+            {
+                Log.Information("════════════════════════════════════════════════");
+                Log.Information("[关键] 标哥插件初始化命令已执行 (StartupCommand)");
+                Log.Information("════════════════════════════════════════════════");
+
+                var doc = Application.DocumentManager.MdiActiveDocument;
+                if (doc != null)
+                {
+                    var ed = doc.Editor;
+
+                    // 执行Ribbon初始化（保险措施）
+                    UI.Ribbon.RibbonManager.LoadRibbon();
+
+                    Log.Debug("Ribbon工具栏已通过StartupCommand初始化");
+
+                    // 仅在开发环境显示初始化消息
+#if DEBUG
+                    ed.WriteMessage("\n[开发模式] 标哥插件初始化完成");
+#endif
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "插件初始化命令执行失败");
+            }
+        }
+
+        #endregion
+
         #region 翻译命令
 
         /// <summary>

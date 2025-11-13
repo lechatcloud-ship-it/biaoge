@@ -578,12 +578,14 @@ namespace BiaogPlugin.UI.Ribbon
                     return;
                 }
 
-                // 清理命令字符串
+                // 清理命令字符串（移除末尾空格）
                 string cleanCommand = commandStr.Trim();
 
-                // 重要：添加 ^C^C 前缀来取消当前命令（AutoCAD最佳实践）
-                // 这确保命令在干净的状态下执行
-                string fullCommand = "^C^C" + cleanCommand + " ";
+                // ✅ 重要修复：对于 SendStringToExecute，使用 \x03 而不是 ^C^C
+                // \x03 是 ASCII 码 3（Ctrl+C），用于取消当前命令
+                // 参考：https://adndevblog.typepad.com/autocad/2012/07/start-command-with-escape-characters-cc.html
+                // 注意：^C^C 是 CUI 宏语法，不适用于 .NET SendStringToExecute
+                string fullCommand = "\x03\x03" + cleanCommand + " ";
 
                 Log.Information($"Ribbon执行命令: {cleanCommand}");
 

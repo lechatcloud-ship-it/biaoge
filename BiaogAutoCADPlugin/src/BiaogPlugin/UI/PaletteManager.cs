@@ -49,7 +49,11 @@ namespace BiaogPlugin.UI
         {
             if (_translationPaletteSet == null)
             {
-                _translationPaletteSet = new PaletteSet("标哥 - 翻译工具")
+                // ✅ 使用 GUID 构造函数以持久化面板位置和大小设置
+                _translationPaletteSet = new PaletteSet(
+                    "标哥 - 翻译工具",
+                    new System.Guid("A5B6C7D8-E9F0-1234-5678-9ABCDEF01111")
+                )
                 {
                     Size = new System.Drawing.Size(380, 700),
                     MinimumSize = new System.Drawing.Size(350, 500),
@@ -73,7 +77,10 @@ namespace BiaogPlugin.UI
                                                PaletteSetStyles.ShowAutoHideButton |
                                                PaletteSetStyles.ShowCloseButton;
 
-                Log.Debug("翻译面板已创建");
+                // ✅ 设置默认停靠位置为右侧
+                _translationPaletteSet.Dock = DockSides.Right;
+
+                Log.Debug("翻译面板已创建（默认停靠在右侧）");
             }
         }
 
@@ -91,9 +98,15 @@ namespace BiaogPlugin.UI
 
                 if (_translationPaletteSet != null)
                 {
+                    // ✅ 确保面板以停靠模式显示
+                    if (_translationPaletteSet.Dock == DockSides.None)
+                    {
+                        _translationPaletteSet.Dock = DockSides.Right;
+                    }
+
                     _translationPaletteSet.Visible = true;
                     _translationPaletteSet.Activate(0);  // 激活第一个选项卡
-                    Log.Debug("翻译面板已显示");
+                    Log.Debug("翻译面板已显示（停靠在右侧）");
                 }
             }
             catch (System.Exception ex)
@@ -126,7 +139,11 @@ namespace BiaogPlugin.UI
         {
             if (_calculationPaletteSet == null)
             {
-                _calculationPaletteSet = new PaletteSet("标哥 - 构件识别算量")
+                // ✅ 使用 GUID 构造函数以持久化面板位置和大小设置
+                _calculationPaletteSet = new PaletteSet(
+                    "标哥 - 构件识别算量",
+                    new System.Guid("A5B6C7D8-E9F0-1234-5678-9ABCDEF02222")
+                )
                 {
                     Size = new System.Drawing.Size(400, 700),
                     MinimumSize = new System.Drawing.Size(350, 500),
@@ -149,7 +166,10 @@ namespace BiaogPlugin.UI
                                                PaletteSetStyles.ShowAutoHideButton |
                                                PaletteSetStyles.ShowCloseButton;
 
-                Log.Debug("算量面板已创建");
+                // ✅ 设置默认停靠位置为右侧
+                _calculationPaletteSet.Dock = DockSides.Right;
+
+                Log.Debug("算量面板已创建（默认停靠在右侧）");
             }
         }
 
@@ -167,9 +187,15 @@ namespace BiaogPlugin.UI
 
                 if (_calculationPaletteSet != null)
                 {
+                    // ✅ 确保面板以停靠模式显示
+                    if (_calculationPaletteSet.Dock == DockSides.None)
+                    {
+                        _calculationPaletteSet.Dock = DockSides.Right;
+                    }
+
                     _calculationPaletteSet.Visible = true;
                     _calculationPaletteSet.Activate(0);
-                    Log.Debug("算量面板已显示");
+                    Log.Debug("算量面板已显示（停靠在右侧）");
                 }
             }
             catch (System.Exception ex)
@@ -202,31 +228,60 @@ namespace BiaogPlugin.UI
         {
             if (_aiPaletteSet == null)
             {
-                _aiPaletteSet = new PaletteSet("标哥 - AI助手")
+                try
                 {
-                    // ✅ 增加默认高度，更适合AI对话界面
-                    Size = new System.Drawing.Size(450, 850),
-                    MinimumSize = new System.Drawing.Size(400, 600),
-                    DockEnabled = (DockSides)((int)DockSides.Left | (int)DockSides.Right),
-                    Visible = false
-                };
+                    Log.Debug("开始创建AI助手面板...");
 
-                _aiPalette = new AIPalette();
+                    // ✅ 使用 GUID 构造函数以持久化面板位置和大小设置
+                    _aiPaletteSet = new PaletteSet(
+                        "标哥 - AI助手",
+                        new System.Guid("A5B6C7D8-E9F0-1234-5678-9ABCDEF03333")
+                    );
 
-                // 使用ElementHost包装WPF控件
-                var elementHost = new System.Windows.Forms.Integration.ElementHost
+                    Log.Debug("PaletteSet已创建，准备设置属性...");
+
+                    // ✅ 关键修复：先设置Style，再设置Size
+                    // 参考AutoCAD文档：某些属性必须在Add之前设置
+                    _aiPaletteSet.Style = PaletteSetStyles.ShowPropertiesMenu |
+                                          PaletteSetStyles.ShowAutoHideButton |
+                                          PaletteSetStyles.ShowCloseButton;
+
+                    // 设置停靠能力
+                    _aiPaletteSet.DockEnabled = (DockSides)((int)DockSides.Left | (int)DockSides.Right);
+
+                    // 创建 WPF 控件
+                    Log.Debug("创建AIPalette WPF控件...");
+                    _aiPalette = new AIPalette();
+
+                    // 使用ElementHost包装WPF控件
+                    Log.Debug("创建ElementHost...");
+                    var elementHost = new System.Windows.Forms.Integration.ElementHost
+                    {
+                        Dock = System.Windows.Forms.DockStyle.Fill,
+                        Child = _aiPalette,
+                        AutoSize = true
+                    };
+
+                    // ✅ 添加控件到 PaletteSet
+                    Log.Debug("添加控件到PaletteSet...");
+                    _aiPaletteSet.Add("AI助手", elementHost);
+
+                    // ✅ 关键修复：在Add之后设置Size和Dock
+                    // 这样可以确保控件已经被添加到容器中
+                    _aiPaletteSet.Size = new System.Drawing.Size(450, 850);
+                    _aiPaletteSet.MinimumSize = new System.Drawing.Size(400, 600);
+                    _aiPaletteSet.Dock = DockSides.Right;
+
+                    // 保持隐藏，等待用户调用命令
+                    _aiPaletteSet.Visible = false;
+
+                    Log.Information("✓ AI助手面板创建成功（停靠右侧，尺寸: 450x850）");
+                }
+                catch (System.Exception ex)
                 {
-                    Dock = System.Windows.Forms.DockStyle.Fill,
-                    Child = _aiPalette
-                };
-
-                _aiPaletteSet.Add("AI助手", elementHost);
-
-                _aiPaletteSet.Style = PaletteSetStyles.ShowPropertiesMenu |
-                                      PaletteSetStyles.ShowAutoHideButton |
-                                      PaletteSetStyles.ShowCloseButton;
-
-                Log.Debug("AI助手面板已创建");
+                    Log.Error(ex, "创建AI助手面板失败");
+                    throw;
+                }
             }
         }
 
@@ -237,16 +292,74 @@ namespace BiaogPlugin.UI
         {
             try
             {
+                Log.Debug("准备显示AI助手面板...");
+
                 if (_aiPaletteSet == null)
                 {
+                    Log.Debug("AI助手面板未初始化，开始初始化...");
                     InitializeAIPalette();
                 }
 
                 if (_aiPaletteSet != null)
                 {
+                    Log.Debug($"AI助手面板状态检查: Visible={_aiPaletteSet.Visible}, Dock={_aiPaletteSet.Dock}, Size={_aiPaletteSet.Size}");
+
+                    // ✅ 确保面板以停靠模式显示
+                    if (_aiPaletteSet.Dock == DockSides.None)
+                    {
+                        Log.Debug("面板未停靠，设置为右侧停靠");
+                        _aiPaletteSet.Dock = DockSides.Right;
+                    }
+
+                    // ✅ 确保尺寸正常（防止被最小化或隐藏）
+                    if (_aiPaletteSet.Size.Width < 300 || _aiPaletteSet.Size.Height < 400)
+                    {
+                        Log.Warning($"检测到异常尺寸: {_aiPaletteSet.Size}，重置为默认尺寸");
+                        _aiPaletteSet.Size = new System.Drawing.Size(450, 850);
+                    }
+
+                    // ✅ 设置为可见
                     _aiPaletteSet.Visible = true;
+                    Log.Debug("面板Visible已设置为true");
+
+                    // ✅ 关键修复：AutoCAD已知bug - 如果没有保存的设置，Tab不会被渲染
+                    // 解决方案：在Visible=true后，程序化地调整两次Size（使用不同的值）强制渲染
+                    // 参考：https://forums.autodesk.com/t5/net/custom-palette-display-issue/td-p/8228560
+                    var targetSize = new System.Drawing.Size(450, 850);
+                    var tempSize = new System.Drawing.Size(targetSize.Width + 10, targetSize.Height + 10);
+
+                    _aiPaletteSet.Size = tempSize;
+                    Log.Debug($"临时调整尺寸为: {tempSize}");
+
+                    System.Threading.Thread.Sleep(50);  // 短暂延迟确保UI更新
+
+                    _aiPaletteSet.Size = targetSize;
+                    Log.Debug($"恢复目标尺寸为: {targetSize}");
+
+                    // ✅ 激活面板（确保获得焦点）
                     _aiPaletteSet.Activate(0);
-                    Log.Debug("AI助手面板已显示");
+                    Log.Debug("面板已激活");
+
+                    // ✅ 强制让面板获得焦点
+                    try
+                    {
+                        if (_aiPaletteSet.Count > 0)
+                        {
+                            _aiPaletteSet.KeepFocus = true;
+                            Log.Debug("面板焦点已锁定");
+                        }
+                    }
+                    catch (System.Exception focusEx)
+                    {
+                        Log.Warning(focusEx, "锁定焦点失败（可忽略）");
+                    }
+
+                    Log.Information($"✓ AI助手面板已显示（停靠: {_aiPaletteSet.Dock}, 尺寸: {_aiPaletteSet.Size}, 可见: {_aiPaletteSet.Visible}）");
+                }
+                else
+                {
+                    Log.Error("AI助手面板初始化后仍为null");
+                    throw new System.InvalidOperationException("无法创建AI助手面板");
                 }
             }
             catch (System.Exception ex)

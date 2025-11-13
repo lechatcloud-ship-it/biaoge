@@ -1,0 +1,336 @@
+<UserControl x:Class="BiaogPlugin.UI.AIPalette"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:controls="clr-namespace:BiaogPlugin.UI.Controls"
+             mc:Ignorable="d"
+             Width="420" Background="#1E1E1E">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 标题栏 -->
+        <Border Grid.Row="0" Background="#2D2D30" Padding="15,12">
+            <Grid>
+                <StackPanel>
+                    <TextBlock Text="标哥AI助手" FontSize="18" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="专为建筑工程领域的Agent" FontSize="11" Foreground="#999999" Margin="0,4,0,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="SessionMenuButton" Content="💬 会话"
+                            Width="65" Height="28" Margin="0,0,8,0"
+                            BorderThickness="0"
+                            Click="SessionMenuButton_Click" ToolTip="会话管理（新建、切换、删除）">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <!-- 默认状态：灰色背景 + 白色文本 -->
+                                <Setter Property="Background" Value="#3C3C3C"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    CornerRadius="4"
+                                                    Padding="6,4">
+                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <!-- 鼠标悬停状态 - 白色背景 + 黑色文本 -->
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="White"/>
+                                        <Setter Property="Foreground" Value="Black"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button x:Name="DeepThinkingToggle" Content="🧠 深度思考"
+                            Width="90" Height="28" Margin="0,0,8,0"
+                            BorderThickness="0"
+                            Click="DeepThinkingToggle_Click" ToolTip="启用深度思考模式（更慢但更准确）">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <!-- 默认状态：灰色背景 + 白色文本 -->
+                                <Setter Property="Background" Value="#3C3C3C"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    CornerRadius="4"
+                                                    Padding="6,4">
+                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <!-- 激活状态 - 蓝色背景 + 白色文本 -->
+                                    <Trigger Property="Tag" Value="Active">
+                                        <Setter Property="Background" Value="#0078D4"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                    </Trigger>
+                                    <!-- 鼠标悬停状态 - 白色背景 + 黑色文本 -->
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="White"/>
+                                        <Setter Property="Foreground" Value="Black"/>
+                                    </Trigger>
+                                    <!-- 激活状态下的悬停 - 也是白色背景 + 黑色文本 -->
+                                    <MultiTrigger>
+                                        <MultiTrigger.Conditions>
+                                            <Condition Property="Tag" Value="Active"/>
+                                            <Condition Property="IsMouseOver" Value="True"/>
+                                        </MultiTrigger.Conditions>
+                                        <Setter Property="Background" Value="White"/>
+                                        <Setter Property="Foreground" Value="Black"/>
+                                    </MultiTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button x:Name="ClearHistoryButton" Content="🗑 清除"
+                            Width="60" Height="28"
+                            BorderThickness="0"
+                            Click="ClearHistory_Click" ToolTip="清除对话历史">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <!-- 默认状态：灰色背景 + 白色文本 -->
+                                <Setter Property="Background" Value="#3C3C3C"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    CornerRadius="4"
+                                                    Padding="6,4">
+                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <!-- 鼠标悬停状态 - 白色背景 + 黑色文本 -->
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="White"/>
+                                        <Setter Property="Foreground" Value="Black"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 对话历史 -->
+        <ScrollViewer Grid.Row="1" x:Name="ChatScrollViewer"
+                      VerticalScrollBarVisibility="Auto"
+                      Background="#1E1E1E"
+                      Padding="15,10">
+            <StackPanel x:Name="ChatHistoryPanel">
+                <!-- 欢迎消息 -->
+                <Border Background="#2D2D30" CornerRadius="8" Padding="15" Margin="0,0,0,10">
+                    <StackPanel>
+                        <TextBlock Text="👋 您好！我是标哥AI助手" FontSize="14" FontWeight="Bold"
+                                   Foreground="White" Margin="0,0,0,8"/>
+                        <TextBlock TextWrapping="Wrap" Foreground="#CCCCCC" FontSize="12" LineHeight="18">
+                            <Run Text="我可以帮您："/>
+                            <LineBreak/>
+                            <Run Text="• 翻译图纸中的文本（自动调用qwen-mt-flash）"/>
+                            <LineBreak/>
+                            <Run Text="• 识别和修改CAD构件（自动调用qwen3-coder-flash）"/>
+                            <LineBreak/>
+                            <Run Text="• 分析图纸内容（自动调用qwen3-vl-flash）"/>
+                            <LineBreak/>
+                            <Run Text="• 回答关于图纸的问题（查询上下文）"/>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 输入区域 -->
+        <Border Grid.Row="2" Background="#2D2D30" Padding="15">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- 输入框 - 使用自定义AutoCADTextBox支持中文输入法 -->
+                <controls:AutoCADTextBox x:Name="InputTextBox" Grid.Row="0"
+                         MinHeight="60" MaxHeight="120"
+                         TextWrapping="Wrap" AcceptsReturn="True"
+                         VerticalScrollBarVisibility="Auto"
+                         Background="#1E1E1E" Foreground="White"
+                         BorderBrush="#3C3C3C" BorderThickness="1"
+                         Padding="10" FontSize="13"
+                         Focusable="True"
+                         FocusVisualStyle="{x:Null}"
+                         KeyDown="InputTextBox_KeyDown"
+                         TextChanged="InputTextBox_TextChanged"
+                         ToolTip="在此输入您的问题，Enter发送，Ctrl+Enter换行"/>
+
+                <!-- 按钮和状态 -->
+                <Grid Grid.Row="1" Margin="0,10,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 状态指示器 -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="StatusText" Text="就绪"
+                                   FontSize="12" Foreground="#999999"/>
+                        <TextBlock x:Name="DeepThinkingIndicator" Text=""
+                                   FontSize="12" Foreground="#0078D4" Margin="10,0,0,0"/>
+                    </StackPanel>
+
+                    <!-- 发送按钮 -->
+                    <Button x:Name="SendButton" Grid.Column="1"
+                            Content="发送 (Enter)" Width="140" Height="36"
+                            Background="#0078D4" Foreground="White" BorderThickness="0"
+                            FontWeight="Bold" FontSize="13"
+                            Click="SendButton_Click"
+                            IsEnabled="False">
+                        <Button.Style>
+                            <Style TargetType="Button">
+                                <Setter Property="Background" Value="#0078D4"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="Button">
+                                            <Border Background="{TemplateBinding Background}"
+                                                    CornerRadius="4"
+                                                    Padding="12,8">
+                                                <ContentPresenter HorizontalAlignment="Center"
+                                                                VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <!-- 鼠标悬停状态 -->
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#1084E4"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                    </Trigger>
+                                    <!-- 禁用状态 - 保持可见但显示为灰色 -->
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter Property="Background" Value="#3C3C3C"/>
+                                        <Setter Property="Foreground" Value="#808080"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- 会话管理Popup -->
+        <Popup x:Name="SessionPopup"
+               PlacementTarget="{Binding ElementName=SessionMenuButton}"
+               Placement="Bottom"
+               StaysOpen="False"
+               AllowsTransparency="True">
+            <Border Background="#2D2D30" BorderBrush="#555555" BorderThickness="1"
+                    CornerRadius="4" Padding="8" MinWidth="280" MaxHeight="400">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 标题和新建按钮 -->
+                    <Grid Grid.Row="0" Margin="0,0,0,8">
+                        <TextBlock Text="会话管理" FontSize="14" FontWeight="Bold"
+                                   Foreground="White" VerticalAlignment="Center"/>
+                        <Button x:Name="NewSessionButton" Content="+ 新建"
+                                Width="60" Height="24"
+                                HorizontalAlignment="Right"
+                                Background="#0078D4" Foreground="White"
+                                BorderThickness="0" FontSize="11"
+                                Click="NewSessionButton_Click"/>
+                    </Grid>
+
+                    <!-- 会话列表 -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                  MaxHeight="300">
+                        <ListBox x:Name="SessionListBox"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 SelectionChanged="SessionListBox_SelectionChanged">
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Background" Value="Transparent"/>
+                                    <Setter Property="Foreground" Value="#CCCCCC"/>
+                                    <Setter Property="Padding" Value="8,6"/>
+                                    <Setter Property="Margin" Value="0,2"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <Border Background="{TemplateBinding Background}"
+                                                        BorderBrush="#555555" BorderThickness="0,0,0,1"
+                                                        CornerRadius="4">
+                                                    <Grid Margin="{TemplateBinding Padding}">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <StackPanel Grid.Column="0">
+                                                            <TextBlock Text="{Binding Title}"
+                                                                       FontSize="12" FontWeight="SemiBold"
+                                                                       Foreground="White" TextTrimming="CharacterEllipsis"/>
+                                                            <TextBlock Text="{Binding LastUpdateTime, StringFormat='yyyy-MM-dd HH:mm'}"
+                                                                       FontSize="10" Foreground="#999999" Margin="0,2,0,0"/>
+                                                        </StackPanel>
+
+                                                        <Button Grid.Column="1" Content="🗑"
+                                                                Width="24" Height="24"
+                                                                Background="Transparent" Foreground="#999999"
+                                                                BorderThickness="0" FontSize="11"
+                                                                ToolTip="删除会话"
+                                                                Tag="{Binding Id}"
+                                                                Click="DeleteSessionButton_Click"/>
+                                                    </Grid>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#3C3C3C"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter Property="Background" Value="#0078D4"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
+                    </ScrollViewer>
+
+                    <!-- 底部操作 -->
+                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
+                        <TextBlock x:Name="SessionCountText" Text="共 0 个会话"
+                                   FontSize="10" Foreground="#999999"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Popup>
+    </Grid>
+</UserControl>

@@ -1,0 +1,267 @@
+<Window x:Class="BiaogPlugin.UI.HelpDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="帮助 - 标哥插件" Height="650" Width="750"
+        WindowStartupLocation="CenterScreen"
+        Topmost="True"
+        ResizeMode="CanResize"
+        Background="#1E1E1E">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 标题区域 -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,20">
+            <TextBlock Text="标哥插件帮助文档" FontSize="20" FontWeight="Bold"
+                       Foreground="White" HorizontalAlignment="Center"/>
+            <TextBlock Text="命令列表与使用说明" FontSize="12"
+                       Foreground="#CCCCCC" HorizontalAlignment="Center" Margin="0,5,0,0"/>
+        </StackPanel>
+
+        <!-- 内容区域 - TabControl -->
+        <TabControl Grid.Row="1" Background="#252526" BorderBrush="#3F3F46">
+            <!-- 翻译功能 -->
+            <TabItem Header="翻译功能">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="15">
+                        <TextBlock Text="翻译功能" FontSize="16" FontWeight="Bold"
+                                   Foreground="White" Margin="0,0,0,15"/>
+
+                        <Border Background="#2D2D30" Padding="10" Margin="0,5" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Text="BIAOGE_TRANSLATE_ZH" FontWeight="Bold" Foreground="#4EC9B0"/>
+                                <TextBlock Text="快速翻译为中文（推荐）" Foreground="#CCCCCC" Margin="0,3"/>
+                                <TextBlock Text="一键将图纸中的所有文本翻译为简体中文" Foreground="#888" FontSize="11" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#2D2D30" Padding="10" Margin="0,5" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Text="BIAOGE_TRANSLATE_EN" FontWeight="Bold" Foreground="#4EC9B0"/>
+                                <TextBlock Text="快速翻译为英语" Foreground="#CCCCCC" Margin="0,3"/>
+                                <TextBlock Text="一键将图纸中的所有文本翻译为英语" Foreground="#888" FontSize="11" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#2D2D30" Padding="10" Margin="0,5" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Text="BIAOGE_TRANSLATE" FontWeight="Bold" Foreground="#4EC9B0"/>
+                                <TextBlock Text="打开翻译面板" Foreground="#CCCCCC" Margin="0,3"/>
+                                <TextBlock Text="打开全功能翻译面板，可选择目标语言和翻译选项" Foreground="#888" FontSize="11" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#2D2D30" Padding="10" Margin="0,5" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Text="BIAOGE_TRANSLATE_SELECTED" FontWeight="Bold" Foreground="#4EC9B0"/>
+                                <TextBlock Text="框选翻译" Foreground="#CCCCCC" Margin="0,3"/>
+                                <TextBlock Text="选择特定区域的文本进行翻译" Foreground="#888" FontSize="11" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#2D2D30" Padding="10" Margin="0,5" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Text="BIAOGE_TRANSLATE_LAYER" FontWeight="Bold" Foreground="#4EC9B0"/>
+                                <TextBlock Text="按图层翻译" Foreground="#CCCCCC" Margin="0,3"/>
+                                <TextBlock Text="选择特定图层进行翻译" Foreground="#888" FontSize="11" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- AI助手 -->
+            <TabItem Header="AI助手">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="15">
+                        <TextBlock Text="AI助手" FontSize="16" FontWeight="Bold"
+                                   Foreground="White" Margin="0,0,0,15"/>
+
+                        <Border Background="#2D2D30" Padding="10" Margin="0,5" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Text="BIAOGE_AI" FontWeight="Bold" Foreground="#4EC9B0"/>
+                                <TextBlock Text="启动标哥AI助手" Foreground="#CCCCCC" Margin="0,3"/>
+                                <TextBlock Text="智能Agent架构，支持深度思考、流式输出、工具调用" Foreground="#888" FontSize="11" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                                <TextBlock Text="核心模型：qwen3-max-preview（思考模式融合）" Foreground="#888" FontSize="11" Margin="0,3,0,0"/>
+                                <TextBlock Text="可智能调用翻译、代码、视觉等专用模型" Foreground="#888" FontSize="11" Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- 算量功能 -->
+            <TabItem Header="算量功能">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="15">
+                        <TextBlock Text="工程算量" FontSize="16" FontWeight="Bold"
+                                   Foreground="White" Margin="0,0,0,15"/>
+
+                        <Border Background="#2D2D30" Padding="10" Margin="0,5" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Text="BIAOGE_CALCULATE" FontWeight="Bold" Foreground="#4EC9B0"/>
+                                <TextBlock Text="打开算量面板" Foreground="#CCCCCC" Margin="0,3"/>
+                                <TextBlock Text="智能识别图纸中的构件，自动计算工程量" Foreground="#888" FontSize="11" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#2D2D30" Padding="10" Margin="0,5" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Text="BIAOGE_QUICKCOUNT" FontWeight="Bold" Foreground="#4EC9B0"/>
+                                <TextBlock Text="快速统计构件数量" Foreground="#CCCCCC" Margin="0,3"/>
+                                <TextBlock Text="快速统计图纸中识别到的所有构件" Foreground="#888" FontSize="11" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#2D2D30" Padding="10" Margin="0,5" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Text="BIAOGE_EXPORTEXCEL" FontWeight="Bold" Foreground="#4EC9B0"/>
+                                <TextBlock Text="导出Excel清单" Foreground="#CCCCCC" Margin="0,3"/>
+                                <TextBlock Text="将算量结果导出为Excel工程量清单（包含汇总表、明细表、材料表）" Foreground="#888" FontSize="11" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- 设置与工具 -->
+            <TabItem Header="设置与工具">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="15">
+                        <TextBlock Text="设置与工具" FontSize="16" FontWeight="Bold"
+                                   Foreground="White" Margin="0,0,0,15"/>
+
+                        <Border Background="#2D2D30" Padding="10" Margin="0,5" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Text="BIAOGE_SETTINGS" FontWeight="Bold" Foreground="#4EC9B0"/>
+                                <TextBlock Text="打开设置对话框" Foreground="#CCCCCC" Margin="0,3"/>
+                                <TextBlock Text="配置API密钥、模型选择、缓存等选项" Foreground="#888" FontSize="11" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#2D2D30" Padding="10" Margin="0,5" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Text="BIAOGE_KEYS" FontWeight="Bold" Foreground="#4EC9B0"/>
+                                <TextBlock Text="显示快捷键配置指南" Foreground="#CCCCCC" Margin="0,3"/>
+                                <TextBlock Text="查看和配置AutoCAD快捷键" Foreground="#888" FontSize="11" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#2D2D30" Padding="10" Margin="0,5" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Text="BIAOGE_INSTALL_KEYS" FontWeight="Bold" Foreground="#4EC9B0"/>
+                                <TextBlock Text="自动安装快捷键" Foreground="#CCCCCC" Margin="0,3"/>
+                                <TextBlock Text="将插件命令添加到AutoCAD快捷键配置文件" Foreground="#888" FontSize="11" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#2D2D30" Padding="10" Margin="0,5" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Text="BIAOGE_CLEARCACHE" FontWeight="Bold" Foreground="#4EC9B0"/>
+                                <TextBlock Text="清除翻译缓存" Foreground="#CCCCCC" Margin="0,3"/>
+                                <TextBlock Text="清除SQLite缓存数据库" Foreground="#888" FontSize="11" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#2D2D30" Padding="10" Margin="0,5" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Text="BIAOGE_DIAGNOSTIC" FontWeight="Bold" Foreground="#4EC9B0"/>
+                                <TextBlock Text="运行系统诊断" Foreground="#CCCCCC" Margin="0,3"/>
+                                <TextBlock Text="检查系统状态、API连接、缓存性能等" Foreground="#888" FontSize="11" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#2D2D30" Padding="10" Margin="0,5" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Text="BIAOGE_HELP" FontWeight="Bold" Foreground="#4EC9B0"/>
+                                <TextBlock Text="显示此帮助信息" Foreground="#CCCCCC" Margin="0,3"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#2D2D30" Padding="10" Margin="0,5" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Text="BIAOGE_ABOUT" FontWeight="Bold" Foreground="#4EC9B0"/>
+                                <TextBlock Text="关于插件" Foreground="#CCCCCC" Margin="0,3"/>
+                                <TextBlock Text="显示插件版本和功能信息" Foreground="#888" FontSize="11" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- 快速入门 -->
+            <TabItem Header="快速入门">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="15">
+                        <TextBlock Text="快速入门指南" FontSize="16" FontWeight="Bold"
+                                   Foreground="White" Margin="0,0,0,15"/>
+
+                        <TextBlock Text="1. 首次配置" FontWeight="Bold" Foreground="#CCCCCC" Margin="0,10,0,5"/>
+                        <TextBlock Foreground="#888" Margin="10,0,0,0" TextWrapping="Wrap">
+                            • 运行 BIAOGE_SETTINGS 命令<LineBreak/>
+                            • 在"百炼API"选项卡中输入API密钥<LineBreak/>
+                            • 点击"测试连接"确认配置成功
+                        </TextBlock>
+
+                        <TextBlock Text="2. 翻译图纸" FontWeight="Bold" Foreground="#CCCCCC" Margin="0,15,0,5"/>
+                        <TextBlock Foreground="#888" Margin="10,0,0,0" TextWrapping="Wrap">
+                            • 运行 BIAOGE_TRANSLATE_ZH 一键翻译为中文<LineBreak/>
+                            • 或运行 BIAOGE_TRANSLATE 打开翻译面板选择语言
+                        </TextBlock>
+
+                        <TextBlock Text="3. 工程算量" FontWeight="Bold" Foreground="#CCCCCC" Margin="0,15,0,5"/>
+                        <TextBlock Foreground="#888" Margin="10,0,0,0" TextWrapping="Wrap">
+                            • 运行 BIAOGE_CALCULATE 打开算量面板<LineBreak/>
+                            • 点击"开始识别"自动识别构件<LineBreak/>
+                            • 点击"导出Excel"生成工程量清单
+                        </TextBlock>
+
+                        <TextBlock Text="4. 使用AI助手" FontWeight="Bold" Foreground="#CCCCCC" Margin="0,15,0,5"/>
+                        <TextBlock Foreground="#888" Margin="10,0,0,0" TextWrapping="Wrap">
+                            • 运行 BIAOGE_AI 打开AI助手面板<LineBreak/>
+                            • 在输入框中提问，例如："这个梁的尺寸是多少？"<LineBreak/>
+                            • AI会智能分析图纸并给出答案
+                        </TextBlock>
+
+                        <TextBlock Text="5. 快捷键配置" FontWeight="Bold" Foreground="#CCCCCC" Margin="0,15,0,5"/>
+                        <TextBlock Foreground="#888" Margin="10,0,0,0" TextWrapping="Wrap">
+                            • 运行 BIAOGE_INSTALL_KEYS 自动安装快捷键<LineBreak/>
+                            • 然后可以使用 BTZ（翻译中文）、BAI（AI助手）等快捷键
+                        </TextBlock>
+
+                        <TextBlock Text="常见问题" FontWeight="Bold" Foreground="#CCCCCC" Margin="0,20,0,10"/>
+                        <Border Background="#2D2D30" Padding="10" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Text="Q: 翻译失败怎么办？" Foreground="White" FontWeight="Bold"/>
+                                <TextBlock Text="A: 检查API密钥是否正确配置，运行 BIAOGE_DIAGNOSTIC 进行系统诊断"
+                                           Foreground="#888" Margin="0,5,0,10" TextWrapping="Wrap"/>
+
+                                <TextBlock Text="Q: 如何清除缓存？" Foreground="White" FontWeight="Bold"/>
+                                <TextBlock Text="A: 运行 BIAOGE_CLEARCACHE 命令清除翻译缓存"
+                                           Foreground="#888" Margin="0,5,0,10" TextWrapping="Wrap"/>
+
+                                <TextBlock Text="Q: 在哪里查看日志？" Foreground="White" FontWeight="Bold"/>
+                                <TextBlock Text="A: 日志文件位于 %APPDATA%\Biaoge\Logs\"
+                                           Foreground="#888" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <!-- 按钮区域 -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Content="在线文档" Width="100" Height="35" Margin="0,0,10,0"
+                    Click="OnlineDocsButton_Click"
+                    Background="#333333" Foreground="White" BorderThickness="1" BorderBrush="#555555"/>
+            <Button Content="关闭" Width="100" Height="35"
+                    Click="CloseButton_Click"
+                    Background="#0078D4" Foreground="White" BorderThickness="0"/>
+        </StackPanel>
+    </Grid>
+</Window>

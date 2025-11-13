@@ -77,12 +77,8 @@ namespace BiaogPlugin
                 catch { /* 忽略未注册的错误 */ }
                 Extensions.ContextMenuManager.RegisterContextMenus();
 
-                // 加载Ribbon工具栏（先卸载避免重复）
-                try
-                {
-                    UI.Ribbon.RibbonManager.UnloadRibbon();
-                }
-                catch { /* 忽略未加载的错误 */ }
+                // ✅ 加载Ribbon工具栏
+                // RibbonManager.LoadRibbon()内部已经处理了Idle延迟加载逻辑
                 UI.Ribbon.RibbonManager.LoadRibbon();
 
                 // 启用双击翻译功能（先禁用避免重复）

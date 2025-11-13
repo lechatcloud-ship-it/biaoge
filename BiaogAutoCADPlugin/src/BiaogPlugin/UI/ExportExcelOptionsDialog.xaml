@@ -1,0 +1,149 @@
+<Window x:Class="BiaogPlugin.UI.ExportExcelOptionsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="导出Excel选项 - 标哥插件" Height="500" Width="550"
+        WindowStartupLocation="CenterScreen"
+        Topmost="True"
+        ResizeMode="NoResize"
+        Background="#1E1E1E">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 标题区域 -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,20">
+            <TextBlock Text="导出Excel工程量清单" FontSize="18" FontWeight="Bold"
+                       Foreground="White"/>
+            <TextBlock Text="配置导出选项和格式" FontSize="12"
+                       Foreground="#CCCCCC" Margin="0,5,0,0"/>
+        </StackPanel>
+
+        <!-- 选项区域 -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- 保存位置 -->
+                <TextBlock Text="保存位置" FontSize="14" FontWeight="Bold"
+                           Foreground="White" Margin="0,0,0,10"/>
+                <Border Background="#252526" Padding="15" Margin="0,0,0,20" CornerRadius="3">
+                    <StackPanel>
+                        <RadioButton x:Name="SaveToDesktopRadio" Content="保存到桌面（推荐）"
+                                     GroupName="SaveLocation" IsChecked="True"
+                                     Foreground="White" Margin="0,5"/>
+                        <RadioButton x:Name="SaveToCustomRadio" Content="自定义路径"
+                                     GroupName="SaveLocation"
+                                     Foreground="White" Margin="0,5"/>
+
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox x:Name="CustomPathTextBox"
+                                     Grid.Column="0"
+                                     Height="32"
+                                     Padding="8"
+                                     Background="#1E1E1E"
+                                     Foreground="White"
+                                     BorderBrush="#3F3F46"
+                                     BorderThickness="1"
+                                     IsEnabled="{Binding IsChecked, ElementName=SaveToCustomRadio}"/>
+
+                            <Button Grid.Column="1"
+                                    Content="浏览..."
+                                    Width="80"
+                                    Height="32"
+                                    Margin="10,0,0,0"
+                                    Click="BrowseButton_Click"
+                                    IsEnabled="{Binding IsChecked, ElementName=SaveToCustomRadio}"
+                                    Background="#333333"
+                                    Foreground="White"
+                                    BorderThickness="1"
+                                    BorderBrush="#555555"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- 文件名 -->
+                <TextBlock Text="文件名" FontSize="14" FontWeight="Bold"
+                           Foreground="White" Margin="0,0,0,10"/>
+                <Border Background="#252526" Padding="15" Margin="0,0,0,20" CornerRadius="3">
+                    <StackPanel>
+                        <TextBox x:Name="FileNameTextBox"
+                                 Height="32"
+                                 Padding="8"
+                                 Background="#1E1E1E"
+                                 Foreground="White"
+                                 BorderBrush="#3F3F46"
+                                 BorderThickness="1"/>
+                        <TextBlock Text="不需要输入.xlsx扩展名"
+                                   FontSize="10"
+                                   Foreground="#888"
+                                   Margin="0,5,0,0"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 导出内容 -->
+                <TextBlock Text="导出内容" FontSize="14" FontWeight="Bold"
+                           Foreground="White" Margin="0,0,0,10"/>
+                <Border Background="#252526" Padding="15" Margin="0,0,0,20" CornerRadius="3">
+                    <StackPanel>
+                        <CheckBox x:Name="IncludeSummaryCheckBox"
+                                  Content="包含汇总表"
+                                  IsChecked="True"
+                                  Foreground="White"
+                                  Margin="0,5"/>
+                        <CheckBox x:Name="IncludeDetailCheckBox"
+                                  Content="包含明细表"
+                                  IsChecked="True"
+                                  Foreground="White"
+                                  Margin="0,5"/>
+                        <CheckBox x:Name="IncludeMaterialCheckBox"
+                                  Content="包含材料汇总表"
+                                  IsChecked="True"
+                                  Foreground="White"
+                                  Margin="0,5"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 完成后操作 -->
+                <TextBlock Text="完成后操作" FontSize="14" FontWeight="Bold"
+                           Foreground="White" Margin="0,0,0,10"/>
+                <Border Background="#252526" Padding="15" CornerRadius="3">
+                    <StackPanel>
+                        <RadioButton x:Name="OpenFileRadio"
+                                     Content="打开Excel文件"
+                                     GroupName="AfterExport"
+                                     IsChecked="True"
+                                     Foreground="White"
+                                     Margin="0,5"/>
+                        <RadioButton x:Name="OpenFolderRadio"
+                                     Content="打开文件所在文件夹"
+                                     GroupName="AfterExport"
+                                     Foreground="White"
+                                     Margin="0,5"/>
+                        <RadioButton x:Name="DoNothingRadio"
+                                     Content="什么都不做"
+                                     GroupName="AfterExport"
+                                     Foreground="White"
+                                     Margin="0,5"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 按钮区域 -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Content="导出" Width="100" Height="35" Margin="0,0,10,0"
+                    Click="ExportButton_Click"
+                    Background="#0078D4" Foreground="White" BorderThickness="0"/>
+            <Button Content="取消" Width="100" Height="35"
+                    Click="CancelButton_Click"
+                    Background="#333333" Foreground="White" BorderThickness="1" BorderBrush="#555555"/>
+        </StackPanel>
+    </Grid>
+</Window>

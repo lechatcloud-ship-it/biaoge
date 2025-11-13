@@ -732,10 +732,11 @@ public class BailianApiClient
             messages = messages.Select(m => new { role = m.Role, content = m.Content }).ToList(),
             tools = tools,
             stream = true,
+            // ✅ 阿里云官方推荐：incremental_output 必须是顶级参数，不能嵌套在 stream_options 中
+            incremental_output = true,  // 增量输出优化，每个chunk只包含新生成的内容
             stream_options = new
             {
-                include_usage = true,
-                incremental_output = true  // 阿里云官方推荐：增量输出优化
+                include_usage = true
             },
             temperature = temperature,
             top_p = topP,
