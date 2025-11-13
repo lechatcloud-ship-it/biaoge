@@ -11,91 +11,101 @@ namespace BiaogPlugin.UI
 {
     /// <summary>
     /// 流式Markdown渲染器
-    /// 专门用于AI助手的实时流式输出，支持逐块接收内容并实时渲染Markdown
+    /// ✅ 重大修复：AutoCAD PaletteSet中立即更新，不使用定时器
     ///
     /// 核心特性：
-    /// - 实时Markdown渲染（每150ms更新一次）
-    /// - 性能优化（Throttling机制避免过度渲染）
+    /// - 实时Markdown渲染（每个chunk立即更新）
+    /// - 性能优化（节流机制：最快每50ms更新一次）
     /// - 支持粗体、代码块、列表等常见Markdown语法
     /// </summary>
     public class StreamingMarkdownRenderer
     {
         private RichTextBox _richTextBox;
         private StringBuilder _content = new StringBuilder();
-        private DispatcherTimer _updateTimer;
-        private bool _isDirty = false;
         private DateTime _lastUpdate = DateTime.MinValue;
+        private int _pendingChunks = 0;
+        private readonly object _lock = new object();
 
-        // Throttling配置：最快每150ms更新一次
-        private const int UpdateIntervalMs = 150;
+        // ✅ 节流配置：最快每50ms更新一次（降低从150ms，提高响应速度）
+        private const int ThrottleMs = 50;
 
         public StreamingMarkdownRenderer(RichTextBox richTextBox)
         {
             _richTextBox = richTextBox;
-
-            // 初始化更新定时器
-            _updateTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(UpdateIntervalMs)
-            };
-            _updateTimer.Tick += OnUpdateTick;
+            Log.Debug("StreamingMarkdownRenderer已初始化");
         }
 
         /// <summary>
-        /// 追加流式内容块
+        /// ✅ 追加流式内容块 - 立即更新模式
         /// </summary>
         public void AppendChunk(string chunk)
         {
             if (string.IsNullOrEmpty(chunk))
                 return;
 
-            _content.Append(chunk);
-            _isDirty = true;
-
-            // 启动定时器（如果未运行）
-            if (!_updateTimer.IsEnabled)
+            lock (_lock)
             {
-                _updateTimer.Start();
+                _content.Append(chunk);
+                _pendingChunks++;
             }
 
-            // 如果距离上次更新超过阈值，立即更新
-            if ((DateTime.Now - _lastUpdate).TotalMilliseconds > UpdateIntervalMs * 2)
+            // ✅ 关键修复：立即同步更新，不使用定时器
+            // 在AutoCAD PaletteSet中，DispatcherTimer可能不可靠
+            // 使用Dispatcher.Invoke而不是BeginInvoke，确保立即执行
+            var timeSinceLastUpdate = (DateTime.Now - _lastUpdate).TotalMilliseconds;
+
+            if (timeSinceLastUpdate >= ThrottleMs || _pendingChunks == 1)
             {
-                ForceUpdate();
+                // ✅ 使用Invoke立即同步执行，确保流式效果
+                try
+                {
+                    _richTextBox.Dispatcher.Invoke(new Action(() =>
+                    {
+                        ForceUpdate();
+                    }), DispatcherPriority.Normal);  // 使用Normal优先级，平衡性能和响应
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "Dispatcher.Invoke失败");
+                }
             }
         }
 
         /// <summary>
-        /// 完成流式输出，强制更新
+        /// 完成流式输出，强制最终更新
         /// </summary>
         public void Complete()
         {
-            _updateTimer.Stop();
-            if (_isDirty)
+            lock (_lock)
             {
-                ForceUpdate();
+                if (_pendingChunks > 0 || _content.Length > 0)
+                {
+                    // ✅ 最终更新，确保所有内容都被渲染
+                    _richTextBox.Dispatcher.Invoke(new Action(() =>
+                    {
+                        ForceUpdate();
+                        Log.Debug($"流式输出完成，最终内容长度: {_content.Length}");
+                    }), DispatcherPriority.Send);
+                }
             }
         }
 
         /// <summary>
-        /// 定时器触发更新
-        /// </summary>
-        private void OnUpdateTick(object sender, EventArgs e)
-        {
-            if (_isDirty)
-            {
-                ForceUpdate();
-            }
-        }
-
-        /// <summary>
-        /// 强制更新Markdown渲染
+        /// ✅ 强制更新Markdown渲染 - 线程安全
         /// </summary>
         private void ForceUpdate()
         {
             try
             {
-                var markdownText = _content.ToString();
+                string markdownText;
+                lock (_lock)
+                {
+                    markdownText = _content.ToString();
+                    _pendingChunks = 0;
+                }
+
+                if (string.IsNullOrEmpty(markdownText))
+                    return;
 
                 // 渲染Markdown为FlowDocument
                 var document = MarkdownRenderer.RenderMarkdown(markdownText);
@@ -103,10 +113,12 @@ namespace BiaogPlugin.UI
                 // 更新RichTextBox
                 _richTextBox.Document = document;
 
-                _isDirty = false;
+                // ✅ 自动滚动到底部（显示最新内容）
+                _richTextBox.ScrollToEnd();
+
                 _lastUpdate = DateTime.Now;
 
-                Log.Verbose($"流式Markdown已更新，内容长度: {markdownText.Length}");
+                Log.Verbose($"[流式] 已更新 {markdownText.Length} 字符");
             }
             catch (Exception ex)
             {
@@ -119,9 +131,12 @@ namespace BiaogPlugin.UI
         /// </summary>
         public void Clear()
         {
-            _content.Clear();
-            _isDirty = false;
-            _updateTimer.Stop();
+            lock (_lock)
+            {
+                _content.Clear();
+                _pendingChunks = 0;
+            }
+            _lastUpdate = DateTime.MinValue;
         }
 
         /// <summary>

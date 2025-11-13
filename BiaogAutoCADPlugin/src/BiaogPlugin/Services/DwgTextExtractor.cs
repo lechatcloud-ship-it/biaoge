@@ -17,6 +17,7 @@ namespace BiaogPlugin.Services
     {
         /// <summary>
         /// 提取当前DWG中的所有文本实体
+        /// ✅ 基于AutoCAD官方文档和社区最佳实践优化
         /// </summary>
         /// <returns>文本实体列表</returns>
         public List<TextEntity> ExtractAllText()
@@ -38,26 +39,28 @@ namespace BiaogPlugin.Services
                 try
                 {
                     var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
-                    var btr = (BlockTableRecord)tr.GetObject(
+
+                    // ✅ 1. 提取模型空间中的文本
+                    var modelSpace = (BlockTableRecord)tr.GetObject(
                         bt[BlockTableRecord.ModelSpace],
                         OpenMode.ForRead);
+                    ExtractFromBlockTableRecord(modelSpace, tr, texts, "ModelSpace");
 
-                    // 遍历模型空间中的所有实体
-                    foreach (ObjectId objId in btr)
+                    // ✅ 2. 提取所有图纸空间（布局）中的文本
+                    // 很多CAD图纸的标注文本都在布局空间中
+                    var layoutDict = (DBDictionary)tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead);
+                    foreach (DBDictionaryEntry entry in layoutDict)
                     {
-                        var ent = tr.GetObject(objId, OpenMode.ForRead) as Entity;
-                        if (ent == null) continue;
+                        if (entry.Key == "Model") continue; // 跳过模型空间（已处理）
 
-                        // 提取不同类型的文本
-                        var textEntity = ExtractTextFromEntity(ent, objId);
-                        if (textEntity != null)
-                        {
-                            texts.Add(textEntity);
-                        }
+                        var layout = (Layout)tr.GetObject(entry.Value, OpenMode.ForRead);
+                        var layoutBtr = (BlockTableRecord)tr.GetObject(layout.BlockTableRecordId, OpenMode.ForRead);
+                        ExtractFromBlockTableRecord(layoutBtr, tr, texts, $"Layout:{entry.Key}");
                     }
 
-                    // 处理块参照中的属性
-                    ExtractBlockAttributes(btr, tr, texts);
+                    // ✅ 3. 提取所有块定义内部的文本（包括嵌套块）
+                    // 递归处理所有非布局的块定义
+                    ExtractFromAllBlockDefinitions(bt, tr, texts);
 
                     tr.Commit();
 
@@ -73,6 +76,40 @@ namespace BiaogPlugin.Services
             }
 
             return texts;
+        }
+
+        /// <summary>
+        /// ✅ 从指定的BlockTableRecord中提取所有文本（包括嵌套块中的文本）
+        /// </summary>
+        private void ExtractFromBlockTableRecord(
+            BlockTableRecord btr,
+            Transaction tr,
+            List<TextEntity> texts,
+            string spaceName)
+        {
+            foreach (ObjectId objId in btr)
+            {
+                var ent = tr.GetObject(objId, OpenMode.ForRead) as Entity;
+                if (ent == null) continue;
+
+                // 1. 直接的文本实体（DBText, MText）
+                var textEntity = ExtractTextFromEntity(ent, objId);
+                if (textEntity != null)
+                {
+                    textEntity.SpaceName = spaceName;
+                    texts.Add(textEntity);
+                }
+
+                // 2. 块参照中的属性和嵌套内容
+                if (ent is BlockReference blockRef)
+                {
+                    // 提取块参照的属性
+                    ExtractBlockReferenceAttributes(blockRef, tr, texts, spaceName);
+
+                    // ✅ 递归提取嵌套块内的文本
+                    ExtractFromNestedBlock(blockRef, tr, texts, spaceName);
+                }
+            }
         }
 
         /// <summary>
@@ -103,7 +140,7 @@ namespace BiaogPlugin.Services
                 {
                     Id = objId,
                     Type = TextEntityType.MText,
-                    Content = mText.Contents ?? string.Empty,  // 纯文本，无格式
+                    Content = mText.Text ?? string.Empty,  // ✅ 使用Text而不是Contents，避免格式代码
                     Position = mText.Location,
                     Layer = mText.Layer,
                     Height = mText.TextHeight,
@@ -134,44 +171,254 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
-        /// 提取块参照中的属性
+        /// ✅ 提取块参照的属性
         /// </summary>
-        private void ExtractBlockAttributes(BlockTableRecord btr, Transaction tr, List<TextEntity> texts)
+        private void ExtractBlockReferenceAttributes(
+            BlockReference blockRef,
+            Transaction tr,
+            List<TextEntity> texts,
+            string spaceName)
         {
-            foreach (ObjectId objId in btr)
-            {
-                var ent = tr.GetObject(objId, OpenMode.ForRead) as Entity;
-                if (ent is BlockReference blockRef)
-                {
-                    var attCol = blockRef.AttributeCollection;
-                    if (attCol == null || attCol.Count == 0) continue;
+            var attCol = blockRef.AttributeCollection;
+            if (attCol == null || attCol.Count == 0) return;
 
-                    foreach (ObjectId attId in attCol)
+            foreach (ObjectId attId in attCol)
+            {
+                try
+                {
+                    var attRef = (AttributeReference)tr.GetObject(attId, OpenMode.ForRead);
+
+                    // ✅ 跳过不可见的属性
+                    if (attRef.Invisible) continue;
+
+                    texts.Add(new TextEntity
                     {
-                        try
+                        Id = attId,
+                        Type = TextEntityType.AttributeReference,
+                        Content = attRef.TextString ?? string.Empty,
+                        Position = attRef.Position,
+                        Layer = attRef.Layer,
+                        Height = attRef.Height,
+                        Rotation = attRef.Rotation,
+                        ColorIndex = (short)attRef.ColorIndex,
+                        Tag = attRef.Tag,
+                        BlockName = blockRef.Name,
+                        SpaceName = spaceName
+                    });
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Warning(ex, $"提取块属性失败: {attId}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// ✅ 递归提取嵌套块内的文本（修复版）
+        ///
+        /// 关键修复：
+        /// 1. 也提取AttributeDefinition - 确保块定义中的属性定义被提取
+        /// 2. 递归处理所有嵌套块 - 多层嵌套也能完整提取
+        /// </summary>
+        private void ExtractFromNestedBlock(
+            BlockReference blockRef,
+            Transaction tr,
+            List<TextEntity> texts,
+            string parentSpace)
+        {
+            try
+            {
+                // 获取块定义
+                var blockDef = (BlockTableRecord)tr.GetObject(blockRef.BlockTableRecord, OpenMode.ForRead);
+
+                // 遍历块定义中的所有实体
+                foreach (ObjectId entityId in blockDef)
+                {
+                    var ent = tr.GetObject(entityId, OpenMode.ForRead) as Entity;
+                    if (ent == null) continue;
+
+                    // 1. 提取块内的直接文本（DBText, MText）
+                    if (ent is DBText dbText)
+                    {
+                        texts.Add(new TextEntity
                         {
-                            var attRef = (AttributeReference)tr.GetObject(attId, OpenMode.ForRead);
-                            texts.Add(new TextEntity
-                            {
-                                Id = attId,
-                                Type = TextEntityType.AttributeReference,
-                                Content = attRef.TextString ?? string.Empty,
-                                Position = attRef.Position,
-                                Layer = attRef.Layer,
-                                Height = attRef.Height,
-                                Rotation = attRef.Rotation,
-                                ColorIndex = (short)attRef.ColorIndex,
-                                Tag = attRef.Tag,
-                                BlockName = blockRef.Name
-                            });
-                        }
-                        catch (System.Exception ex)
+                            Id = entityId,
+                            Type = TextEntityType.DBText,
+                            Content = dbText.TextString ?? string.Empty,
+                            Position = dbText.Position,
+                            Layer = dbText.Layer,
+                            Height = dbText.Height,
+                            Rotation = dbText.Rotation,
+                            ColorIndex = (short)dbText.ColorIndex,
+                            BlockName = blockDef.Name,
+                            SpaceName = parentSpace
+                        });
+                    }
+                    else if (ent is MText mText)
+                    {
+                        texts.Add(new TextEntity
                         {
-                            Log.Warning(ex, $"提取块属性失败: {attId}");
-                        }
+                            Id = entityId,
+                            Type = TextEntityType.MText,
+                            Content = mText.Text ?? string.Empty,  // ✅ 使用Text获取纯文本
+                            Position = mText.Location,
+                            Layer = mText.Layer,
+                            Height = mText.TextHeight,
+                            Rotation = mText.Rotation,
+                            ColorIndex = (short)mText.ColorIndex,
+                            Width = mText.Width,
+                            BlockName = blockDef.Name,
+                            SpaceName = parentSpace
+                        });
+                    }
+                    // ✅ 关键修复：提取AttributeDefinition（块属性定义）
+                    else if (ent is AttributeDefinition attDef)
+                    {
+                        // 跳过不可见的属性定义
+                        if (attDef.Invisible) continue;
+
+                        texts.Add(new TextEntity
+                        {
+                            Id = entityId,
+                            Type = TextEntityType.AttributeDefinition,
+                            Content = attDef.TextString ?? string.Empty,
+                            Position = attDef.Position,
+                            Layer = attDef.Layer,
+                            Height = attDef.Height,
+                            Rotation = attDef.Rotation,
+                            ColorIndex = (short)attDef.ColorIndex,
+                            Tag = attDef.Tag,
+                            BlockName = blockDef.Name,
+                            SpaceName = parentSpace
+                        });
+                    }
+                    // 2. ✅ 递归处理嵌套的BlockReference
+                    else if (ent is BlockReference nestedBlockRef)
+                    {
+                        // 提取嵌套块的属性
+                        ExtractBlockReferenceAttributes(nestedBlockRef, tr, texts, parentSpace);
+
+                        // 递归提取更深层的嵌套块
+                        ExtractFromNestedBlock(nestedBlockRef, tr, texts, parentSpace);
                     }
                 }
             }
+            catch (System.Exception ex)
+            {
+                Log.Warning(ex, $"提取嵌套块文本失败: {blockRef.Name}");
+            }
+        }
+
+        /// <summary>
+        /// ✅ 提取所有块定义内部的文本（修复版）
+        ///
+        /// 关键修复：
+        /// 1. 不再跳过匿名块 - 动态块、标注块等会创建匿名块变体，这些块中可能包含文本
+        /// 2. 提取AttributeDefinition - 块定义中的属性定义也是文本
+        /// 3. 递归提取嵌套块 - 确保块定义中的嵌套块也被处理
+        /// </summary>
+        private void ExtractFromAllBlockDefinitions(BlockTable bt, Transaction tr, List<TextEntity> texts)
+        {
+            var processedBlocks = new HashSet<ObjectId>();
+
+            foreach (ObjectId btrId in bt)
+            {
+                var blockDef = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
+
+                // 只跳过模型空间和图纸空间（已在ExtractFromBlockTableRecord中处理）
+                if (blockDef.IsLayout)
+                    continue;
+
+                // ✅ 关键修复：不再跳过匿名块！
+                // 动态块、标注块等会创建匿名块变体，必须提取这些块中的文本
+                // if (blockDef.IsAnonymous)
+                //     continue;
+
+                // 防止重复处理
+                if (!processedBlocks.Add(btrId))
+                    continue;
+
+                // 遍历块定义中的实体
+                foreach (ObjectId entityId in blockDef)
+                {
+                    try
+                    {
+                        var ent = tr.GetObject(entityId, OpenMode.ForRead) as Entity;
+                        if (ent == null) continue;
+
+                        // ✅ 提取所有类型的文本（DBText, MText, AttributeDefinition）
+                        if (ent is DBText dbText)
+                        {
+                            texts.Add(new TextEntity
+                            {
+                                Id = entityId,
+                                Type = TextEntityType.DBText,
+                                Content = dbText.TextString ?? string.Empty,
+                                Position = dbText.Position,
+                                Layer = dbText.Layer,
+                                Height = dbText.Height,
+                                Rotation = dbText.Rotation,
+                                ColorIndex = (short)dbText.ColorIndex,
+                                BlockName = blockDef.Name,
+                                SpaceName = "BlockDefinition"
+                            });
+                        }
+                        else if (ent is MText mText)
+                        {
+                            texts.Add(new TextEntity
+                            {
+                                Id = entityId,
+                                Type = TextEntityType.MText,
+                                Content = mText.Text ?? string.Empty,
+                                Position = mText.Location,
+                                Layer = mText.Layer,
+                                Height = mText.TextHeight,
+                                Rotation = mText.Rotation,
+                                ColorIndex = (short)mText.ColorIndex,
+                                Width = mText.Width,
+                                BlockName = blockDef.Name,
+                                SpaceName = "BlockDefinition"
+                            });
+                        }
+                        // ✅ 关键修复：提取AttributeDefinition（块属性定义）
+                        else if (ent is AttributeDefinition attDef)
+                        {
+                            // 跳过不可见的属性定义
+                            if (attDef.Invisible) continue;
+
+                            texts.Add(new TextEntity
+                            {
+                                Id = entityId,
+                                Type = TextEntityType.AttributeDefinition,
+                                Content = attDef.TextString ?? string.Empty,
+                                Position = attDef.Position,
+                                Layer = attDef.Layer,
+                                Height = attDef.Height,
+                                Rotation = attDef.Rotation,
+                                ColorIndex = (short)attDef.ColorIndex,
+                                Tag = attDef.Tag,
+                                BlockName = blockDef.Name,
+                                SpaceName = "BlockDefinition"
+                            });
+                        }
+                        // ✅ 关键修复：递归提取块定义中的嵌套块
+                        else if (ent is BlockReference nestedBlockRef)
+                        {
+                            // 提取嵌套块的属性
+                            ExtractBlockReferenceAttributes(nestedBlockRef, tr, texts, "BlockDefinition");
+
+                            // 递归提取更深层的嵌套块
+                            ExtractFromNestedBlock(nestedBlockRef, tr, texts, "BlockDefinition");
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Log.Warning(ex, $"提取块定义文本失败: {entityId}");
+                    }
+                }
+            }
+
+            Log.Debug($"从块定义中提取了文本，共处理 {processedBlocks.Count} 个块定义");
         }
 
         /// <summary>

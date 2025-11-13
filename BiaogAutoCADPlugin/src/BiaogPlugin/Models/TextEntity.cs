@@ -67,6 +67,12 @@ namespace BiaogPlugin.Models
         public string? BlockName { get; set; }
 
         /// <summary>
+        /// ✅ 所属空间名称（ModelSpace, Layout:xxx, BlockDefinition）
+        /// 用于区分文本来自哪个空间
+        /// </summary>
+        public string? SpaceName { get; set; }
+
+        /// <summary>
         /// 文本样式名称
         /// </summary>
         public string? TextStyle { get; set; }

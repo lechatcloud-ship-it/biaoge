@@ -201,11 +201,17 @@ namespace BiaogPlugin.Services
                     Percentage = 90
                 });
 
+                Log.Information($"准备更新{updateRequests.Count}个文本实体到DWG");
+                ed.WriteMessage($"\n准备更新{updateRequests.Count}个文本实体...");
+
                 var updateResult = _updater.UpdateTexts(updateRequests);
                 statistics.SuccessCount = updateResult.SuccessCount;
                 statistics.FailureCount = updateResult.FailCount;
 
                 Log.Information($"更新结果: {updateResult}");
+                ed.WriteMessage($"\n✓ 成功更新: {updateResult.SuccessCount}");
+                ed.WriteMessage($"\n✗ 失败: {updateResult.FailCount}");
+                ed.WriteMessage($"\n○ 跳过: {updateResult.SkippedCount}");
 
                 // 记录翻译历史
                 if (_configManager != null && _configManager.Config.Translation.EnableHistory)

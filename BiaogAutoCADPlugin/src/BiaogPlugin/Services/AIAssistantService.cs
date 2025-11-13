@@ -50,10 +50,15 @@ namespace BiaogPlugin.Services
         /// <summary>
         /// Agent对话 - 智能分析和执行任务
         /// </summary>
+        /// <param name="userMessage">用户消息</param>
+        /// <param name="useDeepThinking">是否启用深度思考</param>
+        /// <param name="onContentChunk">正文内容流式回调</param>
+        /// <param name="onReasoningChunk">深度思考内容流式回调</param>
         public async Task<AssistantResponse> ChatStreamAsync(
             string userMessage,
             bool useDeepThinking = false,
-            Action<string>? onStreamChunk = null)
+            Action<string>? onContentChunk = null,
+            Action<string>? onReasoningChunk = null)
         {
             try
             {
@@ -89,13 +94,15 @@ namespace BiaogPlugin.Services
                 // ✅ 移除状态消息，直接开始流式输出AI回复
                 Log.Information("开始Agent决策...");
 
+                // ✅ 关键修复：正确分离思考内容和正文内容的回调
+                // 不再将reasoning包裹后发送到同一个回调，而是直接传递两个独立的回调
                 var agentDecision = await _bailianClient.ChatCompletionStreamAsync(
                     messages: messages,
                     model: AgentModel,
                     tools: tools,
-                    onStreamChunk: chunk => onStreamChunk?.Invoke(chunk),
+                    onStreamChunk: chunk => onContentChunk?.Invoke(chunk),  // ✅ 正文回调
                     onReasoningChunk: useDeepThinking
-                        ? reasoning => onStreamChunk?.Invoke($"\n[深度思考] {reasoning}\n")
+                        ? reasoning => onReasoningChunk?.Invoke(reasoning)  // ✅ 思考回调（不添加前缀）
                         : null,
                     temperature: 0.7,
                     topP: 0.9,
@@ -113,14 +120,14 @@ namespace BiaogPlugin.Services
                 // ===== 第4步：工具执行 =====
                 if (agentDecision.ToolCalls.Count > 0)
                 {
-                    onStreamChunk?.Invoke($"\n[标哥AI助手] 需要调用{agentDecision.ToolCalls.Count}个工具执行任务\n");
+                    onContentChunk?.Invoke($"\n[标哥AI助手] 需要调用{agentDecision.ToolCalls.Count}个工具执行任务\n");
 
                     foreach (var toolCall in agentDecision.ToolCalls)
                     {
                         Log.Information($"执行工具: {toolCall.Name}");
-                        onStreamChunk?.Invoke($"\n[工具调用] {toolCall.Name}\n");
+                        onContentChunk?.Invoke($"\n[工具调用] {toolCall.Name}\n");
 
-                        string toolResult = await ExecuteTool(toolCall, onStreamChunk);
+                        string toolResult = await ExecuteTool(toolCall, onContentChunk);
 
                         // 添加工具结果到历史（官方推荐格式）
                         _chatHistory.Add(new BiaogPlugin.Services.ChatMessage
@@ -132,13 +139,13 @@ namespace BiaogPlugin.Services
                     }
 
                     // ===== 第5步：总结反馈 =====
-                    onStreamChunk?.Invoke($"\n[标哥AI助手] 正在总结执行结果...\n");
+                    onContentChunk?.Invoke($"\n[标哥AI助手] 正在总结执行结果...\n");
 
                     var summaryMessages = BuildMessages(systemPrompt);
                     var summary = await _bailianClient.ChatCompletionStreamAsync(
                         messages: summaryMessages,
                         model: AgentModel,
-                        onStreamChunk: chunk => onStreamChunk?.Invoke(chunk)
+                        onStreamChunk: chunk => onContentChunk?.Invoke(chunk)
                     );
 
                     _chatHistory.Add(new BiaogPlugin.Services.ChatMessage

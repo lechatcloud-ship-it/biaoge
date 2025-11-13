@@ -1,7 +1,10 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Threading;
 using Serilog;
 
 namespace BiaogPlugin.UI.Controls
@@ -9,12 +12,19 @@ namespace BiaogPlugin.UI.Controls
     /// <summary>
     /// 自定义TextBox，解决在AutoCAD PaletteSet中中文输入法焦点跳转问题
     ///
+    /// ✅ 重大修复 (2025-01-14)：
+    /// 1. 增强焦点保持 - 监听PreviewTextInput/TextInput强制保持焦点
+    /// 2. IME激活时锁定焦点 - 防止跳转到AutoCAD命令行
+    /// 3. 强化Windows消息钩子
+    ///
     /// 问题原因：
     /// WPF控件在AutoCAD的PaletteSet中通过ElementHost托管时，
-    /// 需要处理Windows消息循环才能正确处理键盘输入和IME（Input Method Editor）
+    /// 输入中文IME激活时焦点会被AutoCAD命令行抢走
     ///
     /// 解决方案：
-    /// Hook HwndSource并处理WM_GETDLGCODE消息，告诉系统此控件需要接收字符输入
+    /// 1. Hook HwndSource并处理WM_GETDLGCODE消息
+    /// 2. 监听所有文本输入事件并强制保持焦点
+    /// 3. PreviewLostKeyboardFocus中取消焦点丢失
     ///
     /// 参考：
     /// https://stackoverflow.com/questions/835878/wpf-textbox-not-accepting-input-when-in-elementhost-in-window-forms
@@ -24,7 +34,9 @@ namespace BiaogPlugin.UI.Controls
     {
         // Windows消息常量
         private const int WM_GETDLGCODE = 0x0087;
-        private const int WM_CHAR = 0x0102;  // ✅ 字符消息（用于防止重复输入）
+        private const int WM_CHAR = 0x0102;
+        private const int WM_IME_SETCONTEXT = 0x0281;  // ✅ IME上下文切换
+        private const int WM_IME_NOTIFY = 0x0282;       // ✅ IME通知消息
 
         // 对话框代码标志
         private const int DLGC_WANTCHARS = 0x0080;   // 接收字符输入（包括中文IME）
@@ -34,12 +46,112 @@ namespace BiaogPlugin.UI.Controls
         private const int DLGC_WANTALLKEYS = 0x0004; // 接收所有键盘输入
 
         private bool _hookInstalled = false;
+        private bool _isComposing = false;  // ✅ 标记是否正在输入法组字中
 
         public AutoCADTextBox() : base()
         {
             // 当控件加载完成时，安装Windows消息钩子
             Loaded += OnLoaded;
             Unloaded += OnUnloaded;
+
+            // ✅ 新增：监听所有文本输入事件，强制保持焦点
+            PreviewTextInput += OnPreviewTextInput;
+            TextInput += OnTextInput;
+            PreviewKeyDown += OnPreviewKeyDown;
+
+            // ✅ 新增：防止焦点丢失
+            PreviewLostKeyboardFocus += OnPreviewLostKeyboardFocus;
+
+            Log.Debug("AutoCADTextBox已创建，焦点保持增强模式已启用");
+        }
+
+        /// <summary>
+        /// ✅ 文本输入前事件 - 强制保持焦点
+        /// </summary>
+        private void OnPreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            _isComposing = true;
+            EnsureFocus();
+        }
+
+        /// <summary>
+        /// ✅ 文本输入事件 - 再次确保焦点
+        /// </summary>
+        private void OnTextInput(object sender, TextCompositionEventArgs e)
+        {
+            EnsureFocus();
+            _isComposing = false;
+        }
+
+        /// <summary>
+        /// ✅ 键盘按下前 - 确保焦点
+        /// </summary>
+        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            EnsureFocus();
+        }
+
+        /// <summary>
+        /// ✅ 关键修复：防止焦点丢失到AutoCAD命令行
+        /// </summary>
+        private void OnPreviewLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            // 如果正在输入法组字中，取消焦点丢失
+            if (_isComposing)
+            {
+                Log.Debug("输入法组字中，取消焦点丢失");
+                e.Handled = true;  // ✅ 阻止焦点丢失
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    Focus();
+                    Keyboard.Focus(this);
+                }), DispatcherPriority.Input);
+                return;
+            }
+
+            // 如果文本框有内容且新焦点不是在本窗口内，也取消焦点丢失
+            if (e.NewFocus == null || !IsAncestorOf((DependencyObject)e.NewFocus))
+            {
+                Log.Debug($"焦点试图跳走到外部，尝试保持焦点 (NewFocus: {e.NewFocus?.GetType().Name ?? "null"})");
+                // ✅ 不完全取消，但延迟抢回焦点
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (!IsFocused && IsVisible && IsEnabled)
+                    {
+                        Focus();
+                        Keyboard.Focus(this);
+                        Log.Debug("已重新获取焦点");
+                    }
+                }), DispatcherPriority.Input);
+            }
+        }
+
+        /// <summary>
+        /// ✅ 辅助方法：确保焦点在TextBox上
+        /// </summary>
+        private void EnsureFocus()
+        {
+            if (!IsFocused)
+            {
+                Focus();
+                Keyboard.Focus(this);
+                Log.Verbose("EnsureFocus: 已重新获取焦点");
+            }
+        }
+
+        /// <summary>
+        /// ✅ 辅助方法：检查目标是否是本控件的子元素
+        /// </summary>
+        private bool IsAncestorOf(DependencyObject child)
+        {
+            var parent = child;
+            while (parent != null)
+            {
+                if (parent == this)
+                    return true;
+                parent = LogicalTreeHelper.GetParent(parent) ?? VisualTreeHelper.GetParent(parent);
+            }
+            return false;
         }
 
         /// <summary>

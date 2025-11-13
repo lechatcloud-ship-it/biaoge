@@ -167,6 +167,29 @@ public class BailianApiClient
     }
 
     /// <summary>
+    /// 清理翻译文本中的特殊标识符
+    /// 阿里云百炼模型可能返回 <|endofcontent|> 等特殊token，需要过滤
+    /// </summary>
+    private string CleanTranslationText(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return text;
+        }
+
+        // 移除常见的特殊标识符
+        var cleanedText = text
+            .Replace("<|endofcontent|>", "")
+            .Replace("<|im_end|>", "")
+            .Replace("<|im_start|>", "")
+            .Replace("<|end|>", "")
+            .Replace("<|start|>", "")
+            .Trim();
+
+        return cleanedText;
+    }
+
+    /// <summary>
     /// 转换语言代码为英文全称
     /// 例如: "zh" -> "Chinese", "en" -> "English"
     /// </summary>
@@ -404,7 +427,12 @@ public class BailianApiClient
                 await semaphore.WaitAsync(cancellationToken);
                 try
                 {
-                    // OpenAI 兼容模式请求格式
+                    // ✅ 修复：translation_options应该在根级别，不是extra_body
+                    // 参考curl示例：https://help.aliyun.com/zh/model-studio/machine-translation
+                    //
+                    // ✅ 工程建筑专业翻译增强：
+                    // 1. domains - 领域提示词（告诉模型这是工程图纸，使用专业术语）
+                    // 2. terms - 专业术语对照（确保术语翻译准确）
                     var requestBody = new
                     {
                         model = model,
@@ -416,15 +444,17 @@ public class BailianApiClient
                                 content = text
                             }
                         },
-                        extra_body = new
+                        translation_options = new  // ✅ 根级别，不是extra_body
                         {
-                            translation_options = new
-                            {
-                                source_lang = sourceLang,
-                                target_lang = targetLang
-                            }
+                            source_lang = sourceLang,
+                            target_lang = targetLang,
+                            domains = EngineeringTranslationConfig.DomainPrompt,  // ✅ 工程建筑领域提示
+                            terms = EngineeringTranslationConfig.GetApiTerms(sourceLang, targetLang)  // ✅ 专业术语
                         }
                     };
+
+                    // ✅ 调试日志：记录API调用参数
+                    Log.Debug($"[翻译API] 索引{index}: 模型={model}, 源语言={sourceLang}, 目标语言={targetLang}, 原文={text.Substring(0, Math.Min(50, text.Length))}");
 
                     var apiKey = GetApiKey();
                     var httpRequest = new HttpRequestMessage(HttpMethod.Post, ChatCompletionEndpoint)
@@ -452,6 +482,12 @@ public class BailianApiClient
                                 if (message.TryGetProperty("content", out var content))
                                 {
                                     var translatedText = content.GetString() ?? text;
+
+                                    // ✅ 清理特殊标识符（如 <|endofcontent|>）
+                                    translatedText = CleanTranslationText(translatedText);
+
+                                    // ✅ 调试日志：记录翻译结果
+                                    Log.Debug($"[翻译结果] 索引{index}: 原文={text.Substring(0, Math.Min(30, text.Length))} → 译文={translatedText.Substring(0, Math.Min(30, translatedText.Length))}");
 
                                     // 记录Token使用量
                                     if (root.TryGetProperty("usage", out var usage))
@@ -515,6 +551,10 @@ public class BailianApiClient
 
     /// <summary>
     /// 单文本翻译 - 使用 OpenAI 兼容模式（2025官方推荐）
+    ///
+    /// ✅ 智能分段处理：
+    /// - qwen-mt-flash模型限制：最大输入8192 tokens，最大输出8192 tokens
+    /// - 超过4000字符时自动分段翻译，确保质量
     /// </summary>
     public async Task<string> TranslateAsync(
         string text,
@@ -534,13 +574,23 @@ public class BailianApiClient
 
         Log.Debug($"翻译使用模型: {model}");
 
+        // ✅ 检查文本长度，如果超过限制则分段翻译
+        if (text.Length > EngineeringTranslationConfig.MaxCharsPerBatch)
+        {
+            Log.Information($"文本过长({text.Length}字符)，启用分段翻译（每段{EngineeringTranslationConfig.MaxCharsPerBatch}字符）");
+            return await TranslateWithSegmentationAsync(text, targetLanguage, model, sourceLanguage, cancellationToken);
+        }
+
         try
         {
             // 转换语言代码为英文全称
             var sourceLang = string.IsNullOrEmpty(sourceLanguage) ? "auto" : ConvertLanguageCode(sourceLanguage);
             var targetLang = ConvertLanguageCode(targetLanguage);
 
-            // OpenAI 兼容模式请求格式
+            // ✅ 修复：translation_options应该在根级别，不是extra_body
+            // 参考curl示例：https://help.aliyun.com/zh/model-studio/machine-translation
+            //
+            // ✅ 工程建筑专业翻译增强：添加domains和terms
             var requestBody = new
             {
                 model = model,
@@ -552,13 +602,12 @@ public class BailianApiClient
                         content = text
                     }
                 },
-                extra_body = new
+                translation_options = new  // ✅ 根级别，不是extra_body
                 {
-                    translation_options = new
-                    {
-                        source_lang = sourceLang,
-                        target_lang = targetLang
-                    }
+                    source_lang = sourceLang,
+                    target_lang = targetLang,
+                    domains = EngineeringTranslationConfig.DomainPrompt,  // ✅ 工程建筑领域提示
+                    terms = EngineeringTranslationConfig.GetApiTerms(sourceLang, targetLang)  // ✅ 专业术语
                 }
             };
 
@@ -594,6 +643,9 @@ public class BailianApiClient
                         {
                             var translatedText = content.GetString() ?? text;
 
+                            // ✅ 清理特殊标识符（如 <|endofcontent|>）
+                            translatedText = CleanTranslationText(translatedText);
+
                             // 记录Token使用量
                             if (root.TryGetProperty("usage", out var usage))
                             {
@@ -622,6 +674,86 @@ public class BailianApiClient
         {
             Log.Error(ex, "翻译异常: {Text}", text.Substring(0, Math.Min(50, text.Length)));
             return text;
+        }
+    }
+
+    /// <summary>
+    /// ✅ 分段翻译长文本
+    ///
+    /// 用于处理超过qwen-mt-flash模型8192 token限制的长文本
+    /// 按语义单位（换行符）分段，确保上下文连贯性
+    /// </summary>
+    private async Task<string> TranslateWithSegmentationAsync(
+        string text,
+        string targetLanguage,
+        string? model = null,
+        string? sourceLanguage = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // ✅ 按换行符分段（保持语义完整性）
+            var lines = text.Split(new[] { '\n', '\r' }, StringSplitOptions.None);
+            var segments = new List<string>();
+            var currentSegment = new System.Text.StringBuilder();
+
+            foreach (var line in lines)
+            {
+                // 如果加上当前行会超过限制，则保存当前段，开始新段
+                if (currentSegment.Length + line.Length + 1 > EngineeringTranslationConfig.MaxCharsPerBatch && currentSegment.Length > 0)
+                {
+                    segments.Add(currentSegment.ToString());
+                    currentSegment.Clear();
+                }
+
+                if (currentSegment.Length > 0)
+                {
+                    currentSegment.AppendLine();
+                }
+                currentSegment.Append(line);
+            }
+
+            // 添加最后一段
+            if (currentSegment.Length > 0)
+            {
+                segments.Add(currentSegment.ToString());
+            }
+
+            Log.Information($"文本已分段：总计{segments.Count}段");
+
+            // ✅ 逐段翻译
+            var translatedSegments = new List<string>();
+            for (int i = 0; i < segments.Count; i++)
+            {
+                Log.Debug($"翻译第{i + 1}/{segments.Count}段 (长度:{segments[i].Length}字符)");
+
+                var translated = await TranslateAsync(
+                    segments[i],
+                    targetLanguage,
+                    model,
+                    sourceLanguage,
+                    cancellationToken
+                );
+
+                translatedSegments.Add(translated);
+
+                // ✅ 避免触发API限流，段间延迟100ms
+                if (i < segments.Count - 1)
+                {
+                    await Task.Delay(100, cancellationToken);
+                }
+            }
+
+            // ✅ 合并翻译结果
+            var result = string.Join("\n", translatedSegments);
+            Log.Information($"分段翻译完成：{segments.Count}段 → {result.Length}字符");
+
+            return result;
+        }
+        catch (System.Exception ex)
+        {
+            Log.Error(ex, "分段翻译失败");
+            return text;  // 失败时返回原文
         }
     }
 
@@ -762,6 +894,13 @@ public class BailianApiClient
             httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
         }
 
+        // ✅ 关键修复：捕获调用线程的SynchronizationContext（AutoCAD主线程）
+        // 这样后台线程的SSE回调可以Marshal回主线程，避免线程安全问题
+        var syncContext = System.Threading.SynchronizationContext.Current;
+        bool hasContext = syncContext != null;
+
+        Log.Debug($"流式API调用 - SynchronizationContext: {(hasContext ? syncContext.GetType().Name : "null")}");
+
         var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         response.EnsureSuccessStatusCode();
 
@@ -802,7 +941,22 @@ public class BailianApiClient
                             if (!string.IsNullOrEmpty(text))
                             {
                                 fullResponse.Append(text);
-                                onStreamChunk?.Invoke(text);
+
+                                // ✅ 关键修复：使用SynchronizationContext.Post将回调Marshal回主线程
+                                // 避免在后台线程调用AutoCAD API或WPF UI
+                                if (onStreamChunk != null)
+                                {
+                                    if (syncContext != null)
+                                    {
+                                        // Post是异步非阻塞的，避免死锁
+                                        syncContext.Post(_ => onStreamChunk(text), null);
+                                    }
+                                    else
+                                    {
+                                        // 降级：直接调用（可能在后台线程，有风险）
+                                        onStreamChunk(text);
+                                    }
+                                }
                             }
                         }
 
@@ -813,7 +967,19 @@ public class BailianApiClient
                             if (!string.IsNullOrEmpty(thinkingText))
                             {
                                 fullReasoning.Append(thinkingText);
-                                onReasoningChunk?.Invoke(thinkingText);
+
+                                // ✅ 同样使用SynchronizationContext.Post
+                                if (onReasoningChunk != null)
+                                {
+                                    if (syncContext != null)
+                                    {
+                                        syncContext.Post(_ => onReasoningChunk(thinkingText), null);
+                                    }
+                                    else
+                                    {
+                                        onReasoningChunk(thinkingText);
+                                    }
+                                }
                             }
                         }
 

@@ -1,4 +1,5 @@
 ﻿using System;
+using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.Windows;
 using Serilog;
 
@@ -91,9 +92,32 @@ namespace BiaogPlugin.UI
         {
             try
             {
-                if (_translationPaletteSet == null)
+                Log.Debug("准备显示翻译面板...");
+
+                // ✅ 关键修复：第一次初始化时需要特殊处理
+                bool isFirstTime = (_translationPaletteSet == null);
+
+                if (isFirstTime)
                 {
+                    Log.Debug("翻译面板未初始化，开始初始化...");
                     InitializeTranslationPalette();
+
+                    // ✅ 第一次创建后，立即进行Size技巧来强制渲染Tab
+                    if (_translationPaletteSet != null)
+                    {
+                        Log.Debug("第一次创建，执行强制渲染技巧...");
+
+                        // 技巧1：调整两次Size（不同值）
+                        var targetSize = new System.Drawing.Size(400, 600);
+                        _translationPaletteSet.Size = new System.Drawing.Size(410, 610);
+                        _translationPaletteSet.Size = targetSize;
+
+                        // 技巧2：Toggle Visible
+                        _translationPaletteSet.Visible = true;
+                        _translationPaletteSet.Visible = false;
+
+                        Log.Debug("强制渲染完成");
+                    }
                 }
 
                 if (_translationPaletteSet != null)
@@ -104,9 +128,15 @@ namespace BiaogPlugin.UI
                         _translationPaletteSet.Dock = DockSides.Right;
                     }
 
+                    // ✅ 简化的显示逻辑：直接设置可见并激活
                     _translationPaletteSet.Visible = true;
                     _translationPaletteSet.Activate(0);  // 激活第一个选项卡
-                    Log.Debug("翻译面板已显示（停靠在右侧）");
+
+                    // ✅ 关键修复：KeepFocus=true允许面板内控件获得焦点
+                    // 不调用Application.MainWindow.Focus()，避免焦点被抢走
+                    _translationPaletteSet.KeepFocus = true;
+
+                    Log.Information($"✓ 翻译面板已显示（Dock={_translationPaletteSet.Dock}, Size={_translationPaletteSet.Size}, Visible={_translationPaletteSet.Visible}）");
                 }
             }
             catch (System.Exception ex)
@@ -180,9 +210,32 @@ namespace BiaogPlugin.UI
         {
             try
             {
-                if (_calculationPaletteSet == null)
+                Log.Debug("准备显示算量面板...");
+
+                // ✅ 关键修复：第一次初始化时需要特殊处理
+                bool isFirstTime = (_calculationPaletteSet == null);
+
+                if (isFirstTime)
                 {
+                    Log.Debug("算量面板未初始化，开始初始化...");
                     InitializeCalculationPalette();
+
+                    // ✅ 第一次创建后，立即进行Size技巧来强制渲染Tab
+                    if (_calculationPaletteSet != null)
+                    {
+                        Log.Debug("第一次创建，执行强制渲染技巧...");
+
+                        // 技巧1：调整两次Size（不同值）
+                        var targetSize = new System.Drawing.Size(500, 700);
+                        _calculationPaletteSet.Size = new System.Drawing.Size(510, 710);
+                        _calculationPaletteSet.Size = targetSize;
+
+                        // 技巧2：Toggle Visible
+                        _calculationPaletteSet.Visible = true;
+                        _calculationPaletteSet.Visible = false;
+
+                        Log.Debug("强制渲染完成");
+                    }
                 }
 
                 if (_calculationPaletteSet != null)
@@ -193,9 +246,14 @@ namespace BiaogPlugin.UI
                         _calculationPaletteSet.Dock = DockSides.Right;
                     }
 
+                    // ✅ 简化的显示逻辑：直接设置可见并激活
                     _calculationPaletteSet.Visible = true;
                     _calculationPaletteSet.Activate(0);
-                    Log.Debug("算量面板已显示（停靠在右侧）");
+
+                    // ✅ 关键修复：KeepFocus=true允许面板内控件获得焦点
+                    _calculationPaletteSet.KeepFocus = true;
+
+                    Log.Information($"✓ 算量面板已显示（Dock={_calculationPaletteSet.Dock}, Size={_calculationPaletteSet.Size}, Visible={_calculationPaletteSet.Visible}）");
                 }
             }
             catch (System.Exception ex)
@@ -268,14 +326,14 @@ namespace BiaogPlugin.UI
 
                     // ✅ 关键修复：在Add之后设置Size和Dock
                     // 这样可以确保控件已经被添加到容器中
-                    _aiPaletteSet.Size = new System.Drawing.Size(450, 850);
-                    _aiPaletteSet.MinimumSize = new System.Drawing.Size(400, 600);
+                    _aiPaletteSet.Size = new System.Drawing.Size(800, 850);
+                    _aiPaletteSet.MinimumSize = new System.Drawing.Size(600, 700);
                     _aiPaletteSet.Dock = DockSides.Right;
 
                     // 保持隐藏，等待用户调用命令
                     _aiPaletteSet.Visible = false;
 
-                    Log.Information("✓ AI助手面板创建成功（停靠右侧，尺寸: 450x850）");
+                    Log.Information("✓ AI助手面板创建成功（停靠右侧，尺寸: 800x850）");
                 }
                 catch (System.Exception ex)
                 {
@@ -294,67 +352,59 @@ namespace BiaogPlugin.UI
             {
                 Log.Debug("准备显示AI助手面板...");
 
-                if (_aiPaletteSet == null)
+                // ✅ 关键修复：第一次初始化时需要特殊处理
+                bool isFirstTime = (_aiPaletteSet == null);
+
+                if (isFirstTime)
                 {
                     Log.Debug("AI助手面板未初始化，开始初始化...");
                     InitializeAIPalette();
+
+                    // ✅ 第一次创建后，立即进行Size技巧来强制渲染Tab
+                    if (_aiPaletteSet != null)
+                    {
+                        Log.Debug("第一次创建，执行强制渲染技巧...");
+
+                        // 技巧1：调整两次Size（不同值）
+                        var targetSize = new System.Drawing.Size(800, 850);
+                        _aiPaletteSet.Size = new System.Drawing.Size(810, 860);
+                        _aiPaletteSet.Size = targetSize;
+
+                        // 技巧2：Toggle Visible
+                        _aiPaletteSet.Visible = true;
+                        _aiPaletteSet.Visible = false;
+
+                        Log.Debug("强制渲染完成");
+                    }
                 }
 
                 if (_aiPaletteSet != null)
                 {
-                    Log.Debug($"AI助手面板状态检查: Visible={_aiPaletteSet.Visible}, Dock={_aiPaletteSet.Dock}, Size={_aiPaletteSet.Size}");
+                    Log.Debug($"AI助手面板状态: Visible={_aiPaletteSet.Visible}, Dock={_aiPaletteSet.Dock}, Size={_aiPaletteSet.Size}");
 
-                    // ✅ 确保面板以停靠模式显示
+                    // 确保停靠设置
                     if (_aiPaletteSet.Dock == DockSides.None)
                     {
-                        Log.Debug("面板未停靠，设置为右侧停靠");
                         _aiPaletteSet.Dock = DockSides.Right;
                     }
 
-                    // ✅ 确保尺寸正常（防止被最小化或隐藏）
-                    if (_aiPaletteSet.Size.Width < 300 || _aiPaletteSet.Size.Height < 400)
+                    // 确保尺寸正常
+                    var targetSize = new System.Drawing.Size(800, 850);
+                    if (_aiPaletteSet.Size.Width < 600 || _aiPaletteSet.Size.Height < 700)
                     {
-                        Log.Warning($"检测到异常尺寸: {_aiPaletteSet.Size}，重置为默认尺寸");
-                        _aiPaletteSet.Size = new System.Drawing.Size(450, 850);
+                        Log.Warning($"尺寸异常: {_aiPaletteSet.Size}，重置");
+                        _aiPaletteSet.Size = targetSize;
                     }
 
-                    // ✅ 设置为可见
+                    // ✅ 简化的显示逻辑：直接设置可见并激活
                     _aiPaletteSet.Visible = true;
-                    Log.Debug("面板Visible已设置为true");
-
-                    // ✅ 关键修复：AutoCAD已知bug - 如果没有保存的设置，Tab不会被渲染
-                    // 解决方案：在Visible=true后，程序化地调整两次Size（使用不同的值）强制渲染
-                    // 参考：https://forums.autodesk.com/t5/net/custom-palette-display-issue/td-p/8228560
-                    var targetSize = new System.Drawing.Size(450, 850);
-                    var tempSize = new System.Drawing.Size(targetSize.Width + 10, targetSize.Height + 10);
-
-                    _aiPaletteSet.Size = tempSize;
-                    Log.Debug($"临时调整尺寸为: {tempSize}");
-
-                    System.Threading.Thread.Sleep(50);  // 短暂延迟确保UI更新
-
-                    _aiPaletteSet.Size = targetSize;
-                    Log.Debug($"恢复目标尺寸为: {targetSize}");
-
-                    // ✅ 激活面板（确保获得焦点）
                     _aiPaletteSet.Activate(0);
-                    Log.Debug("面板已激活");
 
-                    // ✅ 强制让面板获得焦点
-                    try
-                    {
-                        if (_aiPaletteSet.Count > 0)
-                        {
-                            _aiPaletteSet.KeepFocus = true;
-                            Log.Debug("面板焦点已锁定");
-                        }
-                    }
-                    catch (System.Exception focusEx)
-                    {
-                        Log.Warning(focusEx, "锁定焦点失败（可忽略）");
-                    }
+                    // ✅ 关键修复：KeepFocus=true允许面板内控件（特别是InputTextBox）获得焦点
+                    // 不调用Application.MainWindow.Focus()，避免焦点被抢走导致中文输入失败
+                    _aiPaletteSet.KeepFocus = true;
 
-                    Log.Information($"✓ AI助手面板已显示（停靠: {_aiPaletteSet.Dock}, 尺寸: {_aiPaletteSet.Size}, 可见: {_aiPaletteSet.Visible}）");
+                    Log.Information($"✓ AI助手面板已显示（Dock={_aiPaletteSet.Dock}, Size={_aiPaletteSet.Size}, Visible={_aiPaletteSet.Visible}）");
                 }
                 else
                 {

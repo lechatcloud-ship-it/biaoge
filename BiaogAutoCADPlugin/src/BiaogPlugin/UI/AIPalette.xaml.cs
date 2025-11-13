@@ -55,6 +55,10 @@ namespace BiaogPlugin.UI
             InputTextBox.PreviewTextInput += InputTextBox_PreviewTextInput;
             InputTextBox.TextInput += InputTextBox_TextInput;
 
+            // ✅ 关键修复：鼠标单击立即获取焦点，无需双击
+            InputTextBox.PreviewMouseDown += InputTextBox_PreviewMouseDown;
+            InputTextBox.MouseDown += InputTextBox_MouseDown;
+
             // ✅ 初始化Markdown更新定时器（每150ms更新一次，平衡流畅度和性能）
             _markdownUpdateTimer = new DispatcherTimer
             {
@@ -110,6 +114,52 @@ namespace BiaogPlugin.UI
         private async void SendButton_Click(object sender, RoutedEventArgs e)
         {
             await SendMessageAsync();
+        }
+
+        /// <summary>
+        /// ✅ 关键修复：PreviewMouseDown - 在鼠标按下时立即获取焦点
+        /// 这是解决AutoCAD PaletteSet中TextBox需要双击才能输入的核心修复
+        /// </summary>
+        private void InputTextBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            try
+            {
+                // 如果TextBox还没有焦点，立即获取焦点
+                if (!InputTextBox.IsFocused)
+                {
+                    Log.Debug("鼠标按下，立即获取焦点");
+                    Keyboard.Focus(InputTextBox);
+                    InputTextBox.Focus();
+
+                    // ✅ 不设置e.Handled，让MouseDown事件继续传递
+                    // 这样TextBox能正确处理光标位置
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "处理PreviewMouseDown失败");
+            }
+        }
+
+        /// <summary>
+        /// ✅ MouseDown - 确保焦点已经设置
+        /// </summary>
+        private void InputTextBox_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            try
+            {
+                // 再次确保焦点在TextBox上
+                if (!InputTextBox.IsFocused)
+                {
+                    Log.Debug("MouseDown事件，再次确保焦点");
+                    Keyboard.Focus(InputTextBox);
+                    InputTextBox.Focus();
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "处理MouseDown失败");
+            }
         }
 
         /// <summary>
@@ -319,7 +369,26 @@ namespace BiaogPlugin.UI
                 // 清空输入框
                 InputTextBox.Clear();
 
-                // ✅ 创建AI回复占位符（使用RichTextBox支持Markdown）
+                // ✅ 关键修复：创建独立的思考框和正文框
+                Expander? thinkingExpander = null;
+                RichTextBox? thinkingRichTextBox = null;
+                StreamingMarkdownRenderer? thinkingRenderer = null;
+
+                // 如果启用深度思考，创建思考框
+                if (_deepThinking)
+                {
+                    thinkingExpander = CreateThinkingExpanderPlaceholder();
+                    ChatHistoryPanel.Children.Add(thinkingExpander);
+
+                    thinkingRichTextBox = FindThinkingRichTextBox(thinkingExpander);
+                    if (thinkingRichTextBox != null)
+                    {
+                        thinkingRenderer = new StreamingMarkdownRenderer(thinkingRichTextBox);
+                    }
+                    ScrollToBottom();
+                }
+
+                // 创建AI正文回复占位符
                 var aiMessageBorder = CreateStreamingAIMessagePlaceholder();
                 ChatHistoryPanel.Children.Add(aiMessageBorder);
                 ScrollToBottom();
@@ -327,33 +396,45 @@ namespace BiaogPlugin.UI
                 var aiRichTextBox = FindAIRichTextBox(aiMessageBorder);
                 string fullResponse = "";
 
-                // ✅ 初始化流式Markdown渲染器
-                StreamingMarkdownRenderer? streamingRenderer = null;
+                // ✅ 初始化正文Markdown渲染器
+                StreamingMarkdownRenderer? contentRenderer = null;
                 if (aiRichTextBox != null)
                 {
-                    streamingRenderer = new StreamingMarkdownRenderer(aiRichTextBox);
+                    contentRenderer = new StreamingMarkdownRenderer(aiRichTextBox);
                 }
 
-                // ✅ 流式接收AI回复（实时Markdown渲染）
+                // ✅ 流式接收AI回复（分离思考和正文）
                 var response = await _aiService.ChatStreamAsync(
-                    userInput,
-                    _deepThinking,
-                    chunk =>
+                    userMessage: userInput,
+                    useDeepThinking: _deepThinking,
+                    onContentChunk: chunk =>
                     {
                         fullResponse += chunk;
                         Dispatcher.Invoke(() =>
                         {
-                            // ✅ 实时更新Markdown渲染
-                            streamingRenderer?.AppendChunk(chunk);
+                            // ✅ 更新正文内容
+                            contentRenderer?.AppendChunk(chunk);
                             ScrollToBottom();
                         });
-                    }
+                    },
+                    onReasoningChunk: _deepThinking
+                        ? reasoning =>
+                        {
+                            Dispatcher.Invoke(() =>
+                            {
+                                // ✅ 更新思考内容
+                                thinkingRenderer?.AppendChunk(reasoning);
+                                ScrollToBottom();
+                            });
+                        }
+                        : null
                 );
 
                 // ✅ 完成流式输出，强制最终更新
                 Dispatcher.Invoke(() =>
                 {
-                    streamingRenderer?.Complete();
+                    thinkingRenderer?.Complete();
+                    contentRenderer?.Complete();
                     ScrollToBottom();
                 });
 
@@ -547,7 +628,53 @@ namespace BiaogPlugin.UI
         #region 深度思考内容处理
 
         /// <summary>
-        /// 解析并分离深度思考内容
+        /// 创建深度思考折叠区域占位符（用于流式显示）
+        /// </summary>
+        private Expander CreateThinkingExpanderPlaceholder()
+        {
+            var expander = new Expander
+            {
+                Header = "🧠 深度思考过程...",
+                IsExpanded = true,  // ✅ 初始展开，让用户看到思考过程
+                Background = new SolidColorBrush(Color.FromRgb(60, 60, 60)),  // 深色背景
+                BorderBrush = new SolidColorBrush(Color.FromRgb(100, 100, 100)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(8),
+                Margin = new Thickness(0, 0, 40, 10),  // 左对齐，与AI消息框一致
+                HorizontalAlignment = HorizontalAlignment.Left
+            };
+
+            // ✅ 使用RichTextBox支持Markdown渲染
+            var thinkingRichTextBox = new RichTextBox
+            {
+                IsReadOnly = true,
+                BorderThickness = new Thickness(0),
+                Background = Brushes.Transparent,
+                Foreground = new SolidColorBrush(Color.FromRgb(170, 170, 170)),  // 灰色文本
+                FontSize = 12,
+                FontFamily = new FontFamily("Consolas, Segoe UI"),
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                MaxHeight = 300  // 限制最大高度，避免思考内容过长
+            };
+
+            // 初始化空文档
+            thinkingRichTextBox.Document = new FlowDocument();
+
+            expander.Content = thinkingRichTextBox;
+            return expander;
+        }
+
+        /// <summary>
+        /// 从Expander中查找思考内容的RichTextBox
+        /// </summary>
+        private RichTextBox? FindThinkingRichTextBox(Expander expander)
+        {
+            return expander.Content as RichTextBox;
+        }
+
+        /// <summary>
+        /// 解析并分离深度思考内容（已废弃，使用流式API）
         /// </summary>
         private (string? thinkingContent, string mainContent) ParseThinkingContent(string fullText)
         {
@@ -577,7 +704,7 @@ namespace BiaogPlugin.UI
         }
 
         /// <summary>
-        /// 创建深度思考折叠区域
+        /// 创建深度思考折叠区域（已废弃，使用CreateThinkingExpanderPlaceholder）
         /// </summary>
         private Expander CreateThinkingExpander(string thinkingContent)
         {

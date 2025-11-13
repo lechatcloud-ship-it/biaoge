@@ -16,15 +16,16 @@ namespace BiaogPlugin.UI.Ribbon
         private static RibbonTab? _biaogTab;
         private static bool _isLoaded = false;
         private static bool _isInitializing = false;
+        private static bool _workspaceEventRegistered = false;
 
         /// <summary>
         /// 加载Ribbon工具栏
         /// </summary>
         public static void LoadRibbon()
         {
-            if (_isLoaded || _isInitializing)
+            if (_isInitializing)
             {
-                Log.Warning("Ribbon已加载或正在初始化，跳过");
+                Log.Warning("Ribbon正在初始化，跳过");
                 return;
             }
 
@@ -32,24 +33,80 @@ namespace BiaogPlugin.UI.Ribbon
             {
                 Log.Information("正在加载Ribbon工具栏...");
 
-                // 检查Ribbon是否可用
-                if (ComponentManager.Ribbon == null)
+                // ✅ 关键修复：注册工作空间切换事件（只注册一次）
+                if (!_workspaceEventRegistered)
                 {
-                    // Ribbon未就绪，注册事件延迟加载
-                    Log.Information("Ribbon未就绪，注册延迟加载事件");
-                    _isInitializing = true;
-                    ComponentManager.ItemInitialized += ComponentManager_ItemInitialized;
+                    Autodesk.AutoCAD.ApplicationServices.Application.SystemVariableChanged += OnSystemVariableChanged;
+                    _workspaceEventRegistered = true;
+                    Log.Debug("已注册SystemVariableChanged事件监听");
                 }
-                else
-                {
-                    // Ribbon已就绪，直接创建
-                    CreateRibbon();
-                }
+
+                // ✅ 使用Application.Idle事件延迟加载，确保Ribbon完全初始化
+                Autodesk.AutoCAD.ApplicationServices.Application.Idle += OnIdleLoadRibbon;
             }
             catch (System.Exception ex)
             {
                 Log.Error(ex, "加载Ribbon工具栏失败");
                 _isInitializing = false;
+            }
+        }
+
+        /// <summary>
+        /// ✅ Application.Idle事件处理：延迟加载Ribbon
+        /// </summary>
+        private static void OnIdleLoadRibbon(object? sender, System.EventArgs e)
+        {
+            // 移除事件，只执行一次
+            Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnIdleLoadRibbon;
+
+            try
+            {
+                if (ComponentManager.Ribbon != null)
+                {
+                    Log.Debug("Ribbon已就绪，开始创建");
+                    CreateRibbon();
+                }
+                else
+                {
+                    // Ribbon仍未就绪，使用ItemInitialized事件
+                    Log.Debug("Ribbon仍未就绪，注册ItemInitialized事件");
+                    _isInitializing = true;
+                    ComponentManager.ItemInitialized += ComponentManager_ItemInitialized;
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "Idle加载Ribbon失败");
+            }
+        }
+
+        /// <summary>
+        /// ✅ 工作空间切换事件处理：重新创建Ribbon确保显示
+        /// </summary>
+        private static void OnSystemVariableChanged(object? sender, Autodesk.AutoCAD.ApplicationServices.SystemVariableChangedEventArgs e)
+        {
+            try
+            {
+                // 监听WSCURRENT变量（当前工作空间）
+                if (e.Name.Equals("WSCURRENT", StringComparison.OrdinalIgnoreCase))
+                {
+                    Log.Debug($"工作空间已切换，重新创建Ribbon");
+
+                    // ✅ 检查是否Classic工作空间（Ribbon被禁用）
+                    if (ComponentManager.Ribbon == null)
+                    {
+                        Log.Warning("当前工作空间不支持Ribbon（可能是Classic模式）");
+                        _isLoaded = false;
+                        return;
+                    }
+
+                    // 重新创建Ribbon Tab
+                    CreateRibbon();
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Warning(ex, "处理工作空间切换事件失败");
             }
         }
 
@@ -111,7 +168,20 @@ namespace BiaogPlugin.UI.Ribbon
                 _isLoaded = true;
                 Log.Information("Ribbon工具栏已创建");
 
-                // ✅ 关键修复：使用Idle事件延迟激活Tab
+                // ✅ 关键修复：立即尝试激活，然后再用Idle事件确保激活
+                // 某些情况下立即激活会成功，某些情况下需要延迟
+                try
+                {
+                    _biaogTab.IsActive = true;
+                    ribbonControl.ActiveTab = _biaogTab;
+                    Log.Debug("尝试立即激活Ribbon Tab");
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Debug(ex, "立即激活失败，将使用Idle延迟激活");
+                }
+
+                // ✅ 使用Idle事件延迟激活Tab（确保显示）
                 // 原因：AutoCAD启动时，Ribbon可能还未完全就绪，直接设置IsActive会被覆盖
                 // 解决方案：等待AutoCAD进入空闲状态（完全启动完成）后再激活
                 Autodesk.AutoCAD.ApplicationServices.Application.Idle += OnIdleActivateTab;
@@ -123,24 +193,55 @@ namespace BiaogPlugin.UI.Ribbon
         }
 
         /// <summary>
-        /// AutoCAD空闲时激活标哥Tab（只执行一次）
+        /// ✅ AutoCAD空闲时激活标哥Tab（可能需要多次尝试）
         /// </summary>
+        private static int _activateAttempts = 0;
         private static void OnIdleActivateTab(object? sender, System.EventArgs e)
         {
             try
             {
-                // 移除事件处理器，只执行一次
-                Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnIdleActivateTab;
+                _activateAttempts++;
 
                 if (_biaogTab != null && ComponentManager.Ribbon != null)
                 {
-                    // 激活标哥Tab，使其显示出来
+                    // 检查Tab是否已经激活
+                    if (_biaogTab.IsActive)
+                    {
+                        // 移除事件处理器
+                        Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnIdleActivateTab;
+                        Log.Information($"✅ Ribbon Tab已激活（尝试{_activateAttempts}次）");
+                        return;
+                    }
+
+                    // ✅ 关键修复：多次设置确保激活
+                    // 1. 设置Tab的IsActive属性
                     _biaogTab.IsActive = true;
-                    Log.Information("✅ Ribbon Tab已激活显示");
+
+                    // 2. 设置RibbonControl的ActiveTab属性
+                    ComponentManager.Ribbon.ActiveTab = _biaogTab;
+
+                    Log.Debug($"尝试激活Ribbon Tab（第{_activateAttempts}次）: IsActive={_biaogTab.IsActive}");
+
+                    // 最多尝试5次
+                    if (_activateAttempts >= 5)
+                    {
+                        Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnIdleActivateTab;
+                        Log.Warning($"Ribbon Tab激活失败，已尝试{_activateAttempts}次");
+                    }
+                }
+                else
+                {
+                    // 如果Ribbon或Tab还不可用，继续等待
+                    if (_activateAttempts >= 10)
+                    {
+                        Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnIdleActivateTab;
+                        Log.Error("Ribbon Tab激活失败：Ribbon或Tab不可用");
+                    }
                 }
             }
             catch (System.Exception ex)
             {
+                Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnIdleActivateTab;
                 Log.Error(ex, "激活Ribbon Tab失败: {Message}", ex.Message);
             }
         }
@@ -196,10 +297,10 @@ namespace BiaogPlugin.UI.Ribbon
                 Source = panelSource
             };
 
-            // === 大按钮：快速翻译为中文（推荐） ===
-            RibbonButton translateZH = new RibbonButton
+            // === 大按钮：翻译图纸 ===
+            RibbonButton translateBtn = new RibbonButton
             {
-                Text = "翻译为中文\n(推荐)★",
+                Text = "翻译图纸",
                 ShowText = true,
                 Size = RibbonItemSize.Large,
                 Orientation = System.Windows.Controls.Orientation.Vertical,
@@ -208,82 +309,11 @@ namespace BiaogPlugin.UI.Ribbon
                 ToolTip = "一键翻译整个图纸为简体中文\n使用qwen-mt-flash模型\n支持92种语言识别"
             };
 
-            panelSource.Items.Add(translateZH);
+            panelSource.Items.Add(translateBtn);
 
-            // === 第二行：小按钮组1 ===
-            RibbonRowPanel row2 = new RibbonRowPanel();
+            // === 第二行：清除缓存 ===
+            RibbonRowPanel row = new RibbonRowPanel();
 
-            // 框选翻译
-            RibbonButton translateSelected = new RibbonButton
-            {
-                Text = "框选翻译",
-                ShowText = true,
-                Size = RibbonItemSize.Standard,
-                Orientation = System.Windows.Controls.Orientation.Horizontal,
-                CommandParameter = "BIAOGE_TRANSLATE_SELECTED ",
-                CommandHandler = new RibbonCommandHandler(),
-                ToolTip = "选择文本实体进行翻译\n支持DBText, MText, AttributeReference"
-            };
-            row2.Items.Add(translateSelected);
-
-            // 全图翻译
-            RibbonButton translateAll = new RibbonButton
-            {
-                Text = "全图翻译",
-                ShowText = true,
-                Size = RibbonItemSize.Standard,
-                Orientation = System.Windows.Controls.Orientation.Horizontal,
-                CommandParameter = "BIAOGE_TRANSLATE ",
-                CommandHandler = new RibbonCommandHandler(),
-                ToolTip = "打开翻译面板，翻译整个图纸"
-            };
-            row2.Items.Add(translateAll);
-
-            // 翻译为英语
-            RibbonButton translateEN = new RibbonButton
-            {
-                Text = "译为英语",
-                ShowText = true,
-                Size = RibbonItemSize.Standard,
-                Orientation = System.Windows.Controls.Orientation.Horizontal,
-                CommandParameter = "BIAOGE_TRANSLATE_EN ",
-                CommandHandler = new RibbonCommandHandler(),
-                ToolTip = "快速翻译整个图纸为英语"
-            };
-            row2.Items.Add(translateEN);
-
-            panelSource.Items.Add(row2);
-
-            // === 第三行：小按钮组2 ===
-            RibbonRowPanel row3 = new RibbonRowPanel();
-
-            // 图层翻译
-            RibbonButton translateLayer = new RibbonButton
-            {
-                Text = "图层翻译",
-                ShowText = true,
-                Size = RibbonItemSize.Standard,
-                Orientation = System.Windows.Controls.Orientation.Horizontal,
-                CommandParameter = "BIAOGE_TRANSLATE_LAYER ",
-                CommandHandler = new RibbonCommandHandler(),
-                ToolTip = "按图层选择性翻译（即将推出）"
-            };
-            row3.Items.Add(translateLayer);
-
-            // 翻译预览
-            RibbonButton translatePreview = new RibbonButton
-            {
-                Text = "翻译预览",
-                ShowText = true,
-                Size = RibbonItemSize.Standard,
-                Orientation = System.Windows.Controls.Orientation.Horizontal,
-                CommandParameter = "BIAOGE_PREVIEW ",
-                CommandHandler = new RibbonCommandHandler(),
-                ToolTip = "预览翻译结果后再应用（即将推出）"
-            };
-            row3.Items.Add(translatePreview);
-
-            // 清除缓存
             RibbonButton clearCache = new RibbonButton
             {
                 Text = "清除缓存",
@@ -294,9 +324,9 @@ namespace BiaogPlugin.UI.Ribbon
                 CommandHandler = new RibbonCommandHandler(),
                 ToolTip = "清除翻译缓存数据库"
             };
-            row3.Items.Add(clearCache);
+            row.Items.Add(clearCache);
 
-            panelSource.Items.Add(row3);
+            panelSource.Items.Add(row);
 
             tab.Panels.Add(panel);
         }
@@ -316,10 +346,10 @@ namespace BiaogPlugin.UI.Ribbon
                 Source = panelSource
             };
 
-            // === 大按钮：标哥AI助手 ===
+            // === 大按钮：AI助手 ===
             RibbonButton aiAssistant = new RibbonButton
             {
-                Text = "标哥AI\n助手",
+                Text = "AI助手",
                 ShowText = true,
                 Size = RibbonItemSize.Large,
                 Orientation = System.Windows.Controls.Orientation.Vertical,
@@ -348,10 +378,10 @@ namespace BiaogPlugin.UI.Ribbon
                 Source = panelSource
             };
 
-            // === 大按钮：智能识别 ===
+            // === 大按钮：智能算量 ===
             RibbonButton calculate = new RibbonButton
             {
-                Text = "智能\n识别",
+                Text = "智能算量",
                 ShowText = true,
                 Size = RibbonItemSize.Large,
                 Orientation = System.Windows.Controls.Orientation.Vertical,
@@ -414,19 +444,6 @@ namespace BiaogPlugin.UI.Ribbon
             // === 第一行 ===
             RibbonRowPanel row1 = new RibbonRowPanel();
 
-            // 测试按钮（用于调试）
-            RibbonButton testButton = new RibbonButton
-            {
-                Text = "测试",
-                ShowText = true,
-                Size = RibbonItemSize.Standard,
-                Orientation = System.Windows.Controls.Orientation.Horizontal,
-                CommandParameter = "TEST_RIBBON_CLICK ",
-                CommandHandler = new RibbonTestHandler(),
-                ToolTip = "测试Ribbon按钮是否工作"
-            };
-            row1.Items.Add(testButton);
-
             // 插件设置
             RibbonButton settings = new RibbonButton
             {
@@ -440,10 +457,10 @@ namespace BiaogPlugin.UI.Ribbon
             };
             row1.Items.Add(settings);
 
-            // 快捷键
+            // 快捷键设置
             RibbonButton keys = new RibbonButton
             {
-                Text = "快捷键",
+                Text = "快捷键设置",
                 ShowText = true,
                 Size = RibbonItemSize.Standard,
                 Orientation = System.Windows.Controls.Orientation.Horizontal,
@@ -458,10 +475,10 @@ namespace BiaogPlugin.UI.Ribbon
             // === 第二行 ===
             RibbonRowPanel row2 = new RibbonRowPanel();
 
-            // 帮助
+            // 查看帮助
             RibbonButton help = new RibbonButton
             {
-                Text = "帮助",
+                Text = "查看帮助",
                 ShowText = true,
                 Size = RibbonItemSize.Standard,
                 Orientation = System.Windows.Controls.Orientation.Horizontal,
@@ -471,10 +488,10 @@ namespace BiaogPlugin.UI.Ribbon
             };
             row2.Items.Add(help);
 
-            // 关于
+            // 关于工具
             RibbonButton about = new RibbonButton
             {
-                Text = "关于",
+                Text = "关于工具",
                 ShowText = true,
                 Size = RibbonItemSize.Standard,
                 Orientation = System.Windows.Controls.Orientation.Horizontal,
@@ -487,49 +504,6 @@ namespace BiaogPlugin.UI.Ribbon
             panelSource.Items.Add(row2);
 
             tab.Panels.Add(panel);
-        }
-    }
-
-    /// <summary>
-    /// Ribbon测试处理器（用于调试）
-    /// </summary>
-    public class RibbonTestHandler : System.Windows.Input.ICommand
-    {
-        public event EventHandler? CanExecuteChanged;
-
-        public bool CanExecute(object? parameter)
-        {
-            return true;
-        }
-
-        public void Execute(object? parameter)
-        {
-            try
-            {
-                // 显示消息框确认按钮被点击
-                System.Windows.MessageBox.Show(
-                    "Ribbon按钮点击成功！\n\n" +
-                    "如果您看到这个消息，说明Ribbon按钮工作正常。\n" +
-                    "现在问题可能出在命令执行部分。\n\n" +
-                    $"参数: {parameter}",
-                    "标哥插件 - Ribbon测试",
-                    System.Windows.MessageBoxButton.OK,
-                    System.Windows.MessageBoxImage.Information
-                );
-
-                Log.Information($"Ribbon测试按钮被点击，参数: {parameter}");
-
-                // 尝试在命令行显示消息
-                var doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
-                if (doc != null)
-                {
-                    doc.Editor.WriteMessage("\n[成功] Ribbon测试按钮已触发！");
-                }
-            }
-            catch (System.Exception ex)
-            {
-                Log.Error(ex, "Ribbon测试按钮执行失败");
-            }
         }
     }
 

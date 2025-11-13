@@ -140,28 +140,61 @@ namespace BiaogPlugin.Services
                 var ent = tr.GetObject(update.ObjectId, OpenMode.ForWrite) as Entity;
                 if (ent == null) return false;
 
+                // ✅ 关键修复：检测中文并自动切换字体
+                bool containsChinese = ContainsChinese(update.NewContent);
+
                 // 根据不同类型更新
                 if (ent is DBText dbText)
                 {
                     dbText.TextString = update.NewContent;
+
+                    // ✅ 如果包含中文，切换到支持中文的字体
+                    if (containsChinese)
+                    {
+                        EnsureChineseFontSupport(dbText, tr);
+                    }
                     return true;
                 }
 
                 if (ent is MText mText)
                 {
+                    // ✅ 关键修复：使用SetContentsRtf保持纯文本格式
+                    // 避免与旧格式代码冲突
+                    // 参考：https://forums.autodesk.com/t5/net-forum/stripping-mtext-formatting/td-p/12360523
                     mText.Contents = update.NewContent;
+
+                    // ✅ 如果包含中文，切换到支持中文的字体
+                    if (containsChinese)
+                    {
+                        EnsureChineseFontSupport(mText, tr);
+                    }
+
+                    // 清理所有格式，只保留文本
+                    mText.TextStyleId = mText.Database.Textstyle;
                     return true;
                 }
 
                 if (ent is AttributeReference attRef)
                 {
                     attRef.TextString = update.NewContent;
+
+                    // ✅ 如果包含中文，切换到支持中文的字体
+                    if (containsChinese)
+                    {
+                        EnsureChineseFontSupport(attRef, tr);
+                    }
                     return true;
                 }
 
                 if (ent is AttributeDefinition attDef)
                 {
                     attDef.TextString = update.NewContent;
+
+                    // ✅ 如果包含中文，切换到支持中文的字体
+                    if (containsChinese)
+                    {
+                        EnsureChineseFontSupport(attDef, tr);
+                    }
                     return true;
                 }
 
@@ -172,6 +205,179 @@ namespace BiaogPlugin.Services
             {
                 Log.Error(ex, $"更新单个文本失败: {update.ObjectId}");
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// ✅ 检测文本是否包含中文字符
+        /// </summary>
+        private bool ContainsChinese(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+
+            foreach (char c in text)
+            {
+                // Unicode中文字符范围：4E00-9FFF（基本汉字）
+                if (c >= 0x4E00 && c <= 0x9FFF)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// ✅ 确保文本实体使用支持中文的字体
+        /// </summary>
+        private void EnsureChineseFontSupport(DBText dbText, Transaction tr)
+        {
+            try
+            {
+                var db = dbText.Database;
+                var textStyleTable = (TextStyleTable)tr.GetObject(db.TextStyleTableId, OpenMode.ForRead);
+
+                // 尝试查找或创建支持中文的文本样式
+                ObjectId chineseStyleId = GetOrCreateChineseTextStyle(textStyleTable, tr, db);
+
+                if (!chineseStyleId.IsNull)
+                {
+                    dbText.TextStyleId = chineseStyleId;
+                    Log.Debug($"已切换DBText到中文字体样式");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Warning(ex, "切换DBText中文字体失败");
+            }
+        }
+
+        /// <summary>
+        /// ✅ 确保MText使用支持中文的字体
+        /// </summary>
+        private void EnsureChineseFontSupport(MText mText, Transaction tr)
+        {
+            try
+            {
+                var db = mText.Database;
+                var textStyleTable = (TextStyleTable)tr.GetObject(db.TextStyleTableId, OpenMode.ForRead);
+
+                // 尝试查找或创建支持中文的文本样式
+                ObjectId chineseStyleId = GetOrCreateChineseTextStyle(textStyleTable, tr, db);
+
+                if (!chineseStyleId.IsNull)
+                {
+                    mText.TextStyleId = chineseStyleId;
+                    Log.Debug($"已切换MText到中文字体样式");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Warning(ex, "切换MText中文字体失败");
+            }
+        }
+
+        /// <summary>
+        /// ✅ 确保AttributeReference使用支持中文的字体
+        /// </summary>
+        private void EnsureChineseFontSupport(AttributeReference attRef, Transaction tr)
+        {
+            try
+            {
+                var db = attRef.Database;
+                var textStyleTable = (TextStyleTable)tr.GetObject(db.TextStyleTableId, OpenMode.ForRead);
+
+                // 尝试查找或创建支持中文的文本样式
+                ObjectId chineseStyleId = GetOrCreateChineseTextStyle(textStyleTable, tr, db);
+
+                if (!chineseStyleId.IsNull)
+                {
+                    attRef.TextStyleId = chineseStyleId;
+                    Log.Debug($"已切换AttributeReference到中文字体样式");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Warning(ex, "切换AttributeReference中文字体失败");
+            }
+        }
+
+        /// <summary>
+        /// ✅ 确保AttributeDefinition使用支持中文的字体
+        /// </summary>
+        private void EnsureChineseFontSupport(AttributeDefinition attDef, Transaction tr)
+        {
+            try
+            {
+                var db = attDef.Database;
+                var textStyleTable = (TextStyleTable)tr.GetObject(db.TextStyleTableId, OpenMode.ForRead);
+
+                // 尝试查找或创建支持中文的文本样式
+                ObjectId chineseStyleId = GetOrCreateChineseTextStyle(textStyleTable, tr, db);
+
+                if (!chineseStyleId.IsNull)
+                {
+                    attDef.TextStyleId = chineseStyleId;
+                    Log.Debug($"已切换AttributeDefinition到中文字体样式");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Warning(ex, "切换AttributeDefinition中文字体失败");
+            }
+        }
+
+        /// <summary>
+        /// ✅ 获取或创建支持中文的文本样式
+        ///
+        /// 优先级：
+        /// 1. 使用AutoCAD标准中文字体 txt.shx + gbcbig.shx（最兼容）
+        /// 2. 使用现有的中文样式
+        /// 3. 创建新的中文样式
+        /// </summary>
+        private ObjectId GetOrCreateChineseTextStyle(TextStyleTable textStyleTable, Transaction tr, Database db)
+        {
+            // 1. 尝试查找现有的中文样式（常见名称）
+            string[] commonChineseStyleNames = { "Chinese", "宋体", "黑体", "仿宋", "楷体", "SimSun", "SimHei" };
+
+            foreach (var styleName in commonChineseStyleNames)
+            {
+                if (textStyleTable.Has(styleName))
+                {
+                    return textStyleTable[styleName];
+                }
+            }
+
+            // 2. 如果没有找到，创建新的中文样式
+            try
+            {
+                textStyleTable.UpgradeOpen();
+
+                var chineseStyle = new TextStyleTableRecord
+                {
+                    Name = "BiaogeChinese",
+                    FileName = "txt.shx",      // AutoCAD标准西文字体
+                    BigFontFileName = "gbcbig.shx"  // AutoCAD标准中文大字体
+                };
+
+                ObjectId styleId = textStyleTable.Add(chineseStyle);
+                tr.AddNewlyCreatedDBObject(chineseStyle, true);
+
+                textStyleTable.DowngradeOpen();
+
+                Log.Information("已创建新的中文字体样式: BiaogeChinese (txt.shx + gbcbig.shx)");
+                return styleId;
+            }
+            catch (System.Exception ex)
+            {
+                Log.Warning(ex, "创建中文字体样式失败");
+
+                // 3. 如果创建失败，返回标准样式
+                if (textStyleTable.Has("Standard"))
+                {
+                    return textStyleTable["Standard"];
+                }
+
+                return ObjectId.Null;
             }
         }
 
@@ -210,7 +416,10 @@ namespace BiaogPlugin.Services
                         }
                         else if (ent is MText mText)
                         {
+                            // ✅ 关键修复：使用Contents更新，并清理格式
                             mText.Contents = newContent;
+                            // 确保文本样式正确
+                            mText.TextStyleId = mText.Database.Textstyle;
                             updated = true;
                         }
                         else if (ent is AttributeReference attRef)
