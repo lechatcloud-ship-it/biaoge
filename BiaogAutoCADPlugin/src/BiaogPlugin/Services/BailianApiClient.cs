@@ -1163,6 +1163,134 @@ public class BailianApiClient
             OutputTokens = outputTokens
         };
     }
+
+    /// <summary>
+    /// 调用视觉语言模型（qwen3-vl-flash / qwen2-vl-7b-instruct等）
+    ///
+    /// 支持图像+文本混合输入，用于工程图纸识别、构件分析等场景
+    /// </summary>
+    /// <param name="model">模型名称（推荐qwen3-vl-flash）</param>
+    /// <param name="prompt">文本Prompt</param>
+    /// <param name="imageBase64">Base64编码的图像数据</param>
+    /// <param name="maxTokens">最大输出Token数</param>
+    /// <param name="temperature">温度参数（0-1，越低越确定）</param>
+    /// <returns>模型响应内容</returns>
+    public async Task<string> CallVisionModelAsync(
+        string model,
+        string prompt,
+        string imageBase64,
+        int maxTokens = 8000,
+        double temperature = 0.1)
+    {
+        var apiKey = GetApiKey();
+        if (string.IsNullOrEmpty(apiKey))
+        {
+            throw new InvalidOperationException("未配置API密钥，请在设置中配置阿里云百炼API密钥");
+        }
+
+        // 构建多模态消息（OpenAI兼容格式）
+        var messages = new List<object>
+        {
+            new
+            {
+                role = "user",
+                content = new object[]
+                {
+                    // 文本部分
+                    new { type = "text", text = prompt },
+                    // 图像部分
+                    new
+                    {
+                        type = "image_url",
+                        image_url = new
+                        {
+                            url = $"data:image/png;base64,{imageBase64}"
+                        }
+                    }
+                }
+            }
+        };
+
+        // 构建请求体
+        var requestBody = new
+        {
+            model,
+            messages,
+            max_tokens = maxTokens,
+            temperature,
+            top_p = 0.9
+        };
+
+        var jsonContent = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+
+        Log.Debug("调用视觉模型: {Model}, MaxTokens:{MaxTokens}, 图像大小:{ImageSize}KB",
+            model, maxTokens, imageBase64.Length / 1024);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, ChatCompletionEndpoint)
+        {
+            Content = new StringContent(jsonContent, Encoding.UTF8, "application/json")
+        };
+
+        request.Headers.Add("Authorization", $"Bearer {apiKey}");
+
+        try
+        {
+            var response = await SendWithRetryAsync(request);
+
+            var responseContent = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                Log.Error("视觉模型API调用失败: {StatusCode}, 响应: {Response}",
+                    response.StatusCode, responseContent);
+                throw new HttpRequestException($"API调用失败: {response.StatusCode}, {responseContent}");
+            }
+
+            // 解析响应
+            using var doc = JsonDocument.Parse(responseContent);
+            var root = doc.RootElement;
+
+            // 提取内容
+            var content = root
+                .GetProperty("choices")[0]
+                .GetProperty("message")
+                .GetProperty("content")
+                .GetString() ?? "";
+
+            // 提取Token使用量
+            if (root.TryGetProperty("usage", out var usage))
+            {
+                var inputTokens = usage.GetProperty("prompt_tokens").GetInt32();
+                var outputTokens = usage.GetProperty("completion_tokens").GetInt32();
+
+                TrackTokenUsage(inputTokens, outputTokens);
+                Log.Debug("视觉模型Token使用: 输入{InputTokens}, 输出{OutputTokens}",
+                    inputTokens, outputTokens);
+            }
+
+            Log.Information("视觉模型调用成功，响应长度:{Length}字符", content.Length);
+
+            return content;
+        }
+        catch (HttpRequestException ex)
+        {
+            Log.Error(ex, "视觉模型API调用HTTP异常");
+            throw;
+        }
+        catch (JsonException ex)
+        {
+            Log.Error(ex, "视觉模型API响应解析失败");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "视觉模型API调用失败");
+            throw;
+        }
+    }
 }
 
 // 对话API数据模型（已统一使用 OpenAI 兼容格式，无需自定义响应模型）
