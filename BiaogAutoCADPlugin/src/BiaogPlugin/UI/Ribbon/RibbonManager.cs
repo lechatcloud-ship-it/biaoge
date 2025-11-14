@@ -41,6 +41,18 @@ namespace BiaogPlugin.UI.Ribbon
                     Log.Debug("已注册SystemVariableChanged事件监听");
                 }
 
+                // ✅ 新增：注册文档激活事件，确保Ribbon在打开文档时显示
+                try
+                {
+                    Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.DocumentActivated -= OnDocumentActivated;
+                    Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.DocumentActivated += OnDocumentActivated;
+                    Log.Debug("已注册DocumentActivated事件监听");
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Warning(ex, "注册DocumentActivated事件失败");
+                }
+
                 // ✅ 使用Application.Idle事件延迟加载，确保Ribbon完全初始化
                 Autodesk.AutoCAD.ApplicationServices.Application.Idle += OnIdleLoadRibbon;
             }
@@ -277,6 +289,91 @@ namespace BiaogPlugin.UI.Ribbon
         }
 
         /// <summary>
+        /// ✅ 文档激活事件：尝试激活Ribbon Tab
+        /// 在用户打开/切换文档时，如果Tab未激活则尝试激活
+        /// </summary>
+        private static void OnDocumentActivated(object? sender, Autodesk.AutoCAD.ApplicationServices.DocumentCollectionEventArgs e)
+        {
+            try
+            {
+                // 如果Tab已激活，无需处理
+                if (_biaogTab != null && _biaogTab.IsActive)
+                {
+                    return;
+                }
+
+                // 延迟1秒后尝试激活（确保文档完全加载）
+                var timer = new System.Timers.Timer(1000);
+                timer.AutoReset = false;
+                timer.Elapsed += (s, args) =>
+                {
+                    try
+                    {
+                        ActivateRibbonTab();
+                        timer.Dispose();
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Log.Warning(ex, "文档激活后尝试激活Ribbon Tab失败");
+                    }
+                };
+                timer.Start();
+                Log.Debug("文档激活，将在1秒后尝试激活Ribbon Tab");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Warning(ex, "处理文档激活事件失败");
+            }
+        }
+
+        /// <summary>
+        /// ✅ 手动激活Ribbon Tab（可从命令调用）
+        /// </summary>
+        public static void ActivateRibbonTab()
+        {
+            try
+            {
+                if (_biaogTab == null)
+                {
+                    Log.Warning("Ribbon Tab未创建，无法激活");
+                    return;
+                }
+
+                if (ComponentManager.Ribbon == null)
+                {
+                    Log.Warning("Ribbon控件不可用，无法激活");
+                    return;
+                }
+
+                Log.Debug("尝试手动激活Ribbon Tab");
+
+                // 设置为活动Tab
+                _biaogTab.IsActive = true;
+                ComponentManager.Ribbon.ActiveTab = _biaogTab;
+
+                // 强制刷新
+                try
+                {
+                    ComponentManager.Ribbon.UpdateLayout();
+                }
+                catch { /* 某些版本可能不支持UpdateLayout */ }
+
+                if (_biaogTab.IsActive)
+                {
+                    Log.Information("✅ Ribbon Tab已成功激活");
+                }
+                else
+                {
+                    Log.Warning("⚠️ Ribbon Tab激活状态未确认");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "手动激活Ribbon Tab失败");
+            }
+        }
+
+        /// <summary>
         /// 卸载Ribbon工具栏
         /// </summary>
         public static void UnloadRibbon()
@@ -285,6 +382,12 @@ namespace BiaogPlugin.UI.Ribbon
             {
                 // 移除Idle事件（如果还未触发）
                 Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnIdleActivateTab;
+                // 移除文档激活事件
+                try
+                {
+                    Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.DocumentActivated -= OnDocumentActivated;
+                }
+                catch { /* 忽略 */ }
             }
             catch { /* 忽略移除事件的错误 */ }
 

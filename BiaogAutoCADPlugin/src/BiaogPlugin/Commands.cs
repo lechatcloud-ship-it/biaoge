@@ -2185,6 +2185,32 @@ namespace BiaogPlugin
         #region UI管理命令
 
         /// <summary>
+        /// ✅ 激活标哥工具Ribbon选项卡
+        /// </summary>
+        [CommandMethod("BIAOGE_SHOW_RIBBON", CommandFlags.Modal)]
+        public void ShowRibbon()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                Log.Information("手动激活Ribbon工具栏");
+                ed.WriteMessage("\n正在激活【标哥工具】选项卡...");
+
+                UI.Ribbon.RibbonManager.ActivateRibbonTab();
+
+                ed.WriteMessage("\n✓ 已尝试激活【标哥工具】选项卡");
+                ed.WriteMessage("\n请检查AutoCAD顶部Ribbon是否显示【标哥工具】选项卡");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "激活Ribbon失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// 重新加载Ribbon工具栏
         /// </summary>
         [CommandMethod("BIAOGE_RELOAD_RIBBON", CommandFlags.Modal)]
