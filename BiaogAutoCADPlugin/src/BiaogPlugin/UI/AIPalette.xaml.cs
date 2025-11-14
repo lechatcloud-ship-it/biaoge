@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Documents;
 using System.Windows.Threading;
+using Autodesk.AutoCAD.ApplicationServices;
 using Serilog;
 using BiaogPlugin.Services;
 
@@ -118,7 +119,8 @@ namespace BiaogPlugin.UI
 
         /// <summary>
         /// ✅ 关键修复：PreviewMouseDown - 在鼠标按下时立即获取焦点
-        /// 这是解决AutoCAD PaletteSet中TextBox需要双击才能输入的核心修复
+        /// 使用AutoCAD官方Window.Focus()方法解决焦点跳转问题
+        /// 参考：AutoCAD DevBlog - "Use of Window.Focus in AutoCAD 2014"
         /// </summary>
         private void InputTextBox_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
@@ -127,7 +129,17 @@ namespace BiaogPlugin.UI
                 // 如果TextBox还没有焦点，立即获取焦点
                 if (!InputTextBox.IsFocused)
                 {
-                    Log.Debug("鼠标按下，立即获取焦点");
+                    Log.Debug("鼠标按下，使用AutoCAD官方方法获取焦点");
+
+                    // ✅ AutoCAD官方解决方案
+                    // 步骤1: 先告诉AutoCAD将焦点给PaletteSet窗口
+                    var doc = Application.DocumentManager.MdiActiveDocument;
+                    if (doc != null && doc.Window != null)
+                    {
+                        doc.Window.Focus();
+                    }
+
+                    // 步骤2: 然后在PaletteSet窗口内设置TextBox焦点
                     Keyboard.Focus(InputTextBox);
                     InputTextBox.Focus();
 
@@ -143,6 +155,7 @@ namespace BiaogPlugin.UI
 
         /// <summary>
         /// ✅ MouseDown - 确保焦点已经设置
+        /// 使用AutoCAD官方Window.Focus()方法
         /// </summary>
         private void InputTextBox_MouseDown(object sender, MouseButtonEventArgs e)
         {
@@ -151,7 +164,15 @@ namespace BiaogPlugin.UI
                 // 再次确保焦点在TextBox上
                 if (!InputTextBox.IsFocused)
                 {
-                    Log.Debug("MouseDown事件，再次确保焦点");
+                    Log.Debug("MouseDown事件，使用AutoCAD官方方法确保焦点");
+
+                    // ✅ AutoCAD官方解决方案
+                    var doc = Application.DocumentManager.MdiActiveDocument;
+                    if (doc != null && doc.Window != null)
+                    {
+                        doc.Window.Focus();
+                    }
+
                     Keyboard.Focus(InputTextBox);
                     InputTextBox.Focus();
                 }
@@ -479,10 +500,26 @@ namespace BiaogPlugin.UI
                 TrimChatHistory();
 
                 // ✅ 确保焦点回到输入框，准备下一次输入
+                // 使用AutoCAD官方Window.Focus()方法
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    Keyboard.Focus(InputTextBox);
-                    InputTextBox.Focus();
+                    try
+                    {
+                        // 步骤1: 先告诉AutoCAD将焦点给PaletteSet窗口
+                        var doc = Application.DocumentManager.MdiActiveDocument;
+                        if (doc != null && doc.Window != null)
+                        {
+                            doc.Window.Focus();
+                        }
+
+                        // 步骤2: 然后在PaletteSet窗口内设置TextBox焦点
+                        Keyboard.Focus(InputTextBox);
+                        InputTextBox.Focus();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Warning(ex, "恢复InputTextBox焦点失败");
+                    }
                 }), DispatcherPriority.Input);
             }
         }
