@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Autodesk.AutoCAD.ApplicationServices;
+using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Serilog;
 
@@ -39,31 +40,28 @@ public class ViewportSnapshotter
 
         try
         {
-            using (var ms = new MemoryStream())
+            // 获取视图信息（用于AI分析）
+            var view = doc.Editor.GetCurrentView();
+
+            // TODO: CapturePreviewImage API在当前AutoCAD版本中不可用
+            // 暂时返回空数据
+            int width = 1920;
+            int height = 1080;
+
+            var snapshot = new ViewportSnapshot
             {
-                // ✅ 官方推荐方法：直接捕获当前文档窗口的预览图像
-                // 优势：简单、稳定、与编辑器显示完全一致
-                doc.CapturePreviewImage(ms);
+                Base64Data = string.Empty, // 暂时为空
+                Width = width,
+                Height = height,
+                ViewName = "Model",
+                Scale = CalculateViewScale(view, (double)height),
+                CaptureTime = DateTime.Now,
+                DocumentName = Path.GetFileNameWithoutExtension(doc.Name)
+            };
 
-                // 获取视图信息（用于AI分析）
-                var view = doc.Editor.GetCurrentView();
+            Log.Warning("视口截图功能暂时禁用（API不兼容）");
 
-                var snapshot = new ViewportSnapshot
-                {
-                    Base64Data = Convert.ToBase64String(ms.ToArray()),
-                    Width = (int)doc.Window.Size.Width,
-                    Height = (int)doc.Window.Size.Height,
-                    ViewName = view.ViewName ?? "Model",
-                    Scale = CalculateViewScale(view, doc.Window.Size.Height),
-                    CaptureTime = DateTime.Now,
-                    DocumentName = Path.GetFileNameWithoutExtension(doc.Name)
-                };
-
-                Log.Debug("截图成功: {Width}×{Height}, 比例尺:{Scale:F4}, 文档:{DocName}",
-                    snapshot.Width, snapshot.Height, snapshot.Scale, snapshot.DocumentName);
-
-                return snapshot;
-            }
+            return snapshot;
         }
         catch (Exception ex)
         {

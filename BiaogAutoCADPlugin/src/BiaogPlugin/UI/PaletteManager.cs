@@ -71,9 +71,6 @@ namespace BiaogPlugin.UI
                     Child = _translationPalette
                 };
 
-                // ✅ 启用中文IME输入支持（修复焦点问题）
-                System.Windows.Forms.Integration.ElementHost.EnableModelessKeyboardInterop(_translationPalette);
-
                 _translationPaletteSet.Add("翻译", elementHost);
 
                 // 设置样式
@@ -191,9 +188,6 @@ namespace BiaogPlugin.UI
                     Dock = System.Windows.Forms.DockStyle.Fill,
                     Child = _calculationPalette
                 };
-
-                // ✅ 启用中文IME输入支持（修复焦点问题）
-                System.Windows.Forms.Integration.ElementHost.EnableModelessKeyboardInterop(_calculationPalette);
 
                 _calculationPaletteSet.Add("算量", elementHost2);
 
@@ -323,12 +317,6 @@ namespace BiaogPlugin.UI
                         Child = _aiPalette,
                         AutoSize = true
                     };
-
-                    // ✅ 修复问题7加强：启用中文IME输入支持
-                    // 参考：https://learn.microsoft.com/en-us/dotnet/api/system.windows.forms.integration.elementhost.enablemodelesskeyboardinterop
-                    // 此方法安装消息过滤器，转发所有键盘消息到WPF控件，解决中文输入法焦点问题
-                    System.Windows.Forms.Integration.ElementHost.EnableModelessKeyboardInterop(_aiPalette);
-                    Log.Debug("已启用WPF控件中文IME键盘互操作");
 
                     // ✅ 添加控件到 PaletteSet
                     Log.Debug("添加控件到PaletteSet...");

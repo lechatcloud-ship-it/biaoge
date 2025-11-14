@@ -189,10 +189,10 @@ namespace BiaogPlugin.Services
                     // DimensionText包含标注显示的文字（可能包含前缀后缀）
                     var dimText = dimension.DimensionText ?? "";
 
-                    // 如果DimensionText为空，获取测量值的格式化文本
+                    // 如果DimensionText为空，使用测量值
                     if (string.IsNullOrEmpty(dimText))
                     {
-                        dimText = dimension.GetFormattedMeasurementString();
+                        dimText = dimension.Measurement.ToString("F2");
                     }
 
                     return new TextEntity
@@ -544,10 +544,11 @@ namespace BiaogPlugin.Services
                         try
                         {
                             // 检查单元格是否有效
-                            if (!table.Cells[row, col].IsMerged || table.Cells[row, col].IsMergeStart)
+                            var cell = table.Cells[row, col];
+                            if (cell.IsMerged != true)
                             {
                                 // 获取单元格文本
-                                var cellText = table.Cells[row, col].TextString ?? "";
+                                var cellText = cell.TextString ?? "";
 
                                 if (!string.IsNullOrWhiteSpace(cellText))
                                 {
@@ -558,7 +559,7 @@ namespace BiaogPlugin.Services
                                         Content = cellText,
                                         Position = table.Position, // 表格的插入点
                                         Layer = table.Layer,
-                                        Height = table.Cells[row, col].TextHeight,
+                                        Height = cell.TextHeight ?? 2.5,
                                         Rotation = table.Rotation,
                                         ColorIndex = (short)table.ColorIndex,
                                         Tag = $"Row{row}_Col{col}", // 使用Tag记录单元格位置

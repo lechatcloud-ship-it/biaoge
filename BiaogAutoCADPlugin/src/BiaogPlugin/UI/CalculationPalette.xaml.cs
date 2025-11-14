@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using Autodesk.AutoCAD.ApplicationServices;
+using BiaogPlugin.Models;
 using BiaogPlugin.Services;
 using Serilog;
 
@@ -39,7 +40,7 @@ namespace BiaogPlugin.UI
                 if (bailianClient != null)
                 {
                     _recognizer = new ComponentRecognizer(bailianClient);
-                    _aiRecognizer = new AIComponentRecognizer(bailianClient);
+                    _aiRecognizer = new AIComponentRecognizer(bailianClient, _recognizer);
                 }
 
                 _calculator = new QuantityCalculator();
