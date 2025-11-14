@@ -319,7 +319,7 @@ namespace BiaogPlugin.UI.Ribbon
         {
             RibbonPanelSource panelSource = new RibbonPanelSource
             {
-                Title = "AI翻译"
+                Title = "翻译"
             };
 
             RibbonPanel panel = new RibbonPanel
@@ -327,21 +327,66 @@ namespace BiaogPlugin.UI.Ribbon
                 Source = panelSource
             };
 
-            // === 大按钮：翻译图纸 ===
-            RibbonButton translateBtn = new RibbonButton
+            // === 大分割按钮：翻译 ===
+            RibbonSplitButton translateSplit = new RibbonSplitButton
             {
-                Text = "翻译图纸",
+                Text = "翻译为中文",
                 ShowText = true,
                 Size = RibbonItemSize.Large,
                 Orientation = System.Windows.Controls.Orientation.Vertical,
                 CommandParameter = "BIAOGE_TRANSLATE_ZH ",
                 CommandHandler = new RibbonCommandHandler(),
-                ToolTip = "一键翻译整个图纸为简体中文\n使用qwen-mt-flash模型\n支持92种语言识别"
+                ToolTip = "一键翻译整个图纸为简体中文\n使用qwen-mt-flash专业翻译模型\n支持92种语言自动识别"
             };
 
-            panelSource.Items.Add(translateBtn);
+            // 下拉菜单项
+            RibbonButton translateEn = new RibbonButton
+            {
+                Text = "翻译为英文",
+                ShowText = true,
+                Size = RibbonItemSize.Standard,
+                CommandParameter = "BIAOGE_TRANSLATE_EN ",
+                CommandHandler = new RibbonCommandHandler(),
+                ToolTip = "一键翻译整个图纸为英语"
+            };
+            translateSplit.Items.Add(translateEn);
 
-            // === 第二行：清除缓存 ===
+            RibbonButton translatePanel = new RibbonButton
+            {
+                Text = "打开翻译面板...",
+                ShowText = true,
+                Size = RibbonItemSize.Standard,
+                CommandParameter = "BIAOGE_TRANSLATE ",
+                CommandHandler = new RibbonCommandHandler(),
+                ToolTip = "打开翻译面板，选择目标语言\n支持92种语言"
+            };
+            translateSplit.Items.Add(translatePanel);
+
+            RibbonButton translateSelected = new RibbonButton
+            {
+                Text = "框选翻译",
+                ShowText = true,
+                Size = RibbonItemSize.Standard,
+                CommandParameter = "BIAOGE_TRANSLATE_SELECTED ",
+                CommandHandler = new RibbonCommandHandler(),
+                ToolTip = "选择特定区域进行翻译"
+            };
+            translateSplit.Items.Add(translateSelected);
+
+            RibbonButton translateLayer = new RibbonButton
+            {
+                Text = "按图层翻译",
+                ShowText = true,
+                Size = RibbonItemSize.Standard,
+                CommandParameter = "BIAOGE_TRANSLATE_LAYER ",
+                CommandHandler = new RibbonCommandHandler(),
+                ToolTip = "选择特定图层进行翻译"
+            };
+            translateSplit.Items.Add(translateLayer);
+
+            panelSource.Items.Add(translateSplit);
+
+            // === 第二行：小按钮 ===
             RibbonRowPanel row = new RibbonRowPanel();
 
             RibbonButton clearCache = new RibbonButton
@@ -352,7 +397,7 @@ namespace BiaogPlugin.UI.Ribbon
                 Orientation = System.Windows.Controls.Orientation.Horizontal,
                 CommandParameter = "BIAOGE_CLEARCACHE ",
                 CommandHandler = new RibbonCommandHandler(),
-                ToolTip = "清除翻译缓存数据库"
+                ToolTip = "清除翻译缓存数据库\n可以在重新翻译前清除旧缓存"
             };
             row.Items.Add(clearCache);
 
@@ -400,7 +445,7 @@ namespace BiaogPlugin.UI.Ribbon
         {
             RibbonPanelSource panelSource = new RibbonPanelSource
             {
-                Title = "工程算量"
+                Title = "算量"
             };
 
             RibbonPanel panel = new RibbonPanel
@@ -408,16 +453,16 @@ namespace BiaogPlugin.UI.Ribbon
                 Source = panelSource
             };
 
-            // === 大按钮：智能算量 ===
+            // === 大按钮：开始算量 ===
             RibbonButton calculate = new RibbonButton
             {
-                Text = "智能算量",
+                Text = "开始算量",
                 ShowText = true,
                 Size = RibbonItemSize.Large,
                 Orientation = System.Windows.Controls.Orientation.Vertical,
                 CommandParameter = "BIAOGE_CALCULATE ",
                 CommandHandler = new RibbonCommandHandler(),
-                ToolTip = "打开算量面板\n智能识别构件\nAI辅助统计"
+                ToolTip = "打开算量面板\nqwen3-vl-flash智能识别\n自动统计工程量"
             };
 
             panelSource.Items.Add(calculate);
@@ -434,20 +479,20 @@ namespace BiaogPlugin.UI.Ribbon
                 Orientation = System.Windows.Controls.Orientation.Horizontal,
                 CommandParameter = "BIAOGE_QUICKCOUNT ",
                 CommandHandler = new RibbonCommandHandler(),
-                ToolTip = "快速统计构件数量"
+                ToolTip = "快速统计已识别的构件数量"
             };
             row.Items.Add(quickCount);
 
             // 导出Excel
             RibbonButton exportExcel = new RibbonButton
             {
-                Text = "导出Excel",
+                Text = "导出清单",
                 ShowText = true,
                 Size = RibbonItemSize.Standard,
                 Orientation = System.Windows.Controls.Orientation.Horizontal,
                 CommandParameter = "BIAOGE_EXPORTEXCEL ",
                 CommandHandler = new RibbonCommandHandler(),
-                ToolTip = "快速导出Excel工程量清单"
+                ToolTip = "导出Excel工程量清单\n包含汇总表、明细表、材料表"
             };
             row.Items.Add(exportExcel);
 
@@ -463,7 +508,7 @@ namespace BiaogPlugin.UI.Ribbon
         {
             RibbonPanelSource panelSource = new RibbonPanelSource
             {
-                Title = "设置"
+                Title = "工具"
             };
 
             RibbonPanel panel = new RibbonPanel
@@ -471,65 +516,79 @@ namespace BiaogPlugin.UI.Ribbon
                 Source = panelSource
             };
 
-            // === 第一行 ===
-            RibbonRowPanel row1 = new RibbonRowPanel();
-
-            // 插件设置
+            // === 大按钮：插件设置 ===
             RibbonButton settings = new RibbonButton
             {
                 Text = "插件设置",
                 ShowText = true,
-                Size = RibbonItemSize.Standard,
-                Orientation = System.Windows.Controls.Orientation.Horizontal,
+                Size = RibbonItemSize.Large,
+                Orientation = System.Windows.Controls.Orientation.Vertical,
                 CommandParameter = "BIAOGE_SETTINGS ",
                 CommandHandler = new RibbonCommandHandler(),
-                ToolTip = "打开设置对话框\n配置API密钥和参数"
+                ToolTip = "打开设置对话框\n配置阿里云百炼API密钥\n选择翻译模型和参数"
             };
-            row1.Items.Add(settings);
 
-            // 快捷键设置
-            RibbonButton keys = new RibbonButton
-            {
-                Text = "快捷键设置",
-                ShowText = true,
-                Size = RibbonItemSize.Standard,
-                Orientation = System.Windows.Controls.Orientation.Horizontal,
-                CommandParameter = "BIAOGE_KEYS ",
-                CommandHandler = new RibbonCommandHandler(),
-                ToolTip = "查看和管理快捷键"
-            };
-            row1.Items.Add(keys);
+            panelSource.Items.Add(settings);
 
-            panelSource.Items.Add(row1);
-
-            // === 第二行 ===
-            RibbonRowPanel row2 = new RibbonRowPanel();
+            // === 第一行：帮助与关于 ===
+            RibbonRowPanel row1 = new RibbonRowPanel();
 
             // 查看帮助
             RibbonButton help = new RibbonButton
             {
-                Text = "查看帮助",
+                Text = "帮助",
                 ShowText = true,
                 Size = RibbonItemSize.Standard,
                 Orientation = System.Windows.Controls.Orientation.Horizontal,
                 CommandParameter = "BIAOGE_HELP ",
                 CommandHandler = new RibbonCommandHandler(),
-                ToolTip = "显示帮助信息"
+                ToolTip = "显示帮助文档\n查看命令列表与使用说明"
             };
-            row2.Items.Add(help);
+            row1.Items.Add(help);
 
             // 关于工具
             RibbonButton about = new RibbonButton
             {
-                Text = "关于工具",
+                Text = "关于",
                 ShowText = true,
                 Size = RibbonItemSize.Standard,
                 Orientation = System.Windows.Controls.Orientation.Horizontal,
                 CommandParameter = "BIAOGE_ABOUT ",
                 CommandHandler = new RibbonCommandHandler(),
-                ToolTip = "关于标哥插件"
+                ToolTip = "关于标哥工具\n查看版本信息和功能介绍"
             };
-            row2.Items.Add(about);
+            row1.Items.Add(about);
+
+            panelSource.Items.Add(row1);
+
+            // === 第二行：快捷键与诊断 ===
+            RibbonRowPanel row2 = new RibbonRowPanel();
+
+            // 快捷键
+            RibbonButton keys = new RibbonButton
+            {
+                Text = "快捷键",
+                ShowText = true,
+                Size = RibbonItemSize.Standard,
+                Orientation = System.Windows.Controls.Orientation.Horizontal,
+                CommandParameter = "BIAOGE_INSTALL_KEYS ",
+                CommandHandler = new RibbonCommandHandler(),
+                ToolTip = "安装AutoCAD快捷键\n例如：BTZ（翻译中文）、BAI（AI助手）"
+            };
+            row2.Items.Add(keys);
+
+            // 系统诊断
+            RibbonButton diagnostic = new RibbonButton
+            {
+                Text = "诊断",
+                ShowText = true,
+                Size = RibbonItemSize.Standard,
+                Orientation = System.Windows.Controls.Orientation.Horizontal,
+                CommandParameter = "BIAOGE_DIAGNOSTIC ",
+                CommandHandler = new RibbonCommandHandler(),
+                ToolTip = "运行系统诊断\n检查API连接、缓存性能、系统状态"
+            };
+            row2.Items.Add(diagnostic);
 
             panelSource.Items.Add(row2);
 
