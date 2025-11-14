@@ -102,19 +102,18 @@ namespace BiaogPlugin.UI
                     Log.Debug("翻译面板未初始化，开始初始化...");
                     InitializeTranslationPalette();
 
-                    // ✅ 第一次创建后，立即进行Size技巧来强制渲染Tab
+                    // ✅ 第一次创建后，调整Size来触发渲染（不隐藏面板）
                     if (_translationPaletteSet != null)
                     {
-                        Log.Debug("第一次创建，执行强制渲染技巧...");
+                        Log.Debug("第一次创建，执行Size调整触发渲染...");
 
-                        // 技巧1：调整两次Size（不同值）
-                        var targetSize = new System.Drawing.Size(400, 600);
-                        _translationPaletteSet.Size = new System.Drawing.Size(410, 610);
-                        _translationPaletteSet.Size = targetSize;
+                        // 调整两次Size（不同值）触发UI布局计算
+                        var tempSize = new System.Drawing.Size(410, 610);
+                        _translationPaletteSet.Size = tempSize;
 
-                        // 技巧2：Toggle Visible
-                        _translationPaletteSet.Visible = true;
-                        _translationPaletteSet.Visible = false;
+                        // ❌ 修复：删除Toggle Visible逻辑，避免首次调用不显示
+                        // _translationPaletteSet.Visible = true;
+                        // _translationPaletteSet.Visible = false;
 
                         Log.Debug("强制渲染完成");
                     }
@@ -132,9 +131,9 @@ namespace BiaogPlugin.UI
                     _translationPaletteSet.Visible = true;
                     _translationPaletteSet.Activate(0);  // 激活第一个选项卡
 
-                    // ✅ 关键修复：KeepFocus=true允许面板内控件获得焦点
-                    // 不调用Application.MainWindow.Focus()，避免焦点被抢走
-                    _translationPaletteSet.KeepFocus = true;
+                    // ✅ 修复问题7：KeepFocus=false允许焦点切换到AutoCAD命令行
+                    // 用户可以点击AutoCAD窗口切换焦点，不会被强制保持在面板
+                    _translationPaletteSet.KeepFocus = false;
 
                     Log.Information($"✓ 翻译面板已显示（Dock={_translationPaletteSet.Dock}, Size={_translationPaletteSet.Size}, Visible={_translationPaletteSet.Visible}）");
                 }
@@ -220,19 +219,18 @@ namespace BiaogPlugin.UI
                     Log.Debug("算量面板未初始化，开始初始化...");
                     InitializeCalculationPalette();
 
-                    // ✅ 第一次创建后，立即进行Size技巧来强制渲染Tab
+                    // ✅ 第一次创建后，调整Size来触发渲染（不隐藏面板）
                     if (_calculationPaletteSet != null)
                     {
-                        Log.Debug("第一次创建，执行强制渲染技巧...");
+                        Log.Debug("第一次创建，执行Size调整触发渲染...");
 
-                        // 技巧1：调整两次Size（不同值）
-                        var targetSize = new System.Drawing.Size(500, 700);
-                        _calculationPaletteSet.Size = new System.Drawing.Size(510, 710);
-                        _calculationPaletteSet.Size = targetSize;
+                        // 调整两次Size（不同值）触发UI布局计算
+                        var tempSize = new System.Drawing.Size(510, 710);
+                        _calculationPaletteSet.Size = tempSize;
 
-                        // 技巧2：Toggle Visible
-                        _calculationPaletteSet.Visible = true;
-                        _calculationPaletteSet.Visible = false;
+                        // ❌ 修复：删除Toggle Visible逻辑，避免首次调用不显示
+                        // _calculationPaletteSet.Visible = true;
+                        // _calculationPaletteSet.Visible = false;
 
                         Log.Debug("强制渲染完成");
                     }
@@ -250,8 +248,8 @@ namespace BiaogPlugin.UI
                     _calculationPaletteSet.Visible = true;
                     _calculationPaletteSet.Activate(0);
 
-                    // ✅ 关键修复：KeepFocus=true允许面板内控件获得焦点
-                    _calculationPaletteSet.KeepFocus = true;
+                    // ✅ 修复问题7：KeepFocus=false允许焦点切换到AutoCAD命令行
+                    _calculationPaletteSet.KeepFocus = false;
 
                     Log.Information($"✓ 算量面板已显示（Dock={_calculationPaletteSet.Dock}, Size={_calculationPaletteSet.Size}, Visible={_calculationPaletteSet.Visible}）");
                 }
@@ -360,19 +358,18 @@ namespace BiaogPlugin.UI
                     Log.Debug("AI助手面板未初始化，开始初始化...");
                     InitializeAIPalette();
 
-                    // ✅ 第一次创建后，立即进行Size技巧来强制渲染Tab
+                    // ✅ 第一次创建后，调整Size来触发渲染（不隐藏面板）
                     if (_aiPaletteSet != null)
                     {
-                        Log.Debug("第一次创建，执行强制渲染技巧...");
+                        Log.Debug("第一次创建，执行Size调整触发渲染...");
 
-                        // 技巧1：调整两次Size（不同值）
-                        var targetSize = new System.Drawing.Size(800, 850);
-                        _aiPaletteSet.Size = new System.Drawing.Size(810, 860);
-                        _aiPaletteSet.Size = targetSize;
+                        // 调整两次Size（不同值）触发UI布局计算
+                        var tempSize = new System.Drawing.Size(810, 860);
+                        _aiPaletteSet.Size = tempSize;
 
-                        // 技巧2：Toggle Visible
-                        _aiPaletteSet.Visible = true;
-                        _aiPaletteSet.Visible = false;
+                        // ❌ 修复：删除Toggle Visible逻辑，避免首次调用不显示
+                        // _aiPaletteSet.Visible = true;
+                        // _aiPaletteSet.Visible = false;
 
                         Log.Debug("强制渲染完成");
                     }
@@ -393,8 +390,8 @@ namespace BiaogPlugin.UI
                     // 第二步：设置Dock（在Size之后）
                     _aiPaletteSet.Dock = DockSides.Right;
 
-                    // 第三步：设置KeepFocus（允许内部控件获得焦点）
-                    _aiPaletteSet.KeepFocus = true;
+                    // 第三步：✅ 修复问题7：KeepFocus=false允许焦点切换到AutoCAD命令行
+                    _aiPaletteSet.KeepFocus = false;
 
                     // 第四步：显示并激活
                     _aiPaletteSet.Visible = true;
