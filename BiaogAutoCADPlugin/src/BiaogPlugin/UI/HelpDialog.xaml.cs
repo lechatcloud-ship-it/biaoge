@@ -22,7 +22,7 @@ namespace BiaogPlugin.UI
         {
             try
             {
-                var url = "https://github.com/lechatcloud-ship-it/biaoge";
+                var url = "https://biaogecad.shangyanyun.com";
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = url,
