@@ -52,6 +52,23 @@ public class AIComponentRecognizer
 
         var results = new List<ComponentRecognitionResult>();
 
+        // ===== Step 0: 预先捕获截图（必须在任何await之前！）=====
+        // ✅ 线程安全：在第一个await之前调用AutoCAD API
+        // AutoCAD API必须在AutoCAD主线程调用，async方法在第一个await之后可能切换线程
+        ViewportSnapshot? snapshot = null;
+        if (precision >= CalculationPrecision.Budget)
+        {
+            try
+            {
+                snapshot = ViewportSnapshotter.CaptureCurrentView();
+                Log.Debug("截图完成（预先捕获）: {Snapshot}", snapshot);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "视口截图失败，将跳过VL模型验证");
+            }
+        }
+
         // ===== Step 1: 规则引擎快速识别（成本¥0） =====
         Log.Debug("Step 1: 规则引擎识别中...");
         var ruleResults = await _ruleRecognizer.RecognizeFromTextEntitiesAsync(
@@ -66,7 +83,7 @@ public class AIComponentRecognizer
         results.AddRange(ruleResults);
 
         // ===== Step 2: VL模型验证（仅低置信度项） =====
-        if (precision >= CalculationPrecision.Budget)
+        if (precision >= CalculationPrecision.Budget && snapshot != null)
         {
             // 筛选低置信度构件（<0.8）
             var lowConfidence = results
@@ -80,11 +97,7 @@ public class AIComponentRecognizer
 
                 try
                 {
-                    // 捕获当前视口截图
-                    var snapshot = ViewportSnapshotter.CaptureCurrentView();
-
-                    Log.Debug("截图完成: {Snapshot}", snapshot);
-
+                    // 使用预先捕获的截图
                     // 调用VL模型验证
                     var verified = await VerifyWithVLModelAsync(
                         lowConfidence,
