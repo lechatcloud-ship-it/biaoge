@@ -114,7 +114,7 @@ namespace BiaogPlugin.Models
     }
 
     /// <summary>
-    /// 文本实体类型枚举
+    /// 文本实体类型枚举（支持所有AutoCAD文本类型）
     /// </summary>
     public enum TextEntityType
     {
@@ -136,7 +136,22 @@ namespace BiaogPlugin.Models
         /// <summary>
         /// 属性参照（AttributeReference - 块中的属性）
         /// </summary>
-        AttributeReference
+        AttributeReference,
+
+        /// <summary>
+        /// ✅ 标注文字（Dimension）
+        /// </summary>
+        Dimension,
+
+        /// <summary>
+        /// ✅ 多重引线（MLeader）
+        /// </summary>
+        MLeader,
+
+        /// <summary>
+        /// ✅ 表格单元格（Table）
+        /// </summary>
+        Table
     }
 
     /// <summary>

@@ -92,7 +92,7 @@ namespace BiaogPlugin.Services
                 var ent = tr.GetObject(objId, OpenMode.ForRead) as Entity;
                 if (ent == null) continue;
 
-                // 1. 直接的文本实体（DBText, MText）
+                // 1. 直接的文本实体（DBText, MText, Dimension, MLeader）
                 var textEntity = ExtractTextFromEntity(ent, objId);
                 if (textEntity != null)
                 {
@@ -100,7 +100,13 @@ namespace BiaogPlugin.Services
                     texts.Add(textEntity);
                 }
 
-                // 2. 块参照中的属性和嵌套内容
+                // 2. ✅ 表格（Table）- 需要遍历所有单元格
+                if (ent is Table table)
+                {
+                    ExtractTableCells(table, objId, texts, spaceName);
+                }
+
+                // 3. 块参照中的属性和嵌套内容
                 if (ent is BlockReference blockRef)
                 {
                     // 提取块参照的属性
@@ -113,7 +119,15 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
-        /// 从单个实体提取文本
+        /// ✅ 从单个实体提取文本（完整版 - 支持所有AutoCAD文本类型）
+        ///
+        /// 支持的实体类型：
+        /// - DBText (单行文本)
+        /// - MText (多行文本)
+        /// - AttributeDefinition (属性定义)
+        /// - Dimension (标注 - 包含标注文字)
+        /// - MLeader (多重引线 - 包含引线文字)
+        /// - Table (表格 - 需单独处理单元格)
         /// </summary>
         private TextEntity ExtractTextFromEntity(Entity ent, ObjectId objId)
         {
@@ -165,6 +179,67 @@ namespace BiaogPlugin.Services
                     ColorIndex = (short)attDef.ColorIndex,
                     Tag = attDef.Tag
                 };
+            }
+
+            // ✅ 标注文字（Dimension）
+            if (ent is Dimension dimension)
+            {
+                try
+                {
+                    // DimensionText包含标注显示的文字（可能包含前缀后缀）
+                    var dimText = dimension.DimensionText ?? "";
+
+                    // 如果DimensionText为空，获取测量值的格式化文本
+                    if (string.IsNullOrEmpty(dimText))
+                    {
+                        dimText = dimension.GetFormattedMeasurementString();
+                    }
+
+                    return new TextEntity
+                    {
+                        Id = objId,
+                        Type = TextEntityType.Dimension,
+                        Content = dimText,
+                        Position = dimension.TextPosition,
+                        Layer = dimension.Layer,
+                        Height = dimension.Dimtxt, // 标注文字高度
+                        Rotation = dimension.TextRotation,
+                        ColorIndex = (short)dimension.ColorIndex
+                    };
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Warning(ex, $"提取标注文字失败: {objId}");
+                }
+            }
+
+            // ✅ 多重引线（MLeader）
+            if (ent is MLeader mLeader)
+            {
+                try
+                {
+                    // MLeader的文本内容
+                    var mLeaderText = mLeader.MText?.Text ?? "";
+
+                    if (!string.IsNullOrEmpty(mLeaderText))
+                    {
+                        return new TextEntity
+                        {
+                            Id = objId,
+                            Type = TextEntityType.MLeader,
+                            Content = mLeaderText,
+                            Position = mLeader.MText?.Location ?? Point3d.Origin,
+                            Layer = mLeader.Layer,
+                            Height = mLeader.MText?.TextHeight ?? 0,
+                            Rotation = mLeader.MText?.Rotation ?? 0,
+                            ColorIndex = (short)mLeader.ColorIndex
+                        };
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Warning(ex, $"提取多重引线文字失败: {objId}");
+                }
             }
 
             return null;
@@ -451,6 +526,60 @@ namespace BiaogPlugin.Services
             }
 
             Log.Debug($"从块定义中提取了文本，共处理 {processedBlocks.Count} 个块定义");
+        }
+
+        /// <summary>
+        /// ✅ 提取表格单元格中的所有文本
+        /// </summary>
+        private void ExtractTableCells(Table table, ObjectId tableId, List<TextEntity> texts, string spaceName)
+        {
+            try
+            {
+                // 遍历所有行
+                for (int row = 0; row < table.Rows.Count; row++)
+                {
+                    // 遍历所有列
+                    for (int col = 0; col < table.Columns.Count; col++)
+                    {
+                        try
+                        {
+                            // 检查单元格是否有效
+                            if (!table.Cells[row, col].IsMerged || table.Cells[row, col].IsMergeStart)
+                            {
+                                // 获取单元格文本
+                                var cellText = table.Cells[row, col].TextString ?? "";
+
+                                if (!string.IsNullOrWhiteSpace(cellText))
+                                {
+                                    texts.Add(new TextEntity
+                                    {
+                                        Id = tableId, // 表格的ObjectId
+                                        Type = TextEntityType.Table,
+                                        Content = cellText,
+                                        Position = table.Position, // 表格的插入点
+                                        Layer = table.Layer,
+                                        Height = table.Cells[row, col].TextHeight,
+                                        Rotation = table.Rotation,
+                                        ColorIndex = (short)table.ColorIndex,
+                                        Tag = $"Row{row}_Col{col}", // 使用Tag记录单元格位置
+                                        SpaceName = spaceName
+                                    });
+                                }
+                            }
+                        }
+                        catch (System.Exception ex)
+                        {
+                            Log.Warning(ex, $"提取表格单元格失败: Row={row}, Col={col}");
+                        }
+                    }
+                }
+
+                Log.Debug($"从表格中提取了 {texts.Count} 个单元格文本");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Warning(ex, $"提取表格失败: {tableId}");
+            }
         }
 
         /// <summary>
