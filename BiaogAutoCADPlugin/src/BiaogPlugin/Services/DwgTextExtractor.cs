@@ -214,22 +214,48 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
-        /// ✅ 递归提取嵌套块内的文本（修复版）
+        /// ✅ 递归提取嵌套块内的文本（增强版 - 添加循环引用保护）
         ///
         /// 关键修复：
         /// 1. 也提取AttributeDefinition - 确保块定义中的属性定义被提取
         /// 2. 递归处理所有嵌套块 - 多层嵌套也能完整提取
+        /// 3. ✅ 新增：循环引用保护 - 防止无限递归
+        /// 4. ✅ 新增：嵌套深度限制 - 最多100层
         /// </summary>
         private void ExtractFromNestedBlock(
             BlockReference blockRef,
             Transaction tr,
             List<TextEntity> texts,
-            string parentSpace)
+            string parentSpace,
+            int nestingLevel = 1,
+            HashSet<ObjectId>? processedBlocks = null)
         {
+            // ✅ 防止无限递归（循环块引用）
+            if (nestingLevel > 100)
+            {
+                Log.Warning($"嵌套深度超过100层，停止递归（可能存在循环引用）");
+                return;
+            }
+
+            processedBlocks ??= new HashSet<ObjectId>();
+
+            // ✅ 防止重复处理同一个块定义（循环引用保护）
+            if (processedBlocks.Contains(blockRef.BlockTableRecord))
+            {
+                return;
+            }
+            processedBlocks.Add(blockRef.BlockTableRecord);
+
             try
             {
                 // 获取块定义
                 var blockDef = (BlockTableRecord)tr.GetObject(blockRef.BlockTableRecord, OpenMode.ForRead);
+
+                // ✅ 跳过匿名块和特殊块（避免处理系统内部块）
+                if (blockDef.IsFromExternalReference)
+                {
+                    return;
+                }
 
                 // 遍历块定义中的所有实体
                 foreach (ObjectId entityId in blockDef)
@@ -298,14 +324,20 @@ namespace BiaogPlugin.Services
                         // 提取嵌套块的属性
                         ExtractBlockReferenceAttributes(nestedBlockRef, tr, texts, parentSpace);
 
-                        // 递归提取更深层的嵌套块
-                        ExtractFromNestedBlock(nestedBlockRef, tr, texts, parentSpace);
+                        // ✅ 递归提取更深层的嵌套块（传递嵌套深度和已处理块集合）
+                        ExtractFromNestedBlock(
+                            nestedBlockRef,
+                            tr,
+                            texts,
+                            $"{parentSpace}:Level{nestingLevel + 1}",
+                            nestingLevel + 1,
+                            processedBlocks);
                     }
                 }
             }
             catch (System.Exception ex)
             {
-                Log.Warning(ex, $"提取嵌套块文本失败: {blockRef.Name}");
+                Log.Warning(ex, $"提取嵌套块文本失败: {blockRef.Name}, Level={nestingLevel}");
             }
         }
 

@@ -196,6 +196,7 @@ namespace BiaogPlugin.UI.Ribbon
 
         /// <summary>
         /// ✅ AutoCAD空闲时激活标哥Tab（可能需要多次尝试）
+        /// AutoCAD 2024兼容性：Ribbon初始化需要更长时间
         /// </summary>
         private static int _activateAttempts = 0;
         private static void OnIdleActivateTab(object? sender, System.EventArgs e)
@@ -212,7 +213,15 @@ namespace BiaogPlugin.UI.Ribbon
                         // 移除事件处理器
                         Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnIdleActivateTab;
                         Log.Information($"✅ Ribbon Tab已激活（尝试{_activateAttempts}次）");
+                        _activateAttempts = 0; // 重置计数器
                         return;
+                    }
+
+                    // ✅ AutoCAD 2024兼容性：确保Tab在Tabs集合中
+                    if (!ComponentManager.Ribbon.Tabs.Contains(_biaogTab))
+                    {
+                        Log.Warning("Tab不在Ribbon.Tabs集合中，重新添加");
+                        ComponentManager.Ribbon.Tabs.Add(_biaogTab);
                     }
 
                     // ✅ 关键修复：多次设置确保激活
@@ -222,22 +231,40 @@ namespace BiaogPlugin.UI.Ribbon
                     // 2. 设置RibbonControl的ActiveTab属性
                     ComponentManager.Ribbon.ActiveTab = _biaogTab;
 
+                    // 3. ✅ AutoCAD 2024关键修复：强制刷新Ribbon显示
+                    try
+                    {
+                        ComponentManager.Ribbon.UpdateLayout();
+                    }
+                    catch { /* 某些版本可能不支持UpdateLayout */ }
+
                     Log.Debug($"尝试激活Ribbon Tab（第{_activateAttempts}次）: IsActive={_biaogTab.IsActive}");
 
-                    // 最多尝试5次
-                    if (_activateAttempts >= 5)
+                    // ✅ AutoCAD 2024兼容性：增加到20次尝试（约2秒）
+                    if (_activateAttempts >= 20)
                     {
                         Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnIdleActivateTab;
-                        Log.Warning($"Ribbon Tab激活失败，已尝试{_activateAttempts}次");
+
+                        if (_biaogTab.IsActive)
+                        {
+                            Log.Information($"✅ Ribbon Tab最终激活成功（共{_activateAttempts}次尝试）");
+                        }
+                        else
+                        {
+                            Log.Warning($"⚠️ Ribbon Tab激活未完成，已尝试{_activateAttempts}次（Tab已添加，可手动切换）");
+                        }
+
+                        _activateAttempts = 0; // 重置计数器
                     }
                 }
                 else
                 {
                     // 如果Ribbon或Tab还不可用，继续等待
-                    if (_activateAttempts >= 10)
+                    if (_activateAttempts >= 30)
                     {
                         Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnIdleActivateTab;
-                        Log.Error("Ribbon Tab激活失败：Ribbon或Tab不可用");
+                        Log.Error("Ribbon Tab激活失败：Ribbon或Tab不可用（可能是Classic工作空间）");
+                        _activateAttempts = 0; // 重置计数器
                     }
                 }
             }
@@ -245,6 +272,7 @@ namespace BiaogPlugin.UI.Ribbon
             {
                 Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnIdleActivateTab;
                 Log.Error(ex, "激活Ribbon Tab失败: {Message}", ex.Message);
+                _activateAttempts = 0; // 重置计数器
             }
         }
 
