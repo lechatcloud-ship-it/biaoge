@@ -17,10 +17,12 @@ namespace BiaogPlugin.UI
     public partial class CalculationPalette : UserControl
     {
         private ComponentRecognizer? _recognizer;
+        private AIComponentRecognizer? _aiRecognizer;
         private QuantityCalculator? _calculator;
         private ExcelExporter? _exporter;
         private List<ComponentRecognitionResult>? _currentResults;
         private QuantitySummary? _currentSummary;
+        private int _aiVerifiedCount = 0;
 
         public CalculationPalette()
         {
@@ -37,12 +39,13 @@ namespace BiaogPlugin.UI
                 if (bailianClient != null)
                 {
                     _recognizer = new ComponentRecognizer(bailianClient);
+                    _aiRecognizer = new AIComponentRecognizer(bailianClient);
                 }
 
                 _calculator = new QuantityCalculator();
                 _exporter = new ExcelExporter();
 
-                AddLog("算量工具已就绪");
+                AddLog("算量工具已就绪（集成qwen3-vl-flash视觉识别）");
             }
             catch (System.Exception ex)
             {
@@ -59,15 +62,36 @@ namespace BiaogPlugin.UI
                 ConfidenceThresholdText.Text = $"{ConfidenceThresholdSlider.Value:P0}";
             };
 
-            AddLog("支持多策略构件识别（正则+AI验证+规范约束）");
+            // 精度模式切换事件
+            PrecisionModeComboBox.SelectionChanged += (s, e) =>
+            {
+                var selected = PrecisionModeComboBox.SelectedItem as ComboBoxItem;
+                if (selected != null)
+                {
+                    switch (selected.Tag as string)
+                    {
+                        case "QuickEstimate":
+                            PrecisionModeDescription.Text = "仅规则引擎，速度快，成本¥0";
+                            break;
+                        case "Budget":
+                            PrecisionModeDescription.Text = "推荐：预算控制模式，平衡精度和成本";
+                            break;
+                        case "FinalAccount":
+                            PrecisionModeDescription.Text = "最高精度，适用于竣工结算审计";
+                            break;
+                    }
+                }
+            };
+
+            AddLog("支持多策略构件识别（规则引擎+qwen3-vl-flash视觉验证）");
             AddLog("自动计算工程量和成本估算");
         }
 
         private async void RecognizeButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_recognizer == null)
+            if (_aiRecognizer == null)
             {
-                MessageBox.Show("算量服务未初始化", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show("AI算量服务未初始化", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
@@ -76,6 +100,29 @@ namespace BiaogPlugin.UI
                 RecognizeButton.IsEnabled = false;
                 ProgressCard.Visibility = Visibility.Visible;
                 ProgressBar.Value = 0;
+                _aiVerifiedCount = 0;
+
+                // 获取精度模式
+                var selected = PrecisionModeComboBox.SelectedItem as ComboBoxItem;
+                var precisionMode = CalculationPrecision.Budget; // 默认预算模式
+                if (selected != null)
+                {
+                    switch (selected.Tag as string)
+                    {
+                        case "QuickEstimate":
+                            precisionMode = CalculationPrecision.QuickEstimate;
+                            AddLog("精度模式: 快速估算（仅规则引擎）");
+                            break;
+                        case "Budget":
+                            precisionMode = CalculationPrecision.Budget;
+                            AddLog("精度模式: 预算控制（规则+AI验证30%）");
+                            break;
+                        case "FinalAccount":
+                            precisionMode = CalculationPrecision.FinalAccount;
+                            AddLog("精度模式: 竣工结算（规则+AI验证100%）");
+                            break;
+                    }
+                }
 
                 AddLog("开始识别构件...");
 
@@ -96,23 +143,41 @@ namespace BiaogPlugin.UI
 
                 AddLog($"提取到 {textEntities.Count} 个文本实体");
 
-                // 识别构件
-                ProgressText.Text = "识别构件...";
+                // 提取图层名称（用于AI分析）
+                ProgressText.Text = "分析图层...";
+                ProgressBar.Value = 15;
+
+                var layerNames = textEntities.Select(t => t.Layer).Distinct().ToList();
+                AddLog($"图层数: {layerNames.Count}");
+
+                // AI增强识别
+                ProgressText.Text = "AI构件识别中...";
                 ProgressBar.Value = 30;
 
-                var useAi = UseAiVerificationCheckBox.IsChecked ?? false;
-                _currentResults = await _recognizer.RecognizeFromTextEntitiesAsync(textEntities, useAi);
+                _currentResults = await _aiRecognizer.RecognizeAsync(
+                    textEntities,
+                    layerNames,
+                    precisionMode
+                );
 
                 AddLog($"识别完成: {_currentResults.Count} 个构件");
+
+                // 统计AI验证数量
+                _aiVerifiedCount = _currentResults.Count(r => r.OriginalText?.Contains("VL") ?? false);
+                if (_aiVerifiedCount > 0)
+                {
+                    AddLog($"AI视觉验证: {_aiVerifiedCount} 个构件");
+                }
 
                 // 过滤低置信度构件
                 ProgressText.Text = "过滤结果...";
                 ProgressBar.Value = 60;
 
                 var threshold = ConfidenceThresholdSlider.Value;
+                var beforeFilterCount = _currentResults.Count;
                 _currentResults = _currentResults.Where(r => r.Confidence >= threshold).ToList();
 
-                AddLog($"置信度>{threshold:P0}的构件: {_currentResults.Count}个");
+                AddLog($"置信度>{threshold:P0}的构件: {_currentResults.Count}/{beforeFilterCount}");
 
                 // 计算工程量
                 ProgressText.Text = "计算工程量...";
@@ -141,6 +206,7 @@ namespace BiaogPlugin.UI
                     $"识别完成！\n\n" +
                     $"构件总数: {_currentSummary.TotalComponents}\n" +
                     $"有效构件: {_currentSummary.ValidCount}\n" +
+                    $"AI验证率: {(_aiVerifiedCount * 100.0 / Math.Max(_currentResults.Count, 1)):F1}%\n" +
                     $"总成本: ¥{_currentSummary.TotalCost:N2}",
                     "识别完成",
                     MessageBoxButton.OK,
@@ -202,10 +268,15 @@ namespace BiaogPlugin.UI
             {
                 TotalComponentsText.Text = summary.TotalComponents.ToString();
                 ValidComponentsText.Text = summary.ValidCount.ToString();
-                AbnormalComponentsText.Text = summary.AbnormalCount.ToString();
                 AvgConfidenceText.Text = $"{summary.AverageConfidence:P0}";
-                TotalCostText.Text = $"¥{summary.TotalCost:N2}";
                 TotalVolumeText.Text = $"{summary.TotalVolume:F2}m³";
+                TotalCostText.Text = $"¥{summary.TotalCost:N2}";
+
+                // AI验证率
+                var verificationRate = _currentResults != null && _currentResults.Count > 0
+                    ? (_aiVerifiedCount * 100.0 / _currentResults.Count)
+                    : 0;
+                AiVerificationRateText.Text = $"{verificationRate:F1}%";
             });
         }
 

@@ -98,13 +98,21 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="15">
                         <TextBlock Text="工程算量" FontSize="16" FontWeight="Bold"
-                                   Foreground="White" Margin="0,0,0,15"/>
+                                   Foreground="White" Margin="0,0,0,10"/>
+                        <TextBlock Text="Phase 1: qwen3-vl-flash视觉识别，双引擎架构" FontSize="11"
+                                   Foreground="#4EC9B0" Margin="0,0,0,15"/>
 
                         <Border Background="#2D2D30" Padding="10" Margin="0,5" CornerRadius="3">
                             <StackPanel>
                                 <TextBlock Text="BIAOGE_CALCULATE" FontWeight="Bold" Foreground="#4EC9B0"/>
-                                <TextBlock Text="打开算量面板" Foreground="#CCCCCC" Margin="0,3"/>
+                                <TextBlock Text="打开AI算量面板" Foreground="#CCCCCC" Margin="0,3"/>
                                 <TextBlock Text="智能识别图纸中的构件，自动计算工程量" Foreground="#888" FontSize="11" Margin="0,5,0,0"/>
+                                <TextBlock Foreground="#888" FontSize="11" Margin="0,3,0,0" TextWrapping="Wrap">
+                                    三种精度模式：<LineBreak/>
+                                    • 快速估算 (90%精度, 仅规则引擎, 成本¥0)<LineBreak/>
+                                    • 预算控制 (95%精度, AI验证30%, 成本¥0.02/构件)<LineBreak/>
+                                    • 竣工结算 (99%精度, AI验证100%, 成本¥0.10/构件)
+                                </TextBlock>
                             </StackPanel>
                         </Border>
 
@@ -121,6 +129,19 @@
                                 <TextBlock Text="BIAOGE_EXPORTEXCEL" FontWeight="Bold" Foreground="#4EC9B0"/>
                                 <TextBlock Text="导出Excel清单" Foreground="#CCCCCC" Margin="0,3"/>
                                 <TextBlock Text="将算量结果导出为Excel工程量清单（包含汇总表、明细表、材料表）" Foreground="#888" FontSize="11" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Text="技术架构" FontWeight="Bold" Foreground="#CCCCCC" Margin="0,15,0,5"/>
+                        <Border Background="#252526" Padding="10" CornerRadius="3">
+                            <StackPanel>
+                                <TextBlock Foreground="#888" FontSize="11" TextWrapping="Wrap">
+                                    • 规则引擎：正则表达式+GB规范约束，零成本快速识别<LineBreak/>
+                                    • VL模型验证：qwen3-vl-flash视觉理解，2D/3D空间感知<LineBreak/>
+                                    • 自动截图：Document.CapturePreviewImage官方方法<LineBreak/>
+                                    • 智能匹配：低置信度项自动触发AI验证<LineBreak/>
+                                    • 成本优化：选择性验证，降低83%成本
+                                </TextBlock>
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -214,9 +235,11 @@
 
                         <TextBlock Text="3. 工程算量" FontWeight="Bold" Foreground="#CCCCCC" Margin="0,15,0,5"/>
                         <TextBlock Foreground="#888" Margin="10,0,0,0" TextWrapping="Wrap">
-                            • 运行 BIAOGE_CALCULATE 打开算量面板<LineBreak/>
-                            • 点击"开始识别"自动识别构件<LineBreak/>
-                            • 点击"导出Excel"生成工程量清单
+                            • 运行 BIAOGE_CALCULATE 打开AI算量面板<LineBreak/>
+                            • 选择精度模式（推荐"预算控制"）<LineBreak/>
+                            • 点击"开始识别构件"自动识别（集成qwen3-vl-flash视觉AI）<LineBreak/>
+                            • 查看识别统计（构件数、AI验证率、成本）<LineBreak/>
+                            • 点击"导出Excel清单"生成工程量清单
                         </TextBlock>
 
                         <TextBlock Text="4. 使用AI助手" FontWeight="Bold" Foreground="#CCCCCC" Margin="0,15,0,5"/>

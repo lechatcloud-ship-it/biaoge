@@ -17,10 +17,18 @@
                     <TextBlock Text="识别选项" FontSize="14" FontWeight="Bold"
                                Foreground="White" Margin="0,0,0,10"/>
 
-                    <CheckBox x:Name="UseAiVerificationCheckBox" Content="启用AI验证（提高置信度）"
-                              Foreground="#CCCCCC" Margin="0,0,0,8"/>
-                    <TextBlock Text="AI验证会提高识别准确率，但会增加处理时间"
-                               FontSize="10" Foreground="#666" Margin="20,0,0,15"/>
+                    <!-- 精度模式选择 -->
+                    <TextBlock Text="精度模式:" Foreground="#CCCCCC" Margin="0,0,0,5"/>
+                    <ComboBox x:Name="PrecisionModeComboBox" Margin="0,0,0,8"
+                              Background="#3E3E42" Foreground="White" BorderBrush="#555555"
+                              SelectedIndex="1">
+                        <ComboBoxItem Content="快速估算 (90%精度, 仅规则引擎, 成本¥0)" Tag="QuickEstimate"/>
+                        <ComboBoxItem Content="预算控制 (95%精度, AI验证30%, 成本¥0.02/构件)" Tag="Budget"/>
+                        <ComboBoxItem Content="竣工结算 (99%精度, AI验证100%, 成本¥0.10/构件)" Tag="FinalAccount"/>
+                    </ComboBox>
+                    <TextBlock x:Name="PrecisionModeDescription"
+                               Text="推荐：预算控制模式，平衡精度和成本"
+                               FontSize="10" Foreground="#4EC9B0" Margin="0,0,0,15"/>
 
                     <TextBlock Text="置信度阈值:" Foreground="#CCCCCC" Margin="0,5,0,5"/>
                     <Slider x:Name="ConfidenceThresholdSlider" Minimum="0.5" Maximum="1.0" Value="0.8"
@@ -72,9 +80,9 @@
                             <TextBlock x:Name="ValidComponentsText" Text="0" FontSize="18"
                                        Foreground="#6A9955" FontWeight="Bold" Margin="0,2,0,10"/>
 
-                            <TextBlock Text="总成本" FontSize="11" Foreground="#999"/>
-                            <TextBlock x:Name="TotalCostText" Text="¥0.00" FontSize="16"
-                                       Foreground="#CE9178" FontWeight="Bold"/>
+                            <TextBlock Text="总体积" FontSize="11" Foreground="#999"/>
+                            <TextBlock x:Name="TotalVolumeText" Text="0.00m³" FontSize="16"
+                                       Foreground="#9CDCFE" FontWeight="Bold"/>
                         </StackPanel>
 
                         <StackPanel Grid.Column="1">
@@ -82,13 +90,13 @@
                             <TextBlock x:Name="AvgConfidenceText" Text="0%" FontSize="18"
                                        Foreground="#DCDCAA" FontWeight="Bold" Margin="0,2,0,10"/>
 
-                            <TextBlock Text="异常构件" FontSize="11" Foreground="#999"/>
-                            <TextBlock x:Name="AbnormalComponentsText" Text="0" FontSize="18"
-                                       Foreground="#F48771" FontWeight="Bold" Margin="0,2,0,10"/>
+                            <TextBlock Text="AI验证率" FontSize="11" Foreground="#999"/>
+                            <TextBlock x:Name="AiVerificationRateText" Text="0%" FontSize="18"
+                                       Foreground="#C586C0" FontWeight="Bold" Margin="0,2,0,10"/>
 
-                            <TextBlock Text="总体积" FontSize="11" Foreground="#999"/>
-                            <TextBlock x:Name="TotalVolumeText" Text="0.00m³" FontSize="16"
-                                       Foreground="#9CDCFE" FontWeight="Bold"/>
+                            <TextBlock Text="总成本" FontSize="11" Foreground="#999"/>
+                            <TextBlock x:Name="TotalCostText" Text="¥0.00" FontSize="16"
+                                       Foreground="#CE9178" FontWeight="Bold"/>
                         </StackPanel>
                     </Grid>
                 </StackPanel>
