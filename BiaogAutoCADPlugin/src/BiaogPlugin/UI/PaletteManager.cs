@@ -382,27 +382,23 @@ namespace BiaogPlugin.UI
                 {
                     Log.Debug($"AI助手面板状态: Visible={_aiPaletteSet.Visible}, Dock={_aiPaletteSet.Dock}, Size={_aiPaletteSet.Size}");
 
-                    // 确保停靠设置
-                    if (_aiPaletteSet.Dock == DockSides.None)
-                    {
-                        _aiPaletteSet.Dock = DockSides.Right;
-                    }
-
-                    // 确保尺寸正常
+                    // ✅ 按照AutoCAD官方最佳实践：先Size，后Dock
+                    // 参考：https://stackoverflow.com/questions/23372182
                     var targetSize = new System.Drawing.Size(800, 850);
-                    if (_aiPaletteSet.Size.Width < 600 || _aiPaletteSet.Size.Height < 700)
-                    {
-                        Log.Warning($"尺寸异常: {_aiPaletteSet.Size}，重置");
-                        _aiPaletteSet.Size = targetSize;
-                    }
 
-                    // ✅ 简化的显示逻辑：直接设置可见并激活
+                    // 第一步：设置Size（调整两次，不同值，触发渲染）
+                    _aiPaletteSet.Size = new System.Drawing.Size(810, 860);
+                    _aiPaletteSet.Size = targetSize;
+
+                    // 第二步：设置Dock（在Size之后）
+                    _aiPaletteSet.Dock = DockSides.Right;
+
+                    // 第三步：设置KeepFocus（允许内部控件获得焦点）
+                    _aiPaletteSet.KeepFocus = true;
+
+                    // 第四步：显示并激活
                     _aiPaletteSet.Visible = true;
                     _aiPaletteSet.Activate(0);
-
-                    // ✅ 关键修复：KeepFocus=true允许面板内控件（特别是InputTextBox）获得焦点
-                    // 不调用Application.MainWindow.Focus()，避免焦点被抢走导致中文输入失败
-                    _aiPaletteSet.KeepFocus = true;
 
                     Log.Information($"✓ AI助手面板已显示（Dock={_aiPaletteSet.Dock}, Size={_aiPaletteSet.Size}, Visible={_aiPaletteSet.Visible}）");
                 }

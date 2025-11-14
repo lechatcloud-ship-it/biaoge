@@ -53,30 +53,32 @@ namespace BiaogPlugin.UI.Ribbon
 
         /// <summary>
         /// ✅ Application.Idle事件处理：延迟加载Ribbon
+        /// 参考AutoCAD官方最佳实践：在Idle事件中检查Ribbon是否为null
+        /// https://forums.autodesk.com/t5/net/getting-componentmanager-ribbon-as-null-for-autocad-2020
         /// </summary>
         private static void OnIdleLoadRibbon(object? sender, System.EventArgs e)
         {
-            // 移除事件，只执行一次
-            Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnIdleLoadRibbon;
-
             try
             {
-                if (ComponentManager.Ribbon != null)
+                // ✅ 关键修复：在Ribbon完全就绪之前不移除Idle事件
+                if (ComponentManager.Ribbon == null)
                 {
-                    Log.Debug("Ribbon已就绪，开始创建");
-                    CreateRibbon();
+                    Log.Debug("Ribbon尚未就绪，等待下一个Idle周期");
+                    return;  // 保持Idle事件订阅，等待下一次触发
                 }
-                else
-                {
-                    // Ribbon仍未就绪，使用ItemInitialized事件
-                    Log.Debug("Ribbon仍未就绪，注册ItemInitialized事件");
-                    _isInitializing = true;
-                    ComponentManager.ItemInitialized += ComponentManager_ItemInitialized;
-                }
+
+                // Ribbon已就绪，移除Idle事件
+                Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnIdleLoadRibbon;
+                Log.Debug("Ribbon已就绪，开始创建");
+
+                CreateRibbon();
             }
             catch (System.Exception ex)
             {
+                // 发生错误时也要移除事件，避免无限循环
+                Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnIdleLoadRibbon;
                 Log.Error(ex, "Idle加载Ribbon失败");
+                _isInitializing = false;
             }
         }
 
