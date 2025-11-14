@@ -587,9 +587,7 @@ public class BailianApiClient
             var sourceLang = string.IsNullOrEmpty(sourceLanguage) ? "auto" : ConvertLanguageCode(sourceLanguage);
             var targetLang = ConvertLanguageCode(targetLanguage);
 
-            // ✅ 修复：translation_options应该在根级别，不是extra_body
-            // 参考curl示例：https://help.aliyun.com/zh/model-studio/machine-translation
-            //
+            // OpenAI 兼容模式请求格式
             // ✅ 工程建筑专业翻译增强：添加domains和terms
             var requestBody = new
             {
@@ -602,12 +600,15 @@ public class BailianApiClient
                         content = text
                     }
                 },
-                translation_options = new  // ✅ 根级别，不是extra_body
+                extra_body = new
                 {
-                    source_lang = sourceLang,
-                    target_lang = targetLang,
-                    domains = EngineeringTranslationConfig.DomainPrompt,  // ✅ 工程建筑领域提示
-                    terms = EngineeringTranslationConfig.GetApiTerms(sourceLang, targetLang)  // ✅ 专业术语
+                    translation_options = new
+                    {
+                        source_lang = sourceLang,
+                        target_lang = targetLang,
+                        domains = EngineeringTranslationConfig.DomainPrompt,  // ✅ 工程建筑领域提示
+                        terms = EngineeringTranslationConfig.GetApiTerms(sourceLang, targetLang)  // ✅ 专业术语
+                    }
                 }
             };
 
