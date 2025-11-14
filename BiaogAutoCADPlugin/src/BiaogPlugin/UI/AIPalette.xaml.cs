@@ -163,22 +163,22 @@ namespace BiaogPlugin.UI
         }
 
         /// <summary>
-        /// 输入框获得焦点时 - 强制保持焦点
+        /// ✅ 修复问题7：输入框获得焦点时 - 不再强制保持焦点
+        /// 允许用户自由切换到AutoCAD命令行
         /// </summary>
         private void InputTextBox_GotFocus(object sender, RoutedEventArgs e)
         {
             try
             {
-                // ✅ 使用Dispatcher延迟执行，确保焦点设置生效
-                // 这是AutoCAD PaletteSet中WPF控件焦点管理的标准做法
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    if (!InputTextBox.IsFocused)
-                    {
-                        Keyboard.Focus(InputTextBox);
-                        InputTextBox.Focus();
-                    }
-                }), DispatcherPriority.Input);
+                // ❌ 删除：不再使用Dispatcher强制获取焦点
+                // Dispatcher.BeginInvoke(new Action(() =>
+                // {
+                //     if (!InputTextBox.IsFocused)
+                //     {
+                //         Keyboard.Focus(InputTextBox);
+                //         InputTextBox.Focus();
+                //     }
+                // }), DispatcherPriority.Input);
 
                 Log.Debug("AI助手输入框获得焦点");
             }
@@ -214,12 +214,12 @@ namespace BiaogPlugin.UI
             // 但让TextBox正常接收输入
             e.Handled = false;
 
-            // 确保焦点仍在TextBox上
-            if (!InputTextBox.IsFocused)
-            {
-                Keyboard.Focus(InputTextBox);
-                InputTextBox.Focus();
-            }
+            // ❌ 删除：不再强制获取焦点，允许用户切换到AutoCAD
+            // if (!InputTextBox.IsFocused)
+            // {
+            //     Keyboard.Focus(InputTextBox);
+            //     InputTextBox.Focus();
+            // }
         }
 
         /// <summary>
@@ -234,16 +234,16 @@ namespace BiaogPlugin.UI
         }
 
         /// <summary>
-        /// ✅ 关键修复：预处理所有按键，防止AutoCAD命令行捕获
+        /// ✅ 修复问题7：预处理按键，但不强制获取焦点
         /// </summary>
         private void InputTextBox_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            // ✅ 确保焦点在TextBox上
-            if (!InputTextBox.IsFocused)
-            {
-                Keyboard.Focus(InputTextBox);
-                InputTextBox.Focus();
-            }
+            // ❌ 删除：不再强制获取焦点
+            // if (!InputTextBox.IsFocused)
+            // {
+            //     Keyboard.Focus(InputTextBox);
+            //     InputTextBox.Focus();
+            // }
 
             // 除了Tab键（用于切换焦点）和Escape键（可能需要取消操作）
             // 其他所有按键都在TextBox内部处理，不传播到AutoCAD
