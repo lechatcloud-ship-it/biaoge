@@ -11,6 +11,11 @@ namespace BiaogPlugin.Services;
 ///
 /// 参考：Kean Walmsley - Through the Interface Blog
 /// 优势：代码简洁（5行核心代码）、稳定性高、与编辑器显示完全一致
+///
+/// ⚠️ 线程安全要求：
+/// - 必须在AutoCAD主线程调用（不支持多线程）
+/// - async方法中，必须在第一个await之前调用此方法
+/// - 只读操作，不需要Transaction或DocumentLock
 /// </summary>
 public class ViewportSnapshotter
 {
@@ -18,6 +23,11 @@ public class ViewportSnapshotter
     /// 捕获当前视口的截图
     /// </summary>
     /// <returns>包含Base64图像数据和视图信息的快照对象</returns>
+    /// <exception cref="InvalidOperationException">没有活动的AutoCAD文档时抛出</exception>
+    /// <remarks>
+    /// ⚠️ 线程安全：必须在AutoCAD主线程调用！
+    /// 在async方法中，确保在第一个await之前调用此方法。
+    /// </remarks>
     public static ViewportSnapshot CaptureCurrentView()
     {
         var doc = Application.DocumentManager.MdiActiveDocument;

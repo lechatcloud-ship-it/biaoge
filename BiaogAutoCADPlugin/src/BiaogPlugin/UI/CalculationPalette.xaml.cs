@@ -134,23 +134,30 @@ namespace BiaogPlugin.UI
                     return;
                 }
 
-                // 提取文本
+                // ===== AutoCAD API调用（需要文档锁定） =====
+                // ✅ 最佳实践：PaletteSet事件中调用AutoCAD API应显式锁定文档
+                // 参考：AutoCAD官方文档 - "When to Lock the Document"
+                List<TextEntity> textEntities;
+                List<string> layerNames;
+
                 ProgressText.Text = "提取文本...";
                 ProgressBar.Value = 10;
 
-                var extractor = new DwgTextExtractor();
-                var textEntities = extractor.ExtractAllText();
+                using (var docLock = doc.LockDocument())
+                {
+                    // 在文档锁定下提取DWG数据
+                    var extractor = new DwgTextExtractor();
+                    textEntities = extractor.ExtractAllText();
+
+                    // 提取图层名称
+                    layerNames = textEntities.Select(t => t.Layer).Distinct().ToList();
+                }
+                // ✅ 文档锁定在await之前释放（避免死锁）
 
                 AddLog($"提取到 {textEntities.Count} 个文本实体");
-
-                // 提取图层名称（用于AI分析）
-                ProgressText.Text = "分析图层...";
-                ProgressBar.Value = 15;
-
-                var layerNames = textEntities.Select(t => t.Layer).Distinct().ToList();
                 AddLog($"图层数: {layerNames.Count}");
 
-                // AI增强识别
+                // ===== AI异步识别（不需要文档锁定） =====
                 ProgressText.Text = "AI构件识别中...";
                 ProgressBar.Value = 30;
 
@@ -212,16 +219,75 @@ namespace BiaogPlugin.UI
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
+            catch (Autodesk.AutoCAD.Runtime.Exception acEx)
+            {
+                // AutoCAD API异常
+                Log.Error(acEx, "AutoCAD API调用失败");
+                AddLog($"[错误] AutoCAD API错误: {acEx.Message}");
+                MessageBox.Show(
+                    $"AutoCAD操作失败:\n{acEx.Message}\n\n" +
+                    "可能原因：\n" +
+                    "• 图纸已损坏或无效\n" +
+                    "• 图层或文本实体已删除\n" +
+                    "• AutoCAD版本不兼容\n\n" +
+                    "建议：检查图纸完整性，或联系技术支持",
+                    "AutoCAD错误",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            catch (System.Net.Http.HttpRequestException httpEx)
+            {
+                // 网络/API调用异常
+                Log.Error(httpEx, "百炼API网络请求失败");
+                AddLog($"[错误] 网络错误: {httpEx.Message}");
+                MessageBox.Show(
+                    $"AI服务连接失败:\n{httpEx.Message}\n\n" +
+                    "可能原因：\n" +
+                    "• 网络连接中断\n" +
+                    "• API密钥无效或过期\n" +
+                    "• 百炼服务暂时不可用\n\n" +
+                    "建议：\n" +
+                    "1. 检查网络连接\n" +
+                    "2. 运行BIAOGE_DIAGNOSTIC诊断\n" +
+                    "3. 验证API密钥（BIAOGE_SETTINGS）",
+                    "网络错误",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            catch (System.InvalidOperationException invEx) when (invEx.Message.Contains("没有活动的AutoCAD文档"))
+            {
+                // 文档状态异常
+                Log.Warning(invEx, "文档状态异常");
+                AddLog($"[错误] {invEx.Message}");
+                MessageBox.Show(
+                    "无法访问AutoCAD文档\n\n" +
+                    "请确保：\n" +
+                    "• 至少打开一个DWG文件\n" +
+                    "• 文档未处于编辑锁定状态",
+                    "文档错误",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
             catch (System.Exception ex)
             {
-                Log.Error(ex, "构件识别失败");
-                AddLog($"[错误] {ex.Message}");
-                MessageBox.Show($"识别失败:\n{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                // 未知异常
+                Log.Error(ex, "构件识别发生未知错误");
+                AddLog($"[错误] 未知错误: {ex.GetType().Name} - {ex.Message}");
+                MessageBox.Show(
+                    $"识别过程发生错误:\n{ex.Message}\n\n" +
+                    $"错误类型: {ex.GetType().Name}\n\n" +
+                    "详细信息已记录到日志文件\n" +
+                    $"日志路径: %APPDATA%\\Biaoge\\Logs\\",
+                    "错误",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
             finally
             {
                 RecognizeButton.IsEnabled = true;
                 ProgressCard.Visibility = Visibility.Collapsed;
+                ProgressText.Text = "就绪";
+                ProgressBar.Value = 0;
             }
         }
 

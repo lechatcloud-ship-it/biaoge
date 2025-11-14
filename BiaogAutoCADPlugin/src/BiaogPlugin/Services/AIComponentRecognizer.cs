@@ -37,11 +37,21 @@ public class AIComponentRecognizer
 
     /// <summary>
     /// 识别图纸中的所有构件（AI增强模式）
+    /// 双引擎架构：规则引擎（快速免费）+ VL模型验证（精准但付费）
     /// </summary>
     /// <param name="textEntities">AutoCAD提取的文本实体</param>
     /// <param name="layerNames">图层名称列表（可选）</param>
     /// <param name="precision">精度模式（影响成本）</param>
     /// <returns>识别结果列表</returns>
+    /// <remarks>
+    /// ⚠️ 线程安全关键设计：
+    /// Step 0: 在第一个await之前，预先捕获视口截图（ViewportSnapshotter.CaptureCurrentView）
+    ///         确保AutoCAD API在主线程调用，避免async切换线程后调用导致崩溃
+    /// Step 1: 规则引擎识别（第一个await在此处）
+    /// Step 2: VL模型验证（使用Step 0预先捕获的截图）
+    ///
+    /// 参考：AutoCAD .NET API - "Generally unsafe to access those APIs from any other thread"
+    /// </remarks>
     public async Task<List<ComponentRecognitionResult>> RecognizeAsync(
         List<TextEntity> textEntities,
         List<string>? layerNames = null,
