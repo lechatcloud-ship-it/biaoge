@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Autodesk.AutoCAD.ApplicationServices;
 using Serilog;
 
 namespace BiaogPlugin.UI.Controls
@@ -93,6 +94,7 @@ namespace BiaogPlugin.UI.Controls
 
         /// <summary>
         /// ✅ 关键修复：防止焦点丢失到AutoCAD命令行
+        /// 使用AutoCAD官方Window.Focus()方法
         /// </summary>
         private void OnPreviewLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
         {
@@ -101,26 +103,58 @@ namespace BiaogPlugin.UI.Controls
             {
                 Log.Debug("输入法组字中，取消焦点丢失");
                 e.Handled = true;  // ✅ 阻止焦点丢失
-                Dispatcher.BeginInvoke(new Action(() =>
+
+                try
                 {
-                    Focus();
-                    Keyboard.Focus(this);
-                }), DispatcherPriority.Input);
+                    // ✅ AutoCAD官方解决方案
+                    var doc = Application.DocumentManager.MdiActiveDocument;
+                    if (doc != null && doc.Window != null)
+                    {
+                        doc.Window.Focus();
+                    }
+
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        Focus();
+                        Keyboard.Focus(this);
+                    }), DispatcherPriority.Input);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "焦点恢复失败");
+                }
                 return;
             }
 
-            // 如果文本框有内容且新焦点不是在本窗口内，也取消焦点丢失
+            // 如果新焦点不是在本窗口内（跳转到AutoCAD命令行），抢回焦点
             if (e.NewFocus == null || !IsAncestorOf((DependencyObject)e.NewFocus))
             {
-                Log.Debug($"焦点试图跳走到外部，尝试保持焦点 (NewFocus: {e.NewFocus?.GetType().Name ?? "null"})");
-                // ✅ 不完全取消，但延迟抢回焦点
+                Log.Debug($"焦点试图跳走到AutoCAD (NewFocus: {e.NewFocus?.GetType().Name ?? "null"})");
+
+                // ✅ 延迟抢回焦点，使用AutoCAD官方方法
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     if (!IsFocused && IsVisible && IsEnabled)
                     {
-                        Focus();
-                        Keyboard.Focus(this);
-                        Log.Debug("已重新获取焦点");
+                        try
+                        {
+                            // ✅ 关键：先调用Window.Focus()
+                            var doc = Application.DocumentManager.MdiActiveDocument;
+                            if (doc != null && doc.Window != null)
+                            {
+                                doc.Window.Focus();
+                                Log.Debug("已调用AutoCAD Window.Focus()");
+                            }
+
+                            // 然后设置TextBox焦点
+                            Focus();
+                            Keyboard.Focus(this);
+                            Log.Debug("已重新获取TextBox焦点");
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning(ex, "焦点恢复失败");
+                        }
                     }
                 }), DispatcherPriority.Input);
             }
@@ -128,14 +162,39 @@ namespace BiaogPlugin.UI.Controls
 
         /// <summary>
         /// ✅ 辅助方法：确保焦点在TextBox上
+        /// 使用AutoCAD官方推荐的Window.Focus()方法
+        /// 参考：AutoCAD DevBlog - "Use of Window.Focus in AutoCAD 2014"
         /// </summary>
         private void EnsureFocus()
         {
             if (!IsFocused)
             {
-                Focus();
-                Keyboard.Focus(this);
-                Log.Verbose("EnsureFocus: 已重新获取焦点");
+                try
+                {
+                    // ✅ 关键修复：AutoCAD官方解决方案
+                    // 步骤1: 先告诉AutoCAD将焦点给PaletteSet窗口
+                    var doc = Application.DocumentManager.MdiActiveDocument;
+                    if (doc != null && doc.Window != null)
+                    {
+                        doc.Window.Focus();
+                        Log.Verbose("EnsureFocus: AutoCAD Window.Focus()已调用");
+                    }
+
+                    // 步骤2: 然后在PaletteSet窗口内设置TextBox焦点
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        Focus();
+                        Keyboard.Focus(this);
+                        Log.Verbose("EnsureFocus: TextBox焦点已设置");
+                    }), DispatcherPriority.Input);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "EnsureFocus失败，使用备用方案");
+                    // 备用方案：直接设置焦点
+                    Focus();
+                    Keyboard.Focus(this);
+                }
             }
         }
 
