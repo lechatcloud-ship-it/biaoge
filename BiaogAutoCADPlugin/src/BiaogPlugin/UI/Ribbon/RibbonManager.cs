@@ -41,6 +41,18 @@ namespace BiaogPlugin.UI.Ribbon
                     Log.Debug("已注册SystemVariableChanged事件监听");
                 }
 
+                // ✅ 新增：注册文档激活事件，确保Ribbon在打开文档时显示
+                try
+                {
+                    Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.DocumentActivated -= OnDocumentActivated;
+                    Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.DocumentActivated += OnDocumentActivated;
+                    Log.Debug("已注册DocumentActivated事件监听");
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Warning(ex, "注册DocumentActivated事件失败");
+                }
+
                 // ✅ 使用Application.Idle事件延迟加载，确保Ribbon完全初始化
                 Autodesk.AutoCAD.ApplicationServices.Application.Idle += OnIdleLoadRibbon;
             }
@@ -187,11 +199,66 @@ namespace BiaogPlugin.UI.Ribbon
                 // 原因：AutoCAD启动时，Ribbon可能还未完全就绪，直接设置IsActive会被覆盖
                 // 解决方案：等待AutoCAD进入空闲状态（完全启动完成）后再激活
                 Autodesk.AutoCAD.ApplicationServices.Application.Idle += OnIdleActivateTab;
+
+                // ✅ 兜底方案：20秒后检查一次，如果未显示则自动激活
+                // 这是最终的fail-safe机制，确保Ribbon一定会显示
+                StartFailsafeActivationTimer();
             }
             catch (System.Exception ex)
             {
                 Log.Error(ex, "创建Ribbon失败: {Message}", ex.Message);
             }
+        }
+
+        /// <summary>
+        /// ✅ 启动兜底激活定时器（20秒后检查）
+        /// 如果Ribbon Tab仍未显示，则自动执行激活命令
+        /// </summary>
+        private static void StartFailsafeActivationTimer()
+        {
+            var failsafeTimer = new System.Timers.Timer(20000); // 20秒
+            failsafeTimer.AutoReset = false; // 只执行一次
+            failsafeTimer.Elapsed += (sender, args) =>
+            {
+                try
+                {
+                    // 检查Tab是否已经激活
+                    if (_biaogTab != null && !_biaogTab.IsActive)
+                    {
+                        Log.Warning("⚠️ Ribbon Tab在20秒后仍未激活，执行兜底激活");
+
+                        // 在AutoCAD主线程执行激活命令
+                        // 使用Dispatcher确保在正确的线程
+                        var doc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
+                        if (doc != null)
+                        {
+                            doc.Editor.Command("_BIAOGE_SHOW_RIBBON");
+                            Log.Information("✅ 已自动执行BIAOGE_SHOW_RIBBON命令（兜底激活）");
+                        }
+                        else
+                        {
+                            // 如果没有活动文档，直接调用方法
+                            ActivateRibbonTab();
+                        }
+                    }
+                    else if (_biaogTab != null && _biaogTab.IsActive)
+                    {
+                        Log.Information("✅ Ribbon Tab已正常激活，跳过兜底激活");
+                    }
+                    else
+                    {
+                        Log.Warning("⚠️ Ribbon Tab未创建，无法执行兜底激活");
+                    }
+
+                    failsafeTimer.Dispose();
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Error(ex, "兜底激活失败");
+                }
+            };
+            failsafeTimer.Start();
+            Log.Debug("已启动20秒兜底激活定时器");
         }
 
         /// <summary>
@@ -277,6 +344,91 @@ namespace BiaogPlugin.UI.Ribbon
         }
 
         /// <summary>
+        /// ✅ 文档激活事件：尝试激活Ribbon Tab
+        /// 在用户打开/切换文档时，如果Tab未激活则尝试激活
+        /// </summary>
+        private static void OnDocumentActivated(object? sender, Autodesk.AutoCAD.ApplicationServices.DocumentCollectionEventArgs e)
+        {
+            try
+            {
+                // 如果Tab已激活，无需处理
+                if (_biaogTab != null && _biaogTab.IsActive)
+                {
+                    return;
+                }
+
+                // 延迟1秒后尝试激活（确保文档完全加载）
+                var timer = new System.Timers.Timer(1000);
+                timer.AutoReset = false;
+                timer.Elapsed += (s, args) =>
+                {
+                    try
+                    {
+                        ActivateRibbonTab();
+                        timer.Dispose();
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Log.Warning(ex, "文档激活后尝试激活Ribbon Tab失败");
+                    }
+                };
+                timer.Start();
+                Log.Debug("文档激活，将在1秒后尝试激活Ribbon Tab");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Warning(ex, "处理文档激活事件失败");
+            }
+        }
+
+        /// <summary>
+        /// ✅ 手动激活Ribbon Tab（可从命令调用）
+        /// </summary>
+        public static void ActivateRibbonTab()
+        {
+            try
+            {
+                if (_biaogTab == null)
+                {
+                    Log.Warning("Ribbon Tab未创建，无法激活");
+                    return;
+                }
+
+                if (ComponentManager.Ribbon == null)
+                {
+                    Log.Warning("Ribbon控件不可用，无法激活");
+                    return;
+                }
+
+                Log.Debug("尝试手动激活Ribbon Tab");
+
+                // 设置为活动Tab
+                _biaogTab.IsActive = true;
+                ComponentManager.Ribbon.ActiveTab = _biaogTab;
+
+                // 强制刷新
+                try
+                {
+                    ComponentManager.Ribbon.UpdateLayout();
+                }
+                catch { /* 某些版本可能不支持UpdateLayout */ }
+
+                if (_biaogTab.IsActive)
+                {
+                    Log.Information("✅ Ribbon Tab已成功激活");
+                }
+                else
+                {
+                    Log.Warning("⚠️ Ribbon Tab激活状态未确认");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "手动激活Ribbon Tab失败");
+            }
+        }
+
+        /// <summary>
         /// 卸载Ribbon工具栏
         /// </summary>
         public static void UnloadRibbon()
@@ -285,6 +437,12 @@ namespace BiaogPlugin.UI.Ribbon
             {
                 // 移除Idle事件（如果还未触发）
                 Autodesk.AutoCAD.ApplicationServices.Application.Idle -= OnIdleActivateTab;
+                // 移除文档激活事件
+                try
+                {
+                    Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.DocumentActivated -= OnDocumentActivated;
+                }
+                catch { /* 忽略 */ }
             }
             catch { /* 忽略移除事件的错误 */ }
 

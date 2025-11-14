@@ -425,28 +425,24 @@ namespace BiaogPlugin.UI
                 }
 
                 // ✅ 流式接收AI回复（分离思考和正文）
+                // 关键修复：移除Dispatcher.Invoke双重调度，直接更新UI
+                // syncContext.Post已经确保回调在UI线程执行
                 var response = await _aiService.ChatStreamAsync(
                     userMessage: userInput,
                     useDeepThinking: _deepThinking,
                     onContentChunk: chunk =>
                     {
                         fullResponse += chunk;
-                        Dispatcher.Invoke(() =>
-                        {
-                            // ✅ 更新正文内容
-                            contentRenderer?.AppendChunk(chunk);
-                            ScrollToBottom();
-                        });
+                        // ✅ 直接更新，无需Dispatcher.Invoke（已在UI线程）
+                        contentRenderer?.AppendChunk(chunk);
+                        ScrollToBottom();
                     },
                     onReasoningChunk: _deepThinking
                         ? reasoning =>
                         {
-                            Dispatcher.Invoke(() =>
-                            {
-                                // ✅ 更新思考内容
-                                thinkingRenderer?.AppendChunk(reasoning);
-                                ScrollToBottom();
-                            });
+                            // ✅ 直接更新，无需Dispatcher.Invoke（已在UI线程）
+                            thinkingRenderer?.AppendChunk(reasoning);
+                            ScrollToBottom();
                         }
                         : null
                 );
