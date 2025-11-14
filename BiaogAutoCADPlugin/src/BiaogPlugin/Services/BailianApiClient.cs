@@ -943,13 +943,14 @@ public class BailianApiClient
                             {
                                 fullResponse.Append(text);
 
-                                // ✅ 关键修复：使用SynchronizationContext.Post将回调Marshal回主线程
-                                // 避免在后台线程调用AutoCAD API或WPF UI
+                                // ✅ 流式显示：使用Post异步调度到UI线程
+                                // Post不会阻塞后台线程，允许快速读取stream
+                                // 回调函数内部不应再使用Dispatcher.Invoke，会造成双重调度延迟
                                 if (onStreamChunk != null)
                                 {
                                     if (syncContext != null)
                                     {
-                                        // Post是异步非阻塞的，避免死锁
+                                        // Post: 异步排队到UI线程，不阻塞stream读取
                                         syncContext.Post(_ => onStreamChunk(text), null);
                                     }
                                     else
@@ -969,7 +970,7 @@ public class BailianApiClient
                             {
                                 fullReasoning.Append(thinkingText);
 
-                                // ✅ 同样使用SynchronizationContext.Post
+                                // ✅ 流式显示：Post异步调度，避免阻塞stream读取
                                 if (onReasoningChunk != null)
                                 {
                                     if (syncContext != null)

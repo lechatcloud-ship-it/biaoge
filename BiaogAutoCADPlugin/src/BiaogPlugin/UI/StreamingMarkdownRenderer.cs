@@ -37,6 +37,7 @@ namespace BiaogPlugin.UI
 
         /// <summary>
         /// ✅ 追加流式内容块 - 立即更新模式
+        /// 关键修复：调用者已通过syncContext.Post在UI线程，此处无需再dispatch
         /// </summary>
         public void AppendChunk(string chunk)
         {
@@ -49,30 +50,27 @@ namespace BiaogPlugin.UI
                 _pendingChunks++;
             }
 
-            // ✅ 关键修复：立即同步更新，不使用定时器
-            // 在AutoCAD PaletteSet中，DispatcherTimer可能不可靠
-            // 使用Dispatcher.Invoke而不是BeginInvoke，确保立即执行
+            // ✅ 节流更新：避免过于频繁的渲染
             var timeSinceLastUpdate = (DateTime.Now - _lastUpdate).TotalMilliseconds;
 
             if (timeSinceLastUpdate >= ThrottleMs || _pendingChunks == 1)
             {
-                // ✅ 使用Invoke立即同步执行，确保流式效果
+                // ✅ 直接更新，无需Dispatcher（调用者已在UI线程）
+                // 移除三重调度，实现真正的实时流式显示
                 try
                 {
-                    _richTextBox.Dispatcher.Invoke(new Action(() =>
-                    {
-                        ForceUpdate();
-                    }), DispatcherPriority.Normal);  // 使用Normal优先级，平衡性能和响应
+                    ForceUpdate();
                 }
                 catch (Exception ex)
                 {
-                    Log.Error(ex, "Dispatcher.Invoke失败");
+                    Log.Error(ex, "流式更新失败");
                 }
             }
         }
 
         /// <summary>
         /// 完成流式输出，强制最终更新
+        /// 调用者已在UI线程，无需Dispatcher
         /// </summary>
         public void Complete()
         {
@@ -80,12 +78,9 @@ namespace BiaogPlugin.UI
             {
                 if (_pendingChunks > 0 || _content.Length > 0)
                 {
-                    // ✅ 最终更新，确保所有内容都被渲染
-                    _richTextBox.Dispatcher.Invoke(new Action(() =>
-                    {
-                        ForceUpdate();
-                        Log.Debug($"流式输出完成，最终内容长度: {_content.Length}");
-                    }), DispatcherPriority.Send);
+                    // ✅ 直接更新，确保所有内容都被渲染
+                    ForceUpdate();
+                    Log.Debug($"流式输出完成，最终内容长度: {_content.Length}");
                 }
             }
         }
