@@ -131,9 +131,9 @@ namespace BiaogPlugin.UI
                     _translationPaletteSet.Visible = true;
                     _translationPaletteSet.Activate(0);  // 激活第一个选项卡
 
-                    // ✅ 修复问题7：KeepFocus=false允许焦点切换到AutoCAD命令行
-                    // 用户可以点击AutoCAD窗口切换焦点，不会被强制保持在面板
-                    _translationPaletteSet.KeepFocus = false;
+                    // ✅ 修复中文输入法焦点跳转：KeepFocus=true保持焦点在面板内
+                    // 防止输入中文时焦点跳转到AutoCAD命令行
+                    _translationPaletteSet.KeepFocus = true;
 
                     Log.Information($"✓ 翻译面板已显示（Dock={_translationPaletteSet.Dock}, Size={_translationPaletteSet.Size}, Visible={_translationPaletteSet.Visible}）");
                 }
@@ -171,10 +171,10 @@ namespace BiaogPlugin.UI
                 // ✅ 使用 GUID 构造函数以持久化面板位置和大小设置
                 _calculationPaletteSet = new PaletteSet(
                     "标哥 - 构件识别算量",
-                    new System.Guid("A5B6C7D8-E9F0-1234-5678-9ABCDEF02222")
+                    new System.Guid("A5B6C7D8-E9F0-1234-5678-9ABCDEF02223")
                 )
                 {
-                    Size = new System.Drawing.Size(400, 700),
+                    Size = new System.Drawing.Size(420, 700),
                     MinimumSize = new System.Drawing.Size(350, 500),
                     DockEnabled = (DockSides)((int)DockSides.Left | (int)DockSides.Right),
                     Visible = false
@@ -225,7 +225,7 @@ namespace BiaogPlugin.UI
                         Log.Debug("第一次创建，执行Size调整触发渲染...");
 
                         // 调整两次Size（不同值）触发UI布局计算
-                        var tempSize = new System.Drawing.Size(510, 710);
+                        var tempSize = new System.Drawing.Size(430, 710);
                         _calculationPaletteSet.Size = tempSize;
 
                         // ❌ 修复：删除Toggle Visible逻辑，避免首次调用不显示
@@ -248,8 +248,8 @@ namespace BiaogPlugin.UI
                     _calculationPaletteSet.Visible = true;
                     _calculationPaletteSet.Activate(0);
 
-                    // ✅ 修复问题7：KeepFocus=false允许焦点切换到AutoCAD命令行
-                    _calculationPaletteSet.KeepFocus = false;
+                    // ✅ 修复中文输入法焦点跳转：KeepFocus=true保持焦点在面板内
+                    _calculationPaletteSet.KeepFocus = true;
 
                     Log.Information($"✓ 算量面板已显示（Dock={_calculationPaletteSet.Dock}, Size={_calculationPaletteSet.Size}, Visible={_calculationPaletteSet.Visible}）");
                 }
@@ -350,60 +350,41 @@ namespace BiaogPlugin.UI
             {
                 Log.Debug("准备显示AI助手面板...");
 
-                // ✅ 关键修复：第一次初始化时需要特殊处理
-                bool isFirstTime = (_aiPaletteSet == null);
-
-                if (isFirstTime)
+                // ✅ 如果未初始化，先初始化
+                if (_aiPaletteSet == null)
                 {
                     Log.Debug("AI助手面板未初始化，开始初始化...");
                     InitializeAIPalette();
-
-                    // ✅ 第一次创建后，调整Size来触发渲染（不隐藏面板）
-                    if (_aiPaletteSet != null)
-                    {
-                        Log.Debug("第一次创建，执行Size调整触发渲染...");
-
-                        // 调整两次Size（不同值）触发UI布局计算
-                        var tempSize = new System.Drawing.Size(810, 860);
-                        _aiPaletteSet.Size = tempSize;
-
-                        // ❌ 修复：删除Toggle Visible逻辑，避免首次调用不显示
-                        // _aiPaletteSet.Visible = true;
-                        // _aiPaletteSet.Visible = false;
-
-                        Log.Debug("强制渲染完成");
-                    }
                 }
 
-                if (_aiPaletteSet != null)
+                // ✅ 确保初始化成功
+                if (_aiPaletteSet == null)
                 {
-                    Log.Debug($"AI助手面板状态: Visible={_aiPaletteSet.Visible}, Dock={_aiPaletteSet.Dock}, Size={_aiPaletteSet.Size}");
-
-                    // ✅ 按照AutoCAD官方最佳实践：先Size，后Dock
-                    // 参考：https://stackoverflow.com/questions/23372182
-                    var targetSize = new System.Drawing.Size(800, 850);
-
-                    // 第一步：设置Size（调整两次，不同值，触发渲染）
-                    _aiPaletteSet.Size = new System.Drawing.Size(810, 860);
-                    _aiPaletteSet.Size = targetSize;
-
-                    // 第二步：设置Dock（在Size之后）
-                    _aiPaletteSet.Dock = DockSides.Right;
-
-                    // 第三步：✅ 修复问题7：KeepFocus=false允许焦点切换到AutoCAD命令行
-                    _aiPaletteSet.KeepFocus = false;
-
-                    // 第四步：显示并激活
-                    _aiPaletteSet.Visible = true;
-                    _aiPaletteSet.Activate(0);
-
-                    Log.Information($"✓ AI助手面板已显示（Dock={_aiPaletteSet.Dock}, Size={_aiPaletteSet.Size}, Visible={_aiPaletteSet.Visible}）");
-                }
-                else
-                {
-                    Log.Error("AI助手面板初始化后仍为null");
+                    Log.Error("AI助手面板初始化失败");
                     throw new System.InvalidOperationException("无法创建AI助手面板");
                 }
+
+                Log.Debug($"AI助手面板状态: Visible={_aiPaletteSet.Visible}, Dock={_aiPaletteSet.Dock}, Size={_aiPaletteSet.Size}");
+
+                // ✅ 按照AutoCAD官方最佳实践：先Size，后Dock
+                // 参考：https://stackoverflow.com/questions/23372182
+                var targetSize = new System.Drawing.Size(800, 850);
+
+                // 第一步：设置Size（调整两次，不同值，触发渲染）
+                _aiPaletteSet.Size = new System.Drawing.Size(810, 860);
+                _aiPaletteSet.Size = targetSize;
+
+                // 第二步：设置Dock（在Size之后）
+                _aiPaletteSet.Dock = DockSides.Right;
+
+                // 第三步：✅ 修复中文输入法焦点跳转：KeepFocus=true保持焦点在面板内
+                _aiPaletteSet.KeepFocus = true;
+
+                // 第四步：显示并激活
+                _aiPaletteSet.Visible = true;
+                _aiPaletteSet.Activate(0);
+
+                Log.Information($"✓ AI助手面板已显示（Dock={_aiPaletteSet.Dock}, Size={_aiPaletteSet.Size}, Visible={_aiPaletteSet.Visible}）");
             }
             catch (System.Exception ex)
             {

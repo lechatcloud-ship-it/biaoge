@@ -151,7 +151,12 @@ namespace BiaogPlugin.Models
         /// <summary>
         /// ✅ 表格单元格（Table）
         /// </summary>
-        Table
+        Table,
+
+        /// <summary>
+        /// ✅ 几何公差（FeatureControlFrame, TOLERANCE命令）
+        /// </summary>
+        FeatureControlFrame
     }
 
     /// <summary>

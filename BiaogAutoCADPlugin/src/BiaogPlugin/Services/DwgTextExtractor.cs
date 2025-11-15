@@ -121,13 +121,16 @@ namespace BiaogPlugin.Services
         /// <summary>
         /// ✅ 从单个实体提取文本（完整版 - 支持所有AutoCAD文本类型）
         ///
-        /// 支持的实体类型：
-        /// - DBText (单行文本)
-        /// - MText (多行文本)
-        /// - AttributeDefinition (属性定义)
-        /// - Dimension (标注 - 包含标注文字)
-        /// - MLeader (多重引线 - 包含引线文字)
-        /// - Table (表格 - 需单独处理单元格)
+        /// 支持的实体类型（基于AutoCAD 2022 .NET API官方文档）：
+        /// - DBText (单行文本, TEXT命令)
+        /// - MText (多行文本, MTEXT命令)
+        /// - AttributeDefinition (属性定义, ATTDEF命令)
+        /// - AttributeReference (属性引用, 通过BlockReference提取)
+        /// - Dimension (标注 - 所有8种子类型: Aligned, Arc, Diametric, LineAngular, Point3Angular, Radial, RadialLarge, Rotated)
+        /// - MLeader (多重引线, MLEADER命令)
+        /// - Leader (旧式引线, LEADER命令 - 文本通过Annotation属性关联)
+        /// - FeatureControlFrame (几何公差, TOLERANCE命令)
+        /// - Table (表格, TABLE命令 - 需单独处理单元格)
         /// </summary>
         private TextEntity ExtractTextFromEntity(Entity ent, ObjectId objId)
         {
@@ -239,6 +242,58 @@ namespace BiaogPlugin.Services
                 catch (System.Exception ex)
                 {
                     Log.Warning(ex, $"提取多重引线文字失败: {objId}");
+                }
+            }
+
+            // ✅ 【新增】旧式引线（Leader）- 关键遗漏！
+            // Leader与MLeader不同，文本通过Annotation属性关联
+            // 参考：https://forums.autodesk.com/t5/net-forum/how-to-add-the-string-as-leader-attached-text-contain-for-c-net/td-p/6908474
+            if (ent is Leader leader)
+            {
+                try
+                {
+                    // Leader通过AnnoType检查是否有注释，通过Annotation属性获取关联实体ObjectId
+                    if (leader.HasArrowHead && leader.Annotation != ObjectId.Null)
+                    {
+                        // 注意：Leader的Annotation可能是MText、DBText、BlockReference等
+                        // 这里不提取Leader本身，而是标记已关联，避免重复提取
+                        // 实际文本会在处理MText/DBText时自然提取
+                        Log.Debug($"检测到Leader (ObjectId: {objId})，关联注释: {leader.Annotation}");
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Warning(ex, $"检查Leader关联注释失败: {objId}");
+                }
+            }
+
+            // ✅ 【新增】几何公差（FeatureControlFrame, TOLERANCE命令）- 关键遗漏！
+            // 参考：https://forums.autodesk.com/t5/net/feature-control-frame/td-p/12713678
+            if (ent is FeatureControlFrame fcf)
+            {
+                try
+                {
+                    // FeatureControlFrame有Text属性，包含公差符号和文本
+                    var fcfText = fcf.Text ?? "";
+
+                    if (!string.IsNullOrEmpty(fcfText))
+                    {
+                        return new TextEntity
+                        {
+                            Id = objId,
+                            Type = TextEntityType.FeatureControlFrame,
+                            Content = fcfText,
+                            Position = fcf.Location,
+                            Layer = fcf.Layer,
+                            Height = 0, // FCF使用DimStyle控制文本高度，没有直接的TextHeight属性
+                            Rotation = 0, // FCF没有rotation属性
+                            ColorIndex = (short)fcf.ColorIndex
+                        };
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Warning(ex, $"提取几何公差文字失败: {objId}");
                 }
             }
 

@@ -15,34 +15,58 @@ namespace BiaogPlugin.Services
         public const int MaxOutputTokens = 8192;
 
         /// <summary>
-        /// 估算：平均每个中文字符约1.5个token，英文单词约1个token
-        /// 为安全起见，使用更保守的估算：每字符2个token
-        /// 因此单次翻译最多4000字符（8192 / 2）
+        /// 单次翻译的最大字符数
+        ///
+        /// ✅ 2025-01-14修正：考虑系统提示词和专业术语占用
+        /// - 模型输入限制: 8192 tokens
+        /// - DomainPrompt系统提示词: ~700 tokens
+        /// - Terms专业术语词汇表: ~300 tokens
+        /// - 实际可用: 8192 - 700 - 300 = 7192 tokens
+        /// - 安全估算: 每字符2个token → 7192 / 2 = 3596字符
+        /// - 保守设置: 3000字符（留有余量）
         /// </summary>
-        public const int MaxCharsPerBatch = 4000;
+        public const int MaxCharsPerBatch = 3000;
 
         /// <summary>
         /// 工程建筑领域提示词（英文，根据阿里云文档要求）
         ///
-        /// 核心要求：
-        /// 1. 明确这是工程建筑领域的AutoCAD图纸
-        /// 2. 保留图号、编号、代号等标识符
-        /// 3. 使用专业的工程术语（结构、建筑、机电、装修等）
-        /// 4. 保持专业性、准确性和行业标准一致性
+        /// ✅ 核心要求（2025-01-14强化 - 严禁直译，必须使用专业术语）：
+        /// 1. 【身份定位】你是专业的工程建筑行业图纸翻译助手
+        /// 2. 【严禁直译】必须使用行业专业术语，禁止字面逐字翻译
+        /// 3. 【专业准确】符合国际工程标准（ACI, AISC, ASHRAE, IBC）
+        /// 4. 【保留标识】图号、编号、代号、单位、规范代号等必须保留
         /// </summary>
         public static readonly string DomainPrompt =
+            "You are a PROFESSIONAL ENGINEERING AND ARCHITECTURAL CONSTRUCTION DRAWING TRANSLATION ASSISTANT. " +
+            "\n\n" +
+            "⚠️ CRITICAL REQUIREMENT #1: You MUST use INDUSTRY-STANDARD PROFESSIONAL TERMINOLOGY ONLY. " +
+            "⚠️ CRITICAL REQUIREMENT #2: DO NOT use literal word-by-word translations. " +
+            "⚠️ CRITICAL REQUIREMENT #3: Translate using the exact technical terms that professional construction engineers and architects would use. " +
+            "\n\n" +
+            "FORBIDDEN EXAMPLES (literal translations that are WRONG): " +
+            "❌ WRONG: 'doghouse' → '狗屋' or '狗屋屋顶' (literal translation) " +
+            "✅ CORRECT: 'doghouse' → '屋顶设备间' (professional term for roof mechanical equipment housing) " +
+            "❌ WRONG: 'door framed' → '门框架' (literal translation) " +
+            "✅ CORRECT: 'door framed' → '门框' (professional term) " +
+            "❌ WRONG: 'self closer' → '自动关闭器' (literal translation) " +
+            "✅ CORRECT: 'self closer' → '闭门器' (professional term) " +
+            "❌ WRONG: 'fire rated' → '火评级' (literal translation) " +
+            "✅ CORRECT: 'fire rated' → '防火等级' or '耐火等级' (professional term) " +
+            "\n\n" +
             "This text is from AutoCAD engineering and architectural construction drawings (structural, architectural, MEP, interior design). " +
             "It contains technical specifications, building materials, construction methods, structural engineering, MEP systems, fire protection, and architectural design terminology. " +
+            "\n\n" +
             "IMPORTANT TRANSLATION RULES: " +
             "1. PRESERVE: Drawing numbers, sheet numbers, part numbers, reference codes (e.g., 'No.', 'No.1', 'A-101', '#1', '编号', '图号', 'DWG No.'). " +
             "2. PRESERVE: Measurement units and symbols (e.g., 'mm', 'cm', 'm', 'kg', 'MPa', 'kN', 'kW', 'Pa', '℃'). " +
             "3. PRESERVE: Alphanumeric identifiers and axis marks (e.g., 'B1', 'C-3', '1F', '2F', 'A轴', '①轴'). " +
             "4. PRESERVE: Chinese national standards codes (e.g., 'GB 50010', 'GB/T', 'JGJ', 'CJJ'). " +
             "5. PRESERVE: Material strength grades and codes (e.g., 'C30', 'HPB300', 'HRB400', 'Q235'). " +
-            "6. TRANSLATE: Descriptive text, material names, construction instructions, notes, and annotations using professional industry-standard terminology. " +
+            "6. TRANSLATE: Descriptive text, material names, construction instructions, notes, and annotations using PROFESSIONAL INDUSTRY-STANDARD TERMINOLOGY ONLY. " +
             "7. ACCURACY: Use official construction industry terminology conforming to international engineering standards (ACI, AISC, ASHRAE, IBC). " +
             "8. CONTEXT: Maintain the technical context appropriate for professional construction documentation and specifications. " +
-            "Translate into professional construction engineering domain style with high technical accuracy.";
+            "\n\n" +
+            "Translate into professional construction engineering domain style with high technical accuracy and industry-standard terminology.";
 
         /// <summary>
         /// 不应翻译的术语/模式规则
@@ -274,6 +298,10 @@ namespace BiaogPlugin.Services
             new ProfessionalTerm { Chinese = "屋面", English = "roof" },
             new ProfessionalTerm { Chinese = "平屋面", English = "flat roof" },
             new ProfessionalTerm { Chinese = "坡屋面", English = "pitched roof" },
+            new ProfessionalTerm { Chinese = "屋顶设备间", English = "doghouse" },  // ✅ 建筑术语：屋顶上的小型设备间/机房/楼梯间等突出结构
+            new ProfessionalTerm { Chinese = "屋顶设备间", English = "dog house" }, // ✅ 同上，支持空格写法
+            new ProfessionalTerm { Chinese = "屋顶机房", English = "roof penthouse" },
+            new ProfessionalTerm { Chinese = "屋顶机房", English = "penthouse" },
             new ProfessionalTerm { Chinese = "天沟", English = "gutter" },
             new ProfessionalTerm { Chinese = "雨水管", English = "downspout" },
             new ProfessionalTerm { Chinese = "阳台", English = "balcony" },

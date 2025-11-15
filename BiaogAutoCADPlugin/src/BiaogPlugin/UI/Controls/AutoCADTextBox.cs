@@ -47,7 +47,7 @@ namespace BiaogPlugin.UI.Controls
         private const int DLGC_WANTALLKEYS = 0x0004; // 接收所有键盘输入
 
         private bool _hookInstalled = false;
-        private bool _isComposing = false;  // ✅ 标记是否正在输入法组字中
+        // ✅ 已移除 _isComposing - 不再需要焦点锁定逻辑
 
         public AutoCADTextBox() : base()
         {
@@ -55,163 +55,15 @@ namespace BiaogPlugin.UI.Controls
             Loaded += OnLoaded;
             Unloaded += OnUnloaded;
 
-            // ✅ 新增：监听所有文本输入事件，强制保持焦点
-            PreviewTextInput += OnPreviewTextInput;
-            TextInput += OnTextInput;
-            PreviewKeyDown += OnPreviewKeyDown;
+            // ✅ 极简修复：只保留Windows消息钩子支持中文输入
+            // 完全移除焦点锁定逻辑，让焦点自然流动：点哪里焦点就到哪里
 
-            // ✅ 新增：防止焦点丢失
-            PreviewLostKeyboardFocus += OnPreviewLostKeyboardFocus;
-
-            Log.Debug("AutoCADTextBox已创建，焦点保持增强模式已启用");
+            Log.Debug("AutoCADTextBox已创建，中文输入支持已启用（无焦点锁定）");
         }
 
-        /// <summary>
-        /// ✅ 文本输入前事件 - 强制保持焦点
-        /// </summary>
-        private void OnPreviewTextInput(object sender, TextCompositionEventArgs e)
-        {
-            _isComposing = true;
-            EnsureFocus();
-        }
-
-        /// <summary>
-        /// ✅ 文本输入事件 - 再次确保焦点
-        /// </summary>
-        private void OnTextInput(object sender, TextCompositionEventArgs e)
-        {
-            EnsureFocus();
-            _isComposing = false;
-        }
-
-        /// <summary>
-        /// ✅ 键盘按下前 - 确保焦点
-        /// </summary>
-        private void OnPreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            EnsureFocus();
-        }
-
-        /// <summary>
-        /// ✅ 关键修复：防止焦点丢失到AutoCAD命令行
-        /// 使用AutoCAD官方Window.Focus()方法
-        /// </summary>
-        private void OnPreviewLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
-        {
-            // 如果正在输入法组字中，取消焦点丢失
-            if (_isComposing)
-            {
-                Log.Debug("输入法组字中，取消焦点丢失");
-                e.Handled = true;  // ✅ 阻止焦点丢失
-
-                try
-                {
-                    // ✅ AutoCAD官方解决方案
-                    var doc = Application.DocumentManager.MdiActiveDocument;
-                    if (doc != null && doc.Window != null)
-                    {
-                        doc.Window.Focus();
-                    }
-
-                    Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        Focus();
-                        Keyboard.Focus(this);
-                    }), DispatcherPriority.Input);
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "焦点恢复失败");
-                }
-                return;
-            }
-
-            // 如果新焦点不是在本窗口内（跳转到AutoCAD命令行），抢回焦点
-            if (e.NewFocus == null || !IsAncestorOf((DependencyObject)e.NewFocus))
-            {
-                Log.Debug($"焦点试图跳走到AutoCAD (NewFocus: {e.NewFocus?.GetType().Name ?? "null"})");
-
-                // ✅ 延迟抢回焦点，使用AutoCAD官方方法
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    if (!IsFocused && IsVisible && IsEnabled)
-                    {
-                        try
-                        {
-                            // ✅ 关键：先调用Window.Focus()
-                            var doc = Application.DocumentManager.MdiActiveDocument;
-                            if (doc != null && doc.Window != null)
-                            {
-                                doc.Window.Focus();
-                                Log.Debug("已调用AutoCAD Window.Focus()");
-                            }
-
-                            // 然后设置TextBox焦点
-                            Focus();
-                            Keyboard.Focus(this);
-                            Log.Debug("已重新获取TextBox焦点");
-                        }
-                        catch (Exception ex)
-                        {
-                            Log.Warning(ex, "焦点恢复失败");
-                        }
-                    }
-                }), DispatcherPriority.Input);
-            }
-        }
-
-        /// <summary>
-        /// ✅ 辅助方法：确保焦点在TextBox上
-        /// 使用AutoCAD官方推荐的Window.Focus()方法
-        /// 参考：AutoCAD DevBlog - "Use of Window.Focus in AutoCAD 2014"
-        /// </summary>
-        private void EnsureFocus()
-        {
-            if (!IsFocused)
-            {
-                try
-                {
-                    // ✅ 关键修复：AutoCAD官方解决方案
-                    // 步骤1: 先告诉AutoCAD将焦点给PaletteSet窗口
-                    var doc = Application.DocumentManager.MdiActiveDocument;
-                    if (doc != null && doc.Window != null)
-                    {
-                        doc.Window.Focus();
-                        Log.Verbose("EnsureFocus: AutoCAD Window.Focus()已调用");
-                    }
-
-                    // 步骤2: 然后在PaletteSet窗口内设置TextBox焦点
-                    Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        Focus();
-                        Keyboard.Focus(this);
-                        Log.Verbose("EnsureFocus: TextBox焦点已设置");
-                    }), DispatcherPriority.Input);
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "EnsureFocus失败，使用备用方案");
-                    // 备用方案：直接设置焦点
-                    Focus();
-                    Keyboard.Focus(this);
-                }
-            }
-        }
-
-        /// <summary>
-        /// ✅ 辅助方法：检查目标是否是本控件的子元素
-        /// </summary>
-        private bool IsAncestorOf(DependencyObject child)
-        {
-            var parent = child;
-            while (parent != null)
-            {
-                if (parent == this)
-                    return true;
-                parent = LogicalTreeHelper.GetParent(parent) ?? VisualTreeHelper.GetParent(parent);
-            }
-            return false;
-        }
+        // ✅ 极简修复完成：所有焦点锁定逻辑已移除
+        // 现在只保留Windows消息钩子支持中文输入
+        // 焦点自然流动：用户点击AI输入框→焦点到AI输入框，点击AutoCAD命令行→焦点到命令行
 
         /// <summary>
         /// 控件加载时安装消息钩子

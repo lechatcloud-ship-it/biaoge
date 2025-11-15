@@ -167,8 +167,8 @@ public class BailianApiClient
     }
 
     /// <summary>
-    /// 清理翻译文本中的特殊标识符
-    /// 阿里云百炼模型可能返回 <|endofcontent|> 等特殊token，需要过滤
+    /// 清理翻译文本中的特殊标识符和提示词泄露
+    /// 阿里云百炼模型可能返回 <|endofcontent|> 等特殊token，或者返回DomainPrompt内容
     /// </summary>
     private string CleanTranslationText(string text)
     {
@@ -177,8 +177,99 @@ public class BailianApiClient
             return text;
         }
 
-        // 移除常见的特殊标识符
-        var cleanedText = text
+        // ✅ 修复严重Bug：移除API响应中可能包含的DomainPrompt提示词内容
+        // 问题：有时API会将提示词内容包含在翻译结果中，导致图纸出现大段英文提示词
+        // 解决：检测并移除所有DomainPrompt相关的内容
+
+        // 1. 移除完整的DomainPrompt（如果API完整返回了提示词）
+        if (text.Contains("This text is from AutoCAD engineering"))
+        {
+            // 尝试截取到提示词之前的部分
+            var promptStart = text.IndexOf("This text is from AutoCAD engineering");
+            if (promptStart > 0)
+            {
+                text = text.Substring(0, promptStart).Trim();
+            }
+            else
+            {
+                // 如果响应只包含提示词，返回空字符串
+                text = "";
+            }
+        }
+
+        // 2. 移除DomainPrompt中的关键短语（英文版本 - 部分泄露的情况）
+        var promptKeyPhrasesEn = new[]
+        {
+            "This text is from AutoCAD",
+            "IMPORTANT TRANSLATION RULES:",
+            "PRESERVE: Drawing numbers",
+            "TRANSLATE: Descriptive text",
+            "Use official construction industry terminology",
+            "Translate into professional construction engineering domain style",
+            "architectural construction drawings",
+            "structural engineering",
+            "MEP systems"
+        };
+
+        foreach (var phrase in promptKeyPhrasesEn)
+        {
+            if (text.Contains(phrase))
+            {
+                var phraseStart = text.IndexOf(phrase);
+                if (phraseStart > 0)
+                {
+                    // 截取到短语之前的部分
+                    text = text.Substring(0, phraseStart).Trim();
+                }
+                else
+                {
+                    // 如果响应开头就是这些短语，清空
+                    text = "";
+                }
+                break;
+            }
+        }
+
+        // 3. ✅ 新增：移除DomainPrompt的中文翻译版本（用户报告：出现"文本来自AutoCAD工程与建筑施工图"）
+        var promptKeyPhrasesZh = new[]
+        {
+            "文本来自AutoCAD",      // ✅ 用户确认的准确短语
+            "本文来自AutoCAD",
+            "这段文本来自",
+            "此文本来自",
+            "工程与建筑施工图",
+            "工程和建筑施工图",
+            "建筑施工图纸",
+            "结构工程",
+            "机电系统",
+            "重要翻译规则",
+            "保留：图纸编号",
+            "翻译：描述性文本",
+            "使用官方建筑行业术语",
+            "翻译成专业建筑工程领域风格"
+        };
+
+        foreach (var phrase in promptKeyPhrasesZh)
+        {
+            if (text.Contains(phrase))
+            {
+                var phraseStart = text.IndexOf(phrase);
+                if (phraseStart > 0)
+                {
+                    // 截取到短语之前的部分
+                    text = text.Substring(0, phraseStart).Trim();
+                }
+                else
+                {
+                    // 如果响应开头就是这些短语，清空
+                    text = "";
+                }
+                break;
+            }
+        }
+
+        // 3. 移除常见的特殊标识符
+        text = text
             .Replace("<|endofcontent|>", "")
             .Replace("<|im_end|>", "")
             .Replace("<|im_start|>", "")
@@ -186,7 +277,13 @@ public class BailianApiClient
             .Replace("<|start|>", "")
             .Trim();
 
-        return cleanedText;
+        // 4. 如果清理后为空或只剩下提示词片段，记录警告
+        if (string.IsNullOrWhiteSpace(text) || text.Length < 2)
+        {
+            Log.Warning("翻译结果清理后为空，可能是提示词泄露或API响应异常");
+        }
+
+        return text;
     }
 
     /// <summary>
@@ -406,21 +503,67 @@ public class BailianApiClient
 
         Log.Information($"批量翻译: {texts.Count}条文本，使用模型: {model}");
 
-        var results = new List<string>();
         var totalCount = texts.Count;
 
         // 转换语言代码
         var sourceLang = string.IsNullOrEmpty(sourceLanguage) ? "auto" : ConvertLanguageCode(sourceLanguage);
         var targetLang = ConvertLanguageCode(targetLanguage);
 
-        // 并发控制 - 限制同时进行的请求数量（避免触发限流）
-        var semaphore = new SemaphoreSlim(10); // 最多10个并发请求
-        var tasks = new List<Task<(int index, string result)>>();
+        // ✅ P1修复：处理超长文本
+        // 批量翻译前，将超过4000字符的文本分离出来，单独使用分段翻译
+        var normalTexts = new List<(int index, string text)>();  // 正常长度的文本
+        var longTexts = new List<(int index, string text)>();    // 超长文本
 
         for (int i = 0; i < texts.Count; i++)
         {
-            var index = i;
-            var text = texts[i];
+            if (texts[i].Length > EngineeringTranslationConfig.MaxCharsPerBatch)
+            {
+                longTexts.Add((i, texts[i]));
+                Log.Information($"检测到超长文本(索引{i}): {texts[i].Length}字符，将使用分段翻译");
+            }
+            else
+            {
+                normalTexts.Add((i, texts[i]));
+            }
+        }
+
+        Log.Information($"批量翻译分类: {normalTexts.Count}条正常文本, {longTexts.Count}条超长文本");
+
+        var allTasks = new List<Task<(int index, string result)>>();
+
+        // ✅ 处理超长文本（使用TranslateAsync，它会自动分段）
+        foreach (var item in longTexts)
+        {
+            var (index, text) = item;
+            var task = Task.Run(async () =>
+            {
+                try
+                {
+                    var translated = await TranslateAsync(text, targetLanguage, model, sourceLanguage, cancellationToken);
+
+                    // 更新进度
+                    var completedCount = Interlocked.Increment(ref _batchProgressCounter);
+                    progress?.Report((double)completedCount / totalCount * 100);
+
+                    return (index, translated);
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Error(ex, $"超长文本翻译失败 (索引{index})");
+                    return (index, text);  // 失败时返回原文
+                }
+            }, cancellationToken);
+            allTasks.Add(task);
+        }
+
+        // ✅ 处理正常长度的文本（原批量翻译逻辑）
+        // 并发控制 - 限制同时进行的请求数量（避免触发限流）
+        var semaphore = new SemaphoreSlim(10); // 最多10个并发请求
+
+        for (int i = 0; i < normalTexts.Count; i++)
+        {
+            var index = normalTexts[i].index;
+            var text = normalTexts[i].text;
 
             var task = Task.Run(async () =>
             {
@@ -527,14 +670,14 @@ public class BailianApiClient
                 }
             }, cancellationToken);
 
-            tasks.Add(task);
+            allTasks.Add(task);
         }
 
-        // 等待所有任务完成
-        var taskResults = await Task.WhenAll(tasks);
+        // ✅ 等待所有任务完成（包括超长文本和正常文本）
+        var taskResults = await Task.WhenAll(allTasks);
 
-        // 按照原始顺序排列结果
-        results = taskResults
+        // ✅ 按照原始顺序排列结果
+        var results = taskResults
             .OrderBy(r => r.index)
             .Select(r => r.result)
             .ToList();

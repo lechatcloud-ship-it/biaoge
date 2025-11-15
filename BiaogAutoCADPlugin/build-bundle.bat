@@ -85,27 +85,47 @@ echo.
 echo     ^<!-- AutoCAD 2018-2020 ^(R22.0-R24.0^) --^>
 echo     ^<ComponentEntry
 echo       AppName="BiaogPlugin"
-echo       Version="1.0.4"
+echo       Version="1.0.12"
 echo       ModuleName="./Contents/2018/BiaogPlugin.dll"
-echo       AppDescription="Biaoge Plugin - AutoCAD 2018-2020"^>
+echo       AppDescription="Biaoge Plugin - AutoCAD 2018-2020"
+echo       LoadOnAutoCADStartup="True"^>
 echo       ^<RuntimeRequirements
 echo         OS="Win64"
 echo         Platform="AutoCAD"
 echo         SeriesMin="R22.0"
 echo         SeriesMax="R24.0" /^>
+echo       ^<Commands GroupName="BIAOGE_COMMANDS"^>
+echo         ^<Command Local="BIAOGE_INITIALIZE" Global="BIAOGE_INITIALIZE" StartupCommand="True" /^>
+echo         ^<Command Local="BIAOGE_AI" Global="BIAOGE_AI" /^>
+echo         ^<Command Local="BIAOGE_TRANSLATE" Global="BIAOGE_TRANSLATE" /^>
+echo         ^<Command Local="BIAOGE_TRANSLATE_ZH" Global="BIAOGE_TRANSLATE_ZH" /^>
+echo         ^<Command Local="BIAOGE_TRANSLATE_EN" Global="BIAOGE_TRANSLATE_EN" /^>
+echo         ^<Command Local="BIAOGE_SETTINGS" Global="BIAOGE_SETTINGS" /^>
+echo         ^<Command Local="BIAOGE_HELP" Global="BIAOGE_HELP" /^>
+echo       ^</Commands^>
 echo     ^</ComponentEntry^>
 echo.
 echo     ^<!-- AutoCAD 2021-2024 ^(R24.1-R24.3^) - Binary Compatible --^>
 echo     ^<ComponentEntry
 echo       AppName="BiaogPlugin"
-echo       Version="1.0.4"
+echo       Version="1.0.12"
 echo       ModuleName="./Contents/2021/BiaogPlugin.dll"
-echo       AppDescription="Biaoge Plugin - AutoCAD 2021-2024"^>
+echo       AppDescription="Biaoge Plugin - AutoCAD 2021-2024"
+echo       LoadOnAutoCADStartup="True"^>
 echo       ^<RuntimeRequirements
 echo         OS="Win64"
 echo         Platform="AutoCAD"
 echo         SeriesMin="R24.1"
 echo         SeriesMax="R24.3" /^>
+echo       ^<Commands GroupName="BIAOGE_COMMANDS"^>
+echo         ^<Command Local="BIAOGE_INITIALIZE" Global="BIAOGE_INITIALIZE" StartupCommand="True" /^>
+echo         ^<Command Local="BIAOGE_AI" Global="BIAOGE_AI" /^>
+echo         ^<Command Local="BIAOGE_TRANSLATE" Global="BIAOGE_TRANSLATE" /^>
+echo         ^<Command Local="BIAOGE_TRANSLATE_ZH" Global="BIAOGE_TRANSLATE_ZH" /^>
+echo         ^<Command Local="BIAOGE_TRANSLATE_EN" Global="BIAOGE_TRANSLATE_EN" /^>
+echo         ^<Command Local="BIAOGE_SETTINGS" Global="BIAOGE_SETTINGS" /^>
+echo         ^<Command Local="BIAOGE_HELP" Global="BIAOGE_HELP" /^>
+echo       ^</Commands^>
 echo     ^</ComponentEntry^>
 echo.
 echo   ^</Components^>

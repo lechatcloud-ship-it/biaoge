@@ -546,15 +546,30 @@ namespace BiaogPlugin
             try
             {
                 Log.Information("执行算量命令: BIAOGE_CALCULATE");
+                ed.WriteMessage("\n正在启动智能算量控制面板...");
 
-                // 显示算量面板
-                PaletteManager.ShowCalculationPalette();
+                // ✅ 修复：弹出算量控制面板（CalculationPalette），不是快速统计
+                // 用Window包装UserControl，实现对话框方式显示
+                var calculationPalette = new UI.CalculationPalette();
 
-                ed.WriteMessage("\n算量面板已打开，请在右侧面板中选择识别模式。");
+                var window = new System.Windows.Window
+                {
+                    Title = "标哥 - 智能算量控制面板",
+                    Content = calculationPalette,
+                    Width = 900,
+                    Height = 700,
+                    WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen,
+                    ResizeMode = System.Windows.ResizeMode.CanResize
+                };
+
+                window.ShowDialog();
+
+                ed.WriteMessage("\n智能算量面板已关闭。");
+                Log.Information("智能算量面板已关闭");
             }
             catch (System.Exception ex)
             {
-                Log.Error(ex, "显示算量面板失败");
+                Log.Error(ex, "显示智能算量面板失败");
                 ed.WriteMessage($"\n[错误] {ex.Message}");
             }
         }

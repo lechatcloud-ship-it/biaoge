@@ -22,6 +22,27 @@
                     <ComboBox x:Name="PrecisionModeComboBox" Margin="0,0,0,8"
                               Background="#3E3E42" Foreground="White" BorderBrush="#555555"
                               SelectedIndex="1">
+                        <ComboBox.ItemContainerStyle>
+                            <Style TargetType="ComboBoxItem">
+                                <Setter Property="Background" Value="#2D2D30"/>
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter Property="Padding" Value="5"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsHighlighted" Value="True">
+                                        <Setter Property="Background" Value="#007ACC"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                    </Trigger>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="#094771"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ComboBox.ItemContainerStyle>
+                        <ComboBox.Resources>
+                            <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#2D2D30"/>
+                            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#007ACC"/>
+                        </ComboBox.Resources>
                         <ComboBoxItem Content="快速估算 (90%精度, 仅规则引擎, 成本¥0)" Tag="QuickEstimate"/>
                         <ComboBoxItem Content="预算控制 (95%精度, AI验证30%, 成本¥0.02/构件)" Tag="Budget"/>
                         <ComboBoxItem Content="竣工结算 (99%精度, AI验证100%, 成本¥0.10/构件)" Tag="FinalAccount"/>
@@ -46,7 +67,33 @@
             <Button x:Name="ExportExcelButton" Content="导出Excel清单" Height="35"
                     Background="#107C10" Foreground="White"
                     BorderThickness="0" Margin="0,0,0,15" Click="ExportExcelButton_Click"
-                    IsEnabled="False"/>
+                    IsEnabled="False">
+                <Button.Style>
+                    <Style TargetType="Button">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="{TemplateBinding Background}"
+                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                            BorderThickness="{TemplateBinding BorderThickness}"
+                                            CornerRadius="4">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Background" Value="#555555"/>
+                                            <Setter Property="Foreground" Value="#999999"/>
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Background" Value="#0D8A0D"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </Button.Style>
+            </Button>
 
             <!-- 进度卡片 -->
             <Border x:Name="ProgressCard" Background="#2D2D30" CornerRadius="8"

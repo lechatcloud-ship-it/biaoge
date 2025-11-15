@@ -310,22 +310,68 @@ namespace BiaogPlugin.Services
 
         /// <summary>
         /// 查询图纸信息工具 - 直接查询DrawingContext
+        /// ✅ 修复：添加异常处理和日志，避免卡住
         /// </summary>
         private async Task<string> ExecuteQueryTool(Dictionary<string, object> args, Action<string>? onStreamChunk)
         {
-            onStreamChunk?.Invoke($"  → 查询图纸信息...\n");
-
-            var queryType = args["query_type"].ToString() ?? "";
-            var context = _contextManager.GetCurrentDrawingContext();
-
-            return queryType switch
+            try
             {
-                "layers" => $"✓ 图层信息：\n{string.Join("\n", context.Layers.Select(l => $"  - {l.Name} ({l.Color})"))}",
-                "texts" => $"✓ 文本数量：{context.TextEntities.Count}个",
-                "entities" => $"✓ 实体统计：\n{string.Join("\n", context.EntityStatistics.Select(e => $"  - {e.Key}: {e.Value}个"))}",
-                "metadata" => $"✓ 元数据：\n{string.Join("\n", context.Metadata.Select(m => $"  - {m.Key}: {m.Value}"))}",
-                _ => $"✓ 图纸摘要：\n{context.Summary}"
-            };
+                onStreamChunk?.Invoke($"  → 查询图纸信息...\n");
+                Log.Debug("开始执行查询图纸工具");
+
+                var queryType = args.ContainsKey("query_type") ? args["query_type"].ToString() : "";
+                Log.Debug($"查询类型: {queryType}");
+
+                // ✅ 添加异常处理
+                DrawingContext context;
+                try
+                {
+                    context = _contextManager.GetCurrentDrawingContext();
+                    Log.Debug("成功获取图纸上下文");
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Error(ex, "获取图纸上下文失败");
+                    return $"✗ 获取图纸信息失败：{ex.Message}";
+                }
+
+                // ✅ 检查是否有错误消息
+                if (!string.IsNullOrEmpty(context.ErrorMessage))
+                {
+                    Log.Warning($"图纸上下文包含错误: {context.ErrorMessage}");
+                    return $"✗ 查询失败：{context.ErrorMessage}";
+                }
+
+                string result;
+                try
+                {
+                    result = queryType switch
+                    {
+                        "layers" => $"✓ 图层信息：\n{string.Join("\n", context.Layers.Select(l => $"  - {l.Name} ({l.Color})"))}",
+                        "texts" => $"✓ 文本数量：{context.TextEntities.Count}个",
+                        "entities" => $"✓ 实体统计：\n{string.Join("\n", context.EntityStatistics.Select(e => $"  - {e.Key}: {e.Value}个"))}",
+                        "metadata" => $"✓ 元数据：\n{string.Join("\n", context.Metadata.Select(m => $"  - {m.Key}: {m.Value}"))}",
+                        _ => $"✓ 图纸摘要：\n{context.Summary}"
+                    };
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Error(ex, "格式化查询结果失败");
+                    return $"✗ 格式化结果失败：{ex.Message}";
+                }
+
+                Log.Information($"查询图纸信息完成: {queryType}, 结果长度={result.Length}");
+                onStreamChunk?.Invoke($"  ✓ 查询完成\n");
+
+                // ✅ 确保返回非空结果，避免阿里云API因空结果而卡住
+                return await Task.FromResult(!string.IsNullOrEmpty(result) ? result : "✗ 查询结果为空");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "执行查询图纸工具失败");
+                onStreamChunk?.Invoke($"  ✗ 查询失败: {ex.Message}\n");
+                return $"✗ 查询图纸信息失败：{ex.Message}";
+            }
         }
 
         /// <summary>

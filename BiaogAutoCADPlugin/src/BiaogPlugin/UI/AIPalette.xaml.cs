@@ -129,17 +129,10 @@ namespace BiaogPlugin.UI
                 // 如果TextBox还没有焦点，立即获取焦点
                 if (!InputTextBox.IsFocused)
                 {
-                    Log.Debug("鼠标按下，使用AutoCAD官方方法获取焦点");
+                    Log.Debug("鼠标按下，设置焦点到输入框");
 
-                    // ✅ AutoCAD官方解决方案
-                    // 步骤1: 先告诉AutoCAD将焦点给PaletteSet窗口
-                    var doc = Application.DocumentManager.MdiActiveDocument;
-                    if (doc != null && doc.Window != null)
-                    {
-                        doc.Window.Focus();
-                    }
-
-                    // 步骤2: 然后在PaletteSet窗口内设置TextBox焦点
+                    // ✅ 修复焦点跳转：使用WPF标准焦点方法，配合PaletteSet.KeepFocus=true
+                    // 不调用doc.Window.Focus()，避免焦点在PaletteSet和AutoCAD之间跳转
                     Keyboard.Focus(InputTextBox);
                     InputTextBox.Focus();
 
@@ -164,15 +157,9 @@ namespace BiaogPlugin.UI
                 // 再次确保焦点在TextBox上
                 if (!InputTextBox.IsFocused)
                 {
-                    Log.Debug("MouseDown事件，使用AutoCAD官方方法确保焦点");
+                    Log.Debug("MouseDown事件，确保焦点在输入框");
 
-                    // ✅ AutoCAD官方解决方案
-                    var doc = Application.DocumentManager.MdiActiveDocument;
-                    if (doc != null && doc.Window != null)
-                    {
-                        doc.Window.Focus();
-                    }
-
+                    // ✅ 修复焦点跳转：使用WPF标准焦点方法，配合PaletteSet.KeepFocus=true
                     Keyboard.Focus(InputTextBox);
                     InputTextBox.Focus();
                 }
@@ -425,24 +412,58 @@ namespace BiaogPlugin.UI
                 }
 
                 // ✅ 流式接收AI回复（分离思考和正文）
-                // 关键修复：移除Dispatcher.Invoke双重调度，直接更新UI
-                // syncContext.Post已经确保回调在UI线程执行
+                // ⚠️ 重要：虽然syncContext.Post会调度到UI线程，但仍需要Dispatcher确保WPF线程安全
                 var response = await _aiService.ChatStreamAsync(
                     userMessage: userInput,
                     useDeepThinking: _deepThinking,
                     onContentChunk: chunk =>
                     {
-                        fullResponse += chunk;
-                        // ✅ 直接更新，无需Dispatcher.Invoke（已在UI线程）
-                        contentRenderer?.AppendChunk(chunk);
-                        ScrollToBottom();
+                        try
+                        {
+                            fullResponse += chunk;
+                            // ✅ 使用Dispatcher确保在WPF UI线程上执行
+                            Dispatcher.InvokeAsync(() =>
+                            {
+                                try
+                                {
+                                    contentRenderer?.AppendChunk(chunk);
+                                    ScrollToBottom();
+                                }
+                                catch (Exception ex)
+                                {
+                                    Log.Error(ex, "内容流式更新失败");
+                                }
+                            }, System.Windows.Threading.DispatcherPriority.Normal);
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Error(ex, "内容回调失败");
+                        }
                     },
                     onReasoningChunk: _deepThinking
                         ? reasoning =>
                         {
-                            // ✅ 直接更新，无需Dispatcher.Invoke（已在UI线程）
-                            thinkingRenderer?.AppendChunk(reasoning);
-                            ScrollToBottom();
+                            try
+                            {
+                                Log.Debug($"收到思考内容: {reasoning?.Length ?? 0} 字符");
+                                // ✅ 使用Dispatcher确保在WPF UI线程上执行
+                                Dispatcher.InvokeAsync(() =>
+                                {
+                                    try
+                                    {
+                                        thinkingRenderer?.AppendChunk(reasoning);
+                                        ScrollToBottom();
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Log.Error(ex, "思考内容流式更新失败");
+                                    }
+                                }, System.Windows.Threading.DispatcherPriority.Normal);
+                            }
+                            catch (Exception ex)
+                            {
+                                Log.Error(ex, "思考回调失败");
+                            }
                         }
                         : null
                 );
@@ -496,19 +517,12 @@ namespace BiaogPlugin.UI
                 TrimChatHistory();
 
                 // ✅ 确保焦点回到输入框，准备下一次输入
-                // 使用AutoCAD官方Window.Focus()方法
+                // 修复焦点跳转：使用WPF标准焦点方法，配合PaletteSet.KeepFocus=true
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     try
                     {
-                        // 步骤1: 先告诉AutoCAD将焦点给PaletteSet窗口
-                        var doc = Application.DocumentManager.MdiActiveDocument;
-                        if (doc != null && doc.Window != null)
-                        {
-                            doc.Window.Focus();
-                        }
-
-                        // 步骤2: 然后在PaletteSet窗口内设置TextBox焦点
+                        // 使用WPF标准焦点方法，不调用doc.Window.Focus()
                         Keyboard.Focus(InputTextBox);
                         InputTextBox.Focus();
                     }
@@ -665,15 +679,24 @@ namespace BiaogPlugin.UI
         /// </summary>
         private Expander CreateThinkingExpanderPlaceholder()
         {
+            // ✅ 创建Header文本（白色）
+            var headerText = new TextBlock
+            {
+                Text = "🧠 深度思考过程...",
+                Foreground = Brushes.White,  // ✅ 白色文本
+                FontSize = 13
+            };
+
             var expander = new Expander
             {
-                Header = "🧠 深度思考过程...",
+                Header = headerText,  // ✅ 使用白色TextBlock作为Header
                 IsExpanded = true,  // ✅ 初始展开，让用户看到思考过程
                 Background = new SolidColorBrush(Color.FromRgb(60, 60, 60)),  // 深色背景
+                Foreground = Brushes.White,  // ✅ Expander箭头颜色也设为白色
                 BorderBrush = new SolidColorBrush(Color.FromRgb(100, 100, 100)),
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(8),
-                Margin = new Thickness(0, 0, 40, 10),  // 左对齐，与AI消息框一致
+                Margin = new Thickness(0, 0, 40, 15),  // ✅ 增加底部边距15px，避免遮挡下方文本
                 HorizontalAlignment = HorizontalAlignment.Left
             };
 
@@ -683,12 +706,12 @@ namespace BiaogPlugin.UI
                 IsReadOnly = true,
                 BorderThickness = new Thickness(0),
                 Background = Brushes.Transparent,
-                Foreground = new SolidColorBrush(Color.FromRgb(170, 170, 170)),  // 灰色文本
+                Foreground = new SolidColorBrush(Color.FromRgb(200, 200, 200)),  // ✅ 改为更亮的灰色，在深色背景上更易读
                 FontSize = 12,
                 FontFamily = new FontFamily("Consolas, Segoe UI"),
-                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                MaxHeight = 300  // 限制最大高度，避免思考内容过长
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,  // ✅ 允许滚动
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+                // ✅ 移除MaxHeight限制，让深度思考内容完全显示
             };
 
             // 初始化空文档
@@ -1091,8 +1114,21 @@ namespace BiaogPlugin.UI
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
             };
 
-            // 初始化空文档
-            richTextBox.Document = new FlowDocument();
+            // ✅ 用户体验改进：显示"在思考中..."占位符
+            // 流式内容到达时会自动替换此占位符
+            var document = new FlowDocument();
+            var paragraph = new Paragraph();
+
+            // 添加思考图标和文本
+            var thinkingRun = new Run("💭 在思考中...")
+            {
+                Foreground = new SolidColorBrush(Color.FromRgb(150, 150, 150)), // 浅灰色
+                FontStyle = FontStyles.Italic
+            };
+            paragraph.Inlines.Add(thinkingRun);
+
+            document.Blocks.Add(paragraph);
+            richTextBox.Document = document;
 
             border.Child = richTextBox;
 
