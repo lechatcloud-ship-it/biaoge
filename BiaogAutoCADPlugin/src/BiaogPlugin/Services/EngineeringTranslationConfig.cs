@@ -34,29 +34,78 @@ namespace BiaogPlugin.Services
         public const int MaxCharsPerBatch = 450000;
 
         /// <summary>
-        /// 工程建筑领域提示词（英文，根据阿里云文档要求）
+        /// 工程建筑领域提示词（英文，符合阿里云百炼Prompt Engineering最佳实践）
         ///
-        /// ✅ 核心要求（2025-01-14强化 - 严禁直译，必须使用专业术语）：
-        /// 1. 【身份定位】你是专业的工程建筑行业图纸翻译助手
-        /// 2. 【严禁直译】必须使用行业专业术语，禁止字面逐字翻译
-        /// 3. 【专业准确】符合国际工程标准（ACI, AISC, ASHRAE, IBC）
-        /// 4. 【保留标识】图号、编号、代号、单位、规范代号等必须保留
+        /// ✅ 2025-11-15升级：基于阿里云百炼官方Prompt Engineering最佳实践
+        /// 框架结构：背景(Background) + 目的(Purpose) + 风格(Style) + 受众(Audience) + 输出(Output)
+        /// 参考：https://help.aliyun.com/zh/model-studio/prompt-engineering-guide
+        ///
+        /// 核心优化：
+        /// 1. 【明确背景】专业建筑工程图纸翻译，AutoCAD/BIM环境
+        /// 2. 【清晰目的】国际工程标准合规，专业术语精准，保留技术标识
+        /// 3. 【专业风格】工程技术文档风格，简洁准确，避免口语化
+        /// 4. 【目标受众】建筑师、工程师、施工人员等专业读者
+        /// 5. 【输出规范】保持原文格式，技术代码/编号不变，术语标准化
+        /// 6. 【Few-shot示例】提供高质量翻译示例引导模型
         /// </summary>
         public static readonly string DomainPrompt =
-            "You are a professional construction drawing translator. " +
-            "This text is from AutoCAD engineering drawings. " +
-            "\n\n" +
-            "Core Requirements:\n" +
-            "1. Use industry-standard professional terminology (NOT literal translations)\n" +
-            "2. Preserve numbers, codes, units (e.g., '1F', 'GB 50010', 'C30', 'mm')\n" +
-            "3. Follow international standards (ACI, AISC, ASHRAE, IBC)\n" +
+            "# Background\n" +
+            "You are a professional translator specializing in construction and engineering drawings. " +
+            "This text is from AutoCAD/BIM engineering drawings, including structural, architectural, " +
+            "MEP (Mechanical, Electrical, Plumbing), and fire protection systems.\n" +
             "\n" +
-            "Key Examples:\n" +
-            "- doghouse → 屋顶设备间 (NOT 狗屋)\n" +
-            "- heavy-duty grating → 重型格栅\n" +
-            "- fabricated → 预制\n" +
-            "- double tee beam → 双T梁\n" +
-            "- self closer → 闭门器\n";
+            "# Purpose\n" +
+            "Translate construction documentation with 100% technical accuracy, complying with:\n" +
+            "- International standards: ACI (American Concrete Institute), AISC (American Institute of Steel Construction), " +
+            "ASHRAE (HVAC), IBC (International Building Code)\n" +
+            "- Chinese standards: GB (National Standards), JGJ (Construction Engineering Standards)\n" +
+            "\n" +
+            "# Style & Tone\n" +
+            "- Professional engineering documentation style\n" +
+            "- Concise, precise, technical terminology\n" +
+            "- Formal register, avoid colloquialisms\n" +
+            "\n" +
+            "# Audience\n" +
+            "Professional engineers, architects, contractors, and construction managers who require " +
+            "technically accurate translations for design, construction, and compliance.\n" +
+            "\n" +
+            "# Critical Requirements\n" +
+            "1. **Use Standard Professional Terminology** (NOT literal word-by-word translation)\n" +
+            "2. **Preserve All Technical Identifiers**:\n" +
+            "   - Drawing numbers (No., DWG No., 图号)\n" +
+            "   - Standard codes (GB 50010, JGJ 3, ACI 318)\n" +
+            "   - Material grades (C30, Q235, HRB400)\n" +
+            "   - Units (mm, m, kN, MPa, °C)\n" +
+            "   - Floor levels (1F, 2F, B1, RF)\n" +
+            "   - Grid axes (Axis A, Axis 1, ①轴)\n" +
+            "3. **Maintain Original Formatting**:\n" +
+            "   - Keep line breaks, spacing, and layout\n" +
+            "   - Preserve punctuation for technical data\n" +
+            "4. **Context-Aware Translation**:\n" +
+            "   - \"beam\" in structural context → 梁 (not 光束/横梁)\n" +
+            "   - \"column\" in structural context → 柱 (not 列/专栏)\n" +
+            "   - \"doghouse\" in roof context → 屋顶设备间 (NOT 狗屋)\n" +
+            "\n" +
+            "# Translation Examples (Few-shot Learning)\n" +
+            "**Example 1 - Structural Component:**\n" +
+            "EN: \"300×600 reinforced concrete beam, C30 concrete, HRB400 steel reinforcement\"\n" +
+            "ZH: \"300×600钢筋混凝土梁，C30混凝土，HRB400钢筋\"\n" +
+            "\n" +
+            "**Example 2 - Drawing Annotation:**\n" +
+            "EN: \"Refer to detail drawing No.SD-102 for connection node at Axis A/1\"\n" +
+            "ZH: \"连接节点详见详图No.SD-102，位于A/1轴交点\"\n" +
+            "\n" +
+            "**Example 3 - Technical Specification:**\n" +
+            "EN: \"Load-bearing wall thickness: 240mm, masonry with MU10 perforated brick and M5 cement mortar\"\n" +
+            "ZH: \"承重墙厚度：240mm，MU10多孔砖+M5水泥砂浆砌筑\"\n" +
+            "\n" +
+            "**Example 4 - MEP System:**\n" +
+            "EN: \"Fire hydrant system design pressure: 0.35MPa, flow rate: 40L/s\"\n" +
+            "ZH: \"消火栓系统设计压力：0.35MPa，流量：40L/s\"\n" +
+            "\n" +
+            "# Output Format\n" +
+            "Provide direct translation only. Do not add explanations, notes, or commentary unless " +
+            "requested. Maintain the same structure and formatting as the source text.\n";
 
         /// <summary>
         /// 不应翻译的术语/模式规则
@@ -421,6 +470,173 @@ namespace BiaogPlugin.Services
         };
 
         /// <summary>
+        /// 翻译记忆库（Translation Memory）- 高质量平行语料示例
+        ///
+        /// ✅ 基于阿里云百炼官方最佳实践：
+        /// 作用：引导模型模仿示例的翻译风格、术语选择、格式保持
+        /// 参考：https://help.aliyun.com/zh/model-studio/machine-translation
+        ///
+        /// 选择标准：
+        /// 1. 典型的AutoCAD图纸标注场景
+        /// 2. 覆盖常见专业领域（结构、建筑、MEP）
+        /// 3. 展示正确的术语使用和格式保持
+        /// 4. 包含技术标识保留的最佳实践
+        /// </summary>
+        public static readonly List<TranslationMemoryPair> TranslationMemory = new List<TranslationMemoryPair>
+        {
+            // 中译英示例
+            new TranslationMemoryPair
+            {
+                Source = "300×600钢筋混凝土梁，混凝土强度等级C30，钢筋HRB400",
+                Target = "300×600 reinforced concrete beam, C30 concrete grade, HRB400 steel reinforcement",
+                Category = "结构构件"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "框架柱KZ1，截面尺寸600×600，混凝土C35，纵筋12Φ25",
+                Target = "Frame column KZ1, section size 600×600, C35 concrete, longitudinal reinforcement 12Φ25",
+                Category = "结构构件"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "屋面板厚度120mm，C30细石混凝土浇筑，双向配筋Φ8@200",
+                Target = "Roof slab thickness 120mm, C30 fine aggregate concrete pouring, two-way reinforcement Φ8@200",
+                Category = "结构构件"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "外墙为200厚加气混凝土砌块，MU5强度等级，M5混合砂浆砌筑",
+                Target = "Exterior wall: 200mm thick AAC block, MU5 strength grade, M5 mixed mortar masonry",
+                Category = "建筑构造"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "卫生间防水采用1.5mm厚聚氨酯防水涂料，上翻300mm",
+                Target = "Bathroom waterproofing: 1.5mm thick polyurethane waterproof coating, turned up 300mm",
+                Category = "建筑构造"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "消火栓系统设计压力0.35MPa，流量40L/s，按GB 50974-2014执行",
+                Target = "Fire hydrant system design pressure 0.35MPa, flow rate 40L/s, per GB 50974-2014",
+                Category = "消防系统"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "给水管采用PPR管，DN25，公称压力1.6MPa",
+                Target = "Water supply pipe: PPR pipe, DN25, nominal pressure 1.6MPa",
+                Category = "给排水"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "配电箱AL-1，电源进线3×95+1×50，TN-S系统",
+                Target = "Distribution box AL-1, power supply cable 3×95+1×50, TN-S system",
+                Category = "电气系统"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "新风机组风量5000m³/h，余压200Pa，电机功率2.2kW",
+                Target = "Fresh air unit air volume 5000m³/h, residual pressure 200Pa, motor power 2.2kW",
+                Category = "暖通空调"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "详见节点详图No.SD-102，轴网定位A/1轴交点",
+                Target = "Refer to detail drawing No.SD-102, grid location at Axis A/1 intersection",
+                Category = "图纸标注"
+            },
+
+            // 英译中示例
+            new TranslationMemoryPair
+            {
+                Source = "Beam B1, section 400×700, C30 concrete, top reinforcement 6Φ20, bottom reinforcement 4Φ18",
+                Target = "梁B1，截面400×700，C30混凝土，上部配筋6Φ20，下部配筋4Φ18",
+                Category = "结构构件"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "Shear wall thickness 200mm, vertical reinforcement Φ12@200 double layer",
+                Target = "剪力墙厚度200mm，竖向钢筋Φ12@200双层双向",
+                Category = "结构构件"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "Floor slab: 100mm thickness, C25 concrete, reinforcement Φ8@150 both ways",
+                Target = "楼板：厚度100mm，C25混凝土，配筋Φ8@150双向",
+                Category = "结构构件"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "Exterior wall finish: Stone cladding with 20mm thick granite, dry-hung system",
+                Target = "外墙饰面：20mm厚花岗岩石材干挂系统",
+                Category = "建筑装饰"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "Sprinkler system design per NFPA 13, upright sprinkler heads at 3.0m spacing",
+                Target = "喷淋系统按NFPA 13设计，直立型喷头间距3.0m",
+                Category = "消防系统"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "HVAC duct: Galvanized steel sheet, 400×300mm, thickness 0.8mm",
+                Target = "空调风管：镀锌钢板，400×300mm，板厚0.8mm",
+                Category = "暖通空调"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "Lighting fixture: LED panel light, 600×600mm, 36W, CRI≥80, CCT 4000K",
+                Target = "照明灯具：LED面板灯，600×600mm，36W，显色指数≥80，色温4000K",
+                Category = "电气照明"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "Foundation: Pile cap thickness 1200mm, C35 concrete, reinforcement mesh Φ20@150",
+                Target = "基础：承台厚度1200mm，C35混凝土，钢筋网Φ20@150",
+                Category = "基础工程"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "Refer to structural layout plan for beam and column locations",
+                Target = "梁柱位置详见结构布置图",
+                Category = "图纸引用"
+            },
+            new TranslationMemoryPair
+            {
+                Source = "See detail A for waterproofing construction at roof parapet",
+                Target = "屋面女儿墙防水构造详见详图A",
+                Category = "图纸引用"
+            }
+        };
+
+        /// <summary>
+        /// 转换为阿里云百炼API所需的tm_list格式
+        /// </summary>
+        public static List<object> GetApiTranslationMemory(string sourceLang, string targetLang)
+        {
+            var tmList = new List<object>();
+
+            // 根据翻译方向选择合适的示例
+            bool isEnToZh = sourceLang.Contains("English") && targetLang.Contains("Chinese");
+            bool isZhToEn = sourceLang.Contains("Chinese") && targetLang.Contains("English");
+
+            foreach (var pair in TranslationMemory)
+            {
+                if (isEnToZh && pair.Source.All(c => c < 128 || char.IsPunctuation(c))) // 英文源文本
+                {
+                    tmList.Add(new { source = pair.Source, target = pair.Target });
+                }
+                else if (isZhToEn && pair.Source.Any(c => c > 128)) // 中文源文本
+                {
+                    tmList.Add(new { source = pair.Source, target = pair.Target });
+                }
+            }
+
+            // ✅ 限制在10个示例以内（避免context过长）
+            return tmList.Take(10).ToList();
+        }
+
+        /// <summary>
         /// 转换为阿里云百炼API所需的terms格式
         /// </summary>
         public static List<object> GetApiTerms(string sourceLang, string targetLang)
@@ -480,5 +696,27 @@ Translate to {targetLanguageName}:";
     {
         public string Chinese { get; set; } = "";
         public string English { get; set; } = "";
+    }
+
+    /// <summary>
+    /// 翻译记忆对（Translation Memory Pair）
+    /// 用于阿里云百炼tm_list参数，提供高质量翻译示例
+    /// </summary>
+    public class TranslationMemoryPair
+    {
+        /// <summary>
+        /// 源语言文本
+        /// </summary>
+        public string Source { get; set; } = "";
+
+        /// <summary>
+        /// 目标语言文本
+        /// </summary>
+        public string Target { get; set; } = "";
+
+        /// <summary>
+        /// 类别标签（用于筛选相关示例）
+        /// </summary>
+        public string Category { get; set; } = "";
     }
 }
