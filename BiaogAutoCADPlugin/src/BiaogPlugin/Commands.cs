@@ -1203,6 +1203,165 @@ namespace BiaogPlugin
         }
 
         /// <summary>
+        /// ✅ 诊断文本提取功能（AutoCAD 2022优化版）
+        /// ✅ 解决问题1：算量功能提取不到构件 - 输出详细的文本提取统计信息
+        ///
+        /// 功能说明：
+        /// - 提取当前DWG中的所有文本实体
+        /// - 输出详细的统计信息（按类型、图层、空间分类）
+        /// - 显示提取到的前20个文本示例
+        /// - 保存完整报告到桌面
+        ///
+        /// 使用场景：
+        /// - 算量功能提取不到构件时，运行此命令查看提取情况
+        /// - 翻译功能遗漏文本时，运行此命令检查文本提取
+        /// - 了解当前DWG文件的文本分布情况
+        /// </summary>
+        [CommandMethod("BIAOGE_DIAGNOSE_TEXT", CommandFlags.Modal)]
+        public void DiagnoseTextExtraction()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+            var db = doc.Database;
+
+            try
+            {
+                ed.WriteMessage("\n═══════════════════════════════════════════════════");
+                ed.WriteMessage("\n文本提取诊断 - AutoCAD 2022优化版");
+                ed.WriteMessage("\n═══════════════════════════════════════════════════");
+                ed.WriteMessage("\n正在提取文本实体，请稍候...\n");
+
+                Log.Information("开始运行文本提取诊断");
+
+                // 提取所有文本
+                var extractor = new DwgTextExtractor();
+                var allTexts = extractor.ExtractAllText();
+
+                // 生成统计报告
+                var stats = extractor.GetStatistics(allTexts);
+
+                // ===== 1. 基本统计 =====
+                ed.WriteMessage("\n【基本统计】");
+                ed.WriteMessage($"\n  总文本数量: {stats.TotalCount}");
+                ed.WriteMessage($"\n  唯一内容数: {stats.UniqueContentCount}");
+                ed.WriteMessage($"\n  可翻译文本: {stats.TranslatableCount}");
+                ed.WriteMessage($"\n  图层数量:   {stats.LayerCount}");
+
+                // ===== 2. 按类型统计 =====
+                ed.WriteMessage("\n\n【按类型统计】");
+                ed.WriteMessage($"\n  单行文本 (DBText):        {stats.DBTextCount}");
+                ed.WriteMessage($"\n  多行文本 (MText):         {stats.MTextCount}");
+                ed.WriteMessage($"\n  属性文本 (Attribute):     {stats.AttributeCount}");
+
+                var dimensionCount = allTexts.Count(t => t.Type == TextEntityType.Dimension);
+                var mLeaderCount = allTexts.Count(t => t.Type == TextEntityType.MLeader);
+                var tableCount = allTexts.Count(t => t.Type == TextEntityType.Table);
+                var fcfCount = allTexts.Count(t => t.Type == TextEntityType.FeatureControlFrame);
+
+                ed.WriteMessage($"\n  标注文本 (Dimension):     {dimensionCount}");
+                ed.WriteMessage($"\n  多重引线 (MLeader):       {mLeaderCount}");
+                ed.WriteMessage($"\n  表格文本 (Table):         {tableCount}");
+                ed.WriteMessage($"\n  几何公差 (FCF):          {fcfCount}");
+
+                // ===== 3. 按空间统计 =====
+                ed.WriteMessage("\n\n【按空间统计】");
+                var spaceGroups = allTexts.GroupBy(t => t.SpaceName).OrderByDescending(g => g.Count());
+                foreach (var group in spaceGroups)
+                {
+                    ed.WriteMessage($"\n  {group.Key}: {group.Count()} 个文本");
+                }
+
+                // ===== 4. 按图层统计（Top 10） =====
+                ed.WriteMessage("\n\n【按图层统计 (Top 10)】");
+                var layerGroups = allTexts.GroupBy(t => t.Layer)
+                    .OrderByDescending(g => g.Count())
+                    .Take(10);
+
+                foreach (var group in layerGroups)
+                {
+                    ed.WriteMessage($"\n  图层 [{group.Key}]: {group.Count()} 个文本");
+                }
+
+                // ===== 5. 块属性统计 =====
+                ed.WriteMessage("\n\n【块属性统计】");
+                var blockTexts = allTexts.Where(t =>
+                    t.Type == TextEntityType.AttributeReference ||
+                    t.Type == TextEntityType.AttributeDefinition);
+
+                var visibleBlockTexts = blockTexts.Count();
+                var blockGroups = blockTexts.GroupBy(t => t.BlockName)
+                    .OrderByDescending(g => g.Count())
+                    .Take(5);
+
+                ed.WriteMessage($"\n  块属性总数: {visibleBlockTexts}");
+                ed.WriteMessage("\n  Top 5 块名称:");
+                foreach (var group in blockGroups)
+                {
+                    ed.WriteMessage($"\n    [{group.Key}]: {group.Count()} 个属性");
+                }
+
+                // ===== 6. 示例文本（前20个） =====
+                ed.WriteMessage("\n\n【文本示例 (前20个)】");
+                var sampleTexts = allTexts.Take(20);
+                int idx = 1;
+                foreach (var text in sampleTexts)
+                {
+                    var content = text.Content.Length > 40
+                        ? text.Content.Substring(0, 40) + "..."
+                        : text.Content;
+                    ed.WriteMessage($"\n  {idx,2}. [{text.Type,-20}] \"{content}\"");
+                    idx++;
+                }
+
+                // ===== 7. 保存详细报告到桌面 =====
+                var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                var reportPath = System.IO.Path.Combine(desktopPath,
+                    $"BiaogPlugin_TextDiagnose_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+
+                var reportBuilder = new System.Text.StringBuilder();
+                reportBuilder.AppendLine("═══════════════════════════════════════════════════");
+                reportBuilder.AppendLine("标哥插件 - 文本提取诊断报告");
+                reportBuilder.AppendLine($"生成时间: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                reportBuilder.AppendLine($"DWG文件: {db.Filename}");
+                reportBuilder.AppendLine("═══════════════════════════════════════════════════");
+                reportBuilder.AppendLine();
+                reportBuilder.AppendLine(stats.ToString());
+                reportBuilder.AppendLine();
+                reportBuilder.AppendLine("【所有提取的文本】");
+                reportBuilder.AppendLine();
+
+                foreach (var text in allTexts)
+                {
+                    reportBuilder.AppendLine($"类型: {text.Type}");
+                    reportBuilder.AppendLine($"内容: {text.Content}");
+                    reportBuilder.AppendLine($"图层: {text.Layer}");
+                    reportBuilder.AppendLine($"空间: {text.SpaceName}");
+                    if (!string.IsNullOrEmpty(text.BlockName))
+                        reportBuilder.AppendLine($"块名: {text.BlockName}");
+                    if (!string.IsNullOrEmpty(text.Tag))
+                        reportBuilder.AppendLine($"标签: {text.Tag}");
+                    reportBuilder.AppendLine($"位置: ({text.Position.X:F2}, {text.Position.Y:F2}, {text.Position.Z:F2})");
+                    reportBuilder.AppendLine("---");
+                }
+
+                System.IO.File.WriteAllText(reportPath, reportBuilder.ToString());
+
+                ed.WriteMessage("\n\n═══════════════════════════════════════════════════");
+                ed.WriteMessage($"\n✅ 诊断完成！详细报告已保存到:");
+                ed.WriteMessage($"\n   {reportPath}");
+                ed.WriteMessage("\n═══════════════════════════════════════════════════");
+
+                Log.Information($"文本提取诊断完成，报告已保存: {reportPath}");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "文本提取诊断失败");
+                ed.WriteMessage($"\n[错误] 诊断失败: {ex.Message}");
+                ed.WriteMessage($"\n详细信息: {ex.StackTrace}");
+            }
+        }
+
+        /// <summary>
         /// 显示性能监控报告
         /// </summary>
         [CommandMethod("BIAOGE_PERFORMANCE", CommandFlags.Modal)]

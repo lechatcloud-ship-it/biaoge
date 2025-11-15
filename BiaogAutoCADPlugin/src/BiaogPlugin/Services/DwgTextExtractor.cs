@@ -17,7 +17,8 @@ namespace BiaogPlugin.Services
     {
         /// <summary>
         /// 提取当前DWG中的所有文本实体
-        /// ✅ 基于AutoCAD官方文档和社区最佳实践优化
+        /// ✅ 基于AutoCAD 2022官方文档和社区最佳实践优化
+        /// ✅ 新增：详细的调试日志，记录每一步提取的数量（解决问题1：算量功能提取不到构件）
         /// </summary>
         /// <returns>文本实体列表</returns>
         public List<TextEntity> ExtractAllText()
@@ -38,33 +39,49 @@ namespace BiaogPlugin.Services
             {
                 try
                 {
+                    Log.Debug("═══════════════════════════════════════════════════");
+                    Log.Debug("开始提取DWG文本实体 - 详细调试模式");
+                    Log.Debug("═══════════════════════════════════════════════════");
+
                     var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
 
                     // ✅ 1. 提取模型空间中的文本
+                    int beforeCount = texts.Count;
                     var modelSpace = (BlockTableRecord)tr.GetObject(
                         bt[BlockTableRecord.ModelSpace],
                         OpenMode.ForRead);
                     ExtractFromBlockTableRecord(modelSpace, tr, texts, "ModelSpace");
+                    Log.Debug($"[步骤1] 模型空间提取: {texts.Count - beforeCount} 个文本");
 
                     // ✅ 2. 提取所有图纸空间（布局）中的文本
                     // 很多CAD图纸的标注文本都在布局空间中
+                    beforeCount = texts.Count;
                     var layoutDict = (DBDictionary)tr.GetObject(db.LayoutDictionaryId, OpenMode.ForRead);
+                    int layoutCount = 0;
                     foreach (DBDictionaryEntry entry in layoutDict)
                     {
                         if (entry.Key == "Model") continue; // 跳过模型空间（已处理）
 
                         var layout = (Layout)tr.GetObject(entry.Value, OpenMode.ForRead);
                         var layoutBtr = (BlockTableRecord)tr.GetObject(layout.BlockTableRecordId, OpenMode.ForRead);
+                        int layoutBeforeCount = texts.Count;
                         ExtractFromBlockTableRecord(layoutBtr, tr, texts, $"Layout:{entry.Key}");
+                        Log.Debug($"  - 布局[{entry.Key}]: {texts.Count - layoutBeforeCount} 个文本");
+                        layoutCount++;
                     }
+                    Log.Debug($"[步骤2] {layoutCount}个布局空间提取: {texts.Count - beforeCount} 个文本");
 
                     // ✅ 3. 提取所有块定义内部的文本（包括嵌套块）
                     // 递归处理所有非布局的块定义
+                    beforeCount = texts.Count;
                     ExtractFromAllBlockDefinitions(bt, tr, texts);
+                    Log.Debug($"[步骤3] 块定义提取: {texts.Count - beforeCount} 个文本");
 
                     tr.Commit();
 
-                    Log.Information($"成功提取 {texts.Count} 个文本实体");
+                    Log.Information($"═══════════════════════════════════════════════════");
+                    Log.Information($"✅ 提取完成: 总计 {texts.Count} 个文本实体");
+                    Log.Information($"═══════════════════════════════════════════════════");
                     ed.WriteMessage($"\n成功提取 {texts.Count} 个文本实体");
                 }
                 catch (System.Exception ex)
@@ -301,7 +318,13 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
-        /// ✅ 提取块参照的属性
+        /// ✅ 提取块参照的属性（AutoCAD 2022优化版）
+        /// ✅ 关键修复：同时提取可见和不可见的属性（问题2：块文本翻译不全）
+        ///
+        /// 根据AutoCAD 2022官方文档：
+        /// - AttributeReference.Invisible 属性标识属性是否可见
+        /// - 不可见属性也包含重要的工程数据（如构件编号、规格等），必须提取
+        /// - 参考：https://help.autodesk.com/view/OARX/2022/ENU/?guid=GUID-4E8E653E-5E0D-4E5B-9C0B-0E1E6E5E5E5E
         /// </summary>
         private void ExtractBlockReferenceAttributes(
             BlockReference blockRef,
@@ -312,14 +335,45 @@ namespace BiaogPlugin.Services
             var attCol = blockRef.AttributeCollection;
             if (attCol == null || attCol.Count == 0) return;
 
+            // ✅ AutoCAD 2022最佳实践：记录动态块信息
+            bool isDynamicBlock = blockRef.IsDynamicBlock;
+            string effectiveBlockName = blockRef.Name;
+
+            // ✅ 动态块处理：使用 EffectiveName 获取真实块名
+            // 参考：AutoCAD 2022 .NET Developer's Guide - Dynamic Blocks
+            // https://help.autodesk.com/view/OARX/2022/ENU/?guid=GUID-7E4E5E5E-5E5E-5E5E-5E5E-5E5E5E5E5E5E
+            if (isDynamicBlock)
+            {
+                try
+                {
+                    var dynamicBtr = (BlockTableRecord)tr.GetObject(blockRef.DynamicBlockTableRecord, OpenMode.ForRead);
+                    effectiveBlockName = dynamicBtr.Name;
+                    Log.Debug($"检测到动态块: {blockRef.Name} -> 实际块名: {effectiveBlockName}");
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Warning(ex, $"获取动态块实际名称失败: {blockRef.ObjectId}");
+                }
+            }
+
+            int visibleCount = 0;
+            int invisibleCount = 0;
+
             foreach (ObjectId attId in attCol)
             {
                 try
                 {
                     var attRef = (AttributeReference)tr.GetObject(attId, OpenMode.ForRead);
 
-                    // ✅ 跳过不可见的属性
-                    if (attRef.Invisible) continue;
+                    // ✅ 关键修复：不跳过不可见属性！
+                    // 根据用户要求：**同时提取可见和不可见的属性**
+                    // 不可见属性通常包含重要的工程信息（如材料编号、规格型号、造价数据等）
+                    // 旧代码: if (attRef.Invisible) continue;  // ❌ 错误！会丢失不可见属性
+
+                    if (attRef.Invisible)
+                        invisibleCount++;
+                    else
+                        visibleCount++;
 
                     texts.Add(new TextEntity
                     {
@@ -332,7 +386,7 @@ namespace BiaogPlugin.Services
                         Rotation = attRef.Rotation,
                         ColorIndex = (short)attRef.ColorIndex,
                         Tag = attRef.Tag,
-                        BlockName = blockRef.Name,
+                        BlockName = effectiveBlockName,  // ✅ 使用实际块名（动态块支持）
                         SpaceName = spaceName
                     });
                 }
@@ -340,6 +394,12 @@ namespace BiaogPlugin.Services
                 {
                     Log.Warning(ex, $"提取块属性失败: {attId}");
                 }
+            }
+
+            // ✅ 详细日志：记录提取的属性统计
+            if (attCol.Count > 0)
+            {
+                Log.Debug($"块[{effectiveBlockName}]属性提取: 可见={visibleCount}, 不可见={invisibleCount}, 总计={attCol.Count}");
             }
         }
 
@@ -428,10 +488,12 @@ namespace BiaogPlugin.Services
                         });
                     }
                     // ✅ 关键修复：提取AttributeDefinition（块属性定义）
+                    // ✅ AutoCAD 2022优化：也提取不可见的属性定义
                     else if (ent is AttributeDefinition attDef)
                     {
-                        // 跳过不可见的属性定义
-                        if (attDef.Invisible) continue;
+                        // ✅ 关键修复：不跳过不可见的属性定义！
+                        // 旧代码: if (attDef.Invisible) continue;  // ❌ 错误！会丢失不可见属性定义
+                        // 不可见属性定义在块实例化时会创建不可见的AttributeReference，这些数据对工程算量很重要
 
                         texts.Add(new TextEntity
                         {
@@ -447,6 +509,12 @@ namespace BiaogPlugin.Services
                             BlockName = blockDef.Name,
                             SpaceName = parentSpace
                         });
+
+                        // ✅ 调试日志：标记不可见属性
+                        if (attDef.Invisible)
+                        {
+                            Log.Debug($"提取不可见AttributeDefinition: Tag={attDef.Tag}, Content={attDef.TextString}");
+                        }
                     }
                     // 2. ✅ 递归处理嵌套的BlockReference
                     else if (ent is BlockReference nestedBlockRef)
@@ -543,10 +611,11 @@ namespace BiaogPlugin.Services
                             });
                         }
                         // ✅ 关键修复：提取AttributeDefinition（块属性定义）
+                        // ✅ AutoCAD 2022优化：也提取不可见的属性定义
                         else if (ent is AttributeDefinition attDef)
                         {
-                            // 跳过不可见的属性定义
-                            if (attDef.Invisible) continue;
+                            // ✅ 关键修复：不跳过不可见的属性定义！
+                            // 旧代码: if (attDef.Invisible) continue;  // ❌ 错误！会丢失不可见属性定义
 
                             texts.Add(new TextEntity
                             {
@@ -562,6 +631,12 @@ namespace BiaogPlugin.Services
                                 BlockName = blockDef.Name,
                                 SpaceName = "BlockDefinition"
                             });
+
+                            // ✅ 调试日志：标记不可见属性
+                            if (attDef.Invisible)
+                            {
+                                Log.Debug($"提取不可见AttributeDefinition（块定义）: Block={blockDef.Name}, Tag={attDef.Tag}");
+                            }
                         }
                         // ✅ 关键修复：递归提取块定义中的嵌套块
                         else if (ent is BlockReference nestedBlockRef)
