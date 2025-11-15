@@ -375,12 +375,20 @@ namespace BiaogPlugin.Services
                         {
                             Log.Information($"✅ 成功从GeoPositionMarker提取TextString: {textString}");
 
-                            // 尝试获取位置
+                            // 尝试获取位置（使用安全的类型检查）
                             Point3d position = Point3d.Origin;
                             var positionProp = entType.GetProperty("Position");
                             if (positionProp != null)
                             {
-                                position = (Point3d)(positionProp.GetValue(ent) ?? Point3d.Origin);
+                                var posValue = positionProp.GetValue(ent);
+                                if (posValue is Point3d p3d)
+                                {
+                                    position = p3d;
+                                }
+                                else if (posValue != null)
+                                {
+                                    Log.Debug($"GeoPositionMarker.Position类型不是Point3d: {posValue.GetType().Name}");
+                                }
                             }
 
                             return new TextEntity
