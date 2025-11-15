@@ -26,56 +26,211 @@ public class ComponentRecognizer
     private static readonly Regex DiameterRegex = new(@"[ΦφØ]?\s*(\d+(?:\.\d+)?)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    // 构件识别规则
+    // ✅ 构件识别规则（AutoCAD 2022优化版 - 大幅扩展中文构件支持）
+    // ✅ 关键修复：添加更多中文构件名称模式，解决"提取不到构件"问题
+    // 基于GB 50500-2013《建设工程工程量清单计价规范》和实际工程图纸
     private static readonly Dictionary<string, List<Regex>> ComponentPatterns = new()
     {
-        // 混凝土构件
+        // ==================== 混凝土构件 ====================
+        // ✅ 柱（所有强度等级）
+        ["C20混凝土柱"] = new List<Regex>
+        {
+            new Regex(@"C20.*柱", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"混凝土柱.*C20", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"柱.*C20", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"框架柱.*C20", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+        ["C25混凝土柱"] = new List<Regex>
+        {
+            new Regex(@"C25.*柱", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"混凝土柱.*C25", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"柱.*C25", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
         ["C30混凝土柱"] = new List<Regex>
         {
             new Regex(@"C30.*柱", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-            new Regex(@"混凝土柱.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+            new Regex(@"混凝土柱.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"柱.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"KZ.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase)  // KZ=框架柱
+        },
+        ["C35混凝土柱"] = new List<Regex>
+        {
+            new Regex(@"C35.*柱", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"混凝土柱.*C35", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"柱.*C35", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+        ["C40混凝土柱"] = new List<Regex>
+        {
+            new Regex(@"C40.*柱", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"混凝土柱.*C40", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+
+        // ✅ 梁（所有强度等级）
+        ["C25混凝土梁"] = new List<Regex>
+        {
+            new Regex(@"C25.*梁", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"混凝土梁.*C25", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"梁.*C25", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+        ["C30混凝土梁"] = new List<Regex>
+        {
+            new Regex(@"C30.*梁", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"混凝土梁.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"梁.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"KL.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase),  // KL=框架梁
+            new Regex(@"L.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
         ["C35混凝土梁"] = new List<Regex>
         {
             new Regex(@"C35.*梁", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-            new Regex(@"混凝土梁.*C35", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+            new Regex(@"混凝土梁.*C35", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"梁.*C35", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+        ["C40混凝土梁"] = new List<Regex>
+        {
+            new Regex(@"C40.*梁", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"混凝土梁.*C40", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+
+        // ✅ 板（所有强度等级）
+        ["C20混凝土板"] = new List<Regex>
+        {
+            new Regex(@"C20.*板", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"混凝土板.*C20", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"楼板.*C20", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+        ["C25混凝土板"] = new List<Regex>
+        {
+            new Regex(@"C25.*板", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"混凝土板.*C25", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
         ["C30混凝土板"] = new List<Regex>
         {
             new Regex(@"C30.*板", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-            new Regex(@"混凝土板.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+            new Regex(@"混凝土板.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"板.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"楼板.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
-        // 钢筋
+
+        // ✅ 剪力墙
+        ["C30剪力墙"] = new List<Regex>
+        {
+            new Regex(@"C30.*剪力墙", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"剪力墙.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"剪.*墙.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+        ["C35剪力墙"] = new List<Regex>
+        {
+            new Regex(@"C35.*剪力墙", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"剪力墙.*C35", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+
+        // ==================== 钢筋 ====================
         ["HRB400钢筋"] = new List<Regex>
         {
             new Regex(@"HRB400", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-            new Regex(@"Φ\d+.*HRB400", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+            new Regex(@"Φ\d+.*HRB400", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"hrb400", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"HRB\s*400", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
         ["HPB300钢筋"] = new List<Regex>
         {
             new Regex(@"HPB300", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-            new Regex(@"Φ\d+.*HPB300", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+            new Regex(@"Φ\d+.*HPB300", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"HPB\s*300", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
-        // 砌体
+        ["HRB335钢筋"] = new List<Regex>
+        {
+            new Regex(@"HRB335", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"Φ\d+.*HRB335", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+        ["HRB500钢筋"] = new List<Regex>
+        {
+            new Regex(@"HRB500", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"Φ\d+.*HRB500", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+
+        // ==================== 砌体 ====================
         ["MU10砖墙"] = new List<Regex>
         {
             new Regex(@"MU10.*墙", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-            new Regex(@"砖墙.*MU10", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+            new Regex(@"砖墙.*MU10", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"MU10.*砖", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"墙.*MU10", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
         ["MU15砌块"] = new List<Regex>
         {
-            new Regex(@"MU15.*砌块", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+            new Regex(@"MU15.*砌块", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"砌块.*MU15", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"MU15", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
-        // 门窗
+        ["MU20砖墙"] = new List<Regex>
+        {
+            new Regex(@"MU20.*墙", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"砖墙.*MU20", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+        ["加气混凝土砌块"] = new List<Regex>
+        {
+            new Regex(@"加气.*砌块", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"加气混凝土", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"ALC", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+
+        // ==================== 门窗（扩展版） ====================
         ["M1门"] = new List<Regex>
         {
-            new Regex(@"M[01](?!\d)", RegexOptions.Compiled),
-            new Regex(@"门.*M[01]", RegexOptions.Compiled)
+            new Regex(@"M[0-9](?!\d)", RegexOptions.Compiled),
+            new Regex(@"门.*M[0-9]", RegexOptions.Compiled),
+            new Regex(@"M-[0-9]", RegexOptions.Compiled)
         },
         ["C1窗"] = new List<Regex>
         {
-            new Regex(@"C[01](?!\d)", RegexOptions.Compiled),
-            new Regex(@"窗.*C[01]", RegexOptions.Compiled)
+            new Regex(@"C[0-9](?!\d)", RegexOptions.Compiled),
+            new Regex(@"窗.*C[0-9]", RegexOptions.Compiled),
+            new Regex(@"C-[0-9]", RegexOptions.Compiled)
+        },
+        ["防火门"] = new List<Regex>
+        {
+            new Regex(@"防火门", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"FM", RegexOptions.Compiled)
+        },
+        ["铝合金窗"] = new List<Regex>
+        {
+            new Regex(@"铝.*窗", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"铝合金", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+
+        // ==================== 通用构件名称（纯中文匹配） ====================
+        ["柱"] = new List<Regex>
+        {
+            new Regex(@"^柱$", RegexOptions.Compiled),
+            new Regex(@"^框架柱$", RegexOptions.Compiled),
+            new Regex(@"^KZ\d+", RegexOptions.Compiled)
+        },
+        ["梁"] = new List<Regex>
+        {
+            new Regex(@"^梁$", RegexOptions.Compiled),
+            new Regex(@"^框架梁$", RegexOptions.Compiled),
+            new Regex(@"^KL\d+", RegexOptions.Compiled),
+            new Regex(@"^L\d+", RegexOptions.Compiled)
+        },
+        ["板"] = new List<Regex>
+        {
+            new Regex(@"^板$", RegexOptions.Compiled),
+            new Regex(@"^楼板$", RegexOptions.Compiled),
+            new Regex(@"^屋面板$", RegexOptions.Compiled)
+        },
+        ["墙"] = new List<Regex>
+        {
+            new Regex(@"^墙$", RegexOptions.Compiled),
+            new Regex(@"^砖墙$", RegexOptions.Compiled),
+            new Regex(@"^填充墙$", RegexOptions.Compiled)
+        },
+        ["基础"] = new List<Regex>
+        {
+            new Regex(@"基础", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"独立基础", RegexOptions.Compiled),
+            new Regex(@"条形基础", RegexOptions.Compiled)
         }
     };
 
@@ -85,28 +240,49 @@ public class ComponentRecognizer
     }
 
     /// <summary>
-    /// 从AutoCAD文本实体识别构件
+    /// 从AutoCAD文本实体识别构件（AutoCAD 2022优化版）
+    /// ✅ 新增：详细的调试日志，记录每个识别步骤（解决问题1：算量功能提取不到构件）
     /// </summary>
     public async Task<List<ComponentRecognitionResult>> RecognizeFromTextEntitiesAsync(
         List<TextEntity> textEntities,
         bool useAiVerification = false)
     {
+        Log.Information("═══════════════════════════════════════════════════");
         Log.Information("开始识别构件: {Count}个文本实体", textEntities.Count);
+        Log.Information("═══════════════════════════════════════════════════");
 
         var results = new List<ComponentRecognitionResult>();
+        int processedCount = 0;
+        int recognizedCount = 0;
+        int skippedCount = 0;
 
         foreach (var entity in textEntities)
         {
+            processedCount++;
+
             if (string.IsNullOrWhiteSpace(entity.Content))
+            {
+                skippedCount++;
                 continue;
+            }
+
+            // ✅ 详细日志：记录每个文本实体的处理过程
+            Log.Debug($"[{processedCount}/{textEntities.Count}] 处理文本: \"{entity.Content}\" (类型: {entity.Type}, 图层: {entity.Layer})");
 
             // 策略1: 正则表达式匹配
             var regexResult = RecognizeByRegex(entity);
 
             if (regexResult != null)
             {
+                recognizedCount++;
+                Log.Debug($"  ✓ 识别为: {regexResult.Type} (置信度: {regexResult.Confidence:P})");
+
                 // 策略2: 提取数量和尺寸
                 ExtractQuantityAndDimensions(entity.Content, regexResult);
+                if (regexResult.Quantity > 1 || regexResult.Length > 0 || regexResult.Width > 0 || regexResult.Height > 0)
+                {
+                    Log.Debug($"  ✓ 提取尺寸: 数量={regexResult.Quantity}, L={regexResult.Length:F2}m, W={regexResult.Width:F2}m, H={regexResult.Height:F2}m");
+                }
 
                 // 策略3: 建筑规范验证
                 ApplyConstructionStandards(regexResult);
@@ -115,16 +291,29 @@ public class ComponentRecognizer
                 if (useAiVerification && regexResult.Confidence < 0.9)
                 {
                     await VerifyWithAiAsync(entity.Content, regexResult);
+                    Log.Debug($"  ✓ AI验证后置信度: {regexResult.Confidence:P}");
                 }
 
                 // 计算工程量
                 CalculateQuantity(regexResult);
+                if (regexResult.Volume > 0 || regexResult.Area > 0)
+                {
+                    Log.Debug($"  ✓ 工程量: 体积={regexResult.Volume:F3}m³, 面积={regexResult.Area:F3}m², 成本={regexResult.Cost:C}");
+                }
 
                 results.Add(regexResult);
             }
+            else
+            {
+                // ✅ 记录未识别的文本，帮助调试
+                Log.Debug($"  ✗ 未识别: \"{entity.Content}\"");
+            }
         }
 
-        Log.Information("识别完成: {Count}个构件", results.Count);
+        Log.Information("═══════════════════════════════════════════════════");
+        Log.Information($"✅ 识别完成: 处理={processedCount}, 识别={recognizedCount}, 跳过={skippedCount}");
+        Log.Information($"识别率: {(recognizedCount * 100.0 / Math.Max(processedCount - skippedCount, 1)):F1}%");
+        Log.Information("═══════════════════════════════════════════════════");
 
         return results;
     }
