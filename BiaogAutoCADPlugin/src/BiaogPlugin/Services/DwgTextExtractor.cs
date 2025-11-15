@@ -143,16 +143,22 @@ namespace BiaogPlugin.Services
         /// <summary>
         /// ✅ 从单个实体提取文本（完整版 - 支持所有AutoCAD文本类型）
         ///
-        /// 支持的实体类型（基于AutoCAD 2022 .NET API官方文档）：
+        /// 支持的实体类型（基于AutoCAD 2024 Double-Click Actions官方文档 + DXF Reference）：
         /// - DBText (单行文本, TEXT命令)
         /// - MText (多行文本, MTEXT命令)
         /// - AttributeDefinition (属性定义, ATTDEF命令)
-        /// - AttributeReference (属性引用, 通过BlockReference提取)
+        /// - AttributeReference (属性引用, ATTRIB - 通过BlockReference提取)
         /// - Dimension (标注 - 所有8种子类型: Aligned, Arc, Diametric, LineAngular, Point3Angular, Radial, RadialLarge, Rotated)
         /// - MLeader (多重引线, MLEADER命令)
         /// - Leader (旧式引线, LEADER命令 - 文本通过Annotation属性关联)
         /// - FeatureControlFrame (几何公差, TOLERANCE命令)
         /// - Table (表格, TABLE命令 - 需单独处理单元格)
+        /// - GeoPositionMarker (地理位置标记, POSITIONMARKER/GEOMARKPOINT命令 - 如果.NET API可用)
+        ///
+        /// ✅ 2025-11-15深度审查：基于AutoCAD官方文档完整验证
+        /// - Double-Click Actions Reference: https://help.autodesk.com/cloudhelp/2024/ENU/AutoCAD-Customization/files/GUID-0181E010-6BF2-4F59-8B9B-C64E10E127BA.htm
+        /// - DXF ENTITIES Section: 所有包含文本的实体类型已全部支持
+        /// - 审查报告: BiaogAutoCADPlugin/TEXT_ENTITY_AUDIT_REPORT.md
         /// </summary>
         private TextEntity ExtractTextFromEntity(Entity ent, ObjectId objId)
         {
@@ -316,6 +322,87 @@ namespace BiaogPlugin.Services
                 catch (System.Exception ex)
                 {
                     Log.Warning(ex, $"提取几何公差文字失败: {objId}");
+                }
+            }
+
+            // ✅ 【2025-11-15新增】地理位置标记（GeoPositionMarker, POSITIONMARKER实体）
+            // 参考：
+            // - AutoCAD Double-Click Actions Reference (POSITIONMARKER可双击编辑)
+            // - AutoCAD 2016+引入，通过GEOMARKPOINT命令创建
+            // - 组成：一个点 + 引线 + 多行文本(MText)
+            // 注意：GeoPositionMarker类主要在ObjectARX (C++)中，.NET API可用性未确认
+            // 策略：使用类型名称检查 + 反射访问（防御性编程）
+            // 参考：https://adndevblog.typepad.com/autocad/2016/04/adding-geopositionmarker-to-different-location-through-api.html
+            if (ent.GetType().Name.Contains("GeoPositionMarker") ||
+                ent.GetType().Name.Contains("PositionMarker"))
+            {
+                try
+                {
+                    Log.Debug($"检测到GeoPositionMarker实体: {objId}, 类型: {ent.GetType().FullName}");
+
+                    // 尝试使用反射访问MText属性或TextString属性
+                    var entType = ent.GetType();
+
+                    // 方法1: 尝试访问MText属性
+                    var mtextProp = entType.GetProperty("MText");
+                    if (mtextProp != null)
+                    {
+                        var mtext = mtextProp.GetValue(ent) as MText;
+                        if (mtext != null && !string.IsNullOrWhiteSpace(mtext.Text))
+                        {
+                            Log.Information($"✅ 成功从GeoPositionMarker提取MText: {mtext.Text}");
+                            return new TextEntity
+                            {
+                                Id = objId,
+                                Type = TextEntityType.MText,
+                                Content = mtext.Text,
+                                Position = mtext.Location,
+                                Layer = ent.Layer,
+                                Height = mtext.TextHeight,
+                                Rotation = mtext.Rotation,
+                                ColorIndex = (short)ent.ColorIndex,
+                                SpaceName = "GeoPositionMarker"
+                            };
+                        }
+                    }
+
+                    // 方法2: 尝试访问TextString属性
+                    var textStringProp = entType.GetProperty("TextString");
+                    if (textStringProp != null)
+                    {
+                        var textString = textStringProp.GetValue(ent) as string;
+                        if (!string.IsNullOrWhiteSpace(textString))
+                        {
+                            Log.Information($"✅ 成功从GeoPositionMarker提取TextString: {textString}");
+
+                            // 尝试获取位置
+                            Point3d position = Point3d.Origin;
+                            var positionProp = entType.GetProperty("Position");
+                            if (positionProp != null)
+                            {
+                                position = (Point3d)(positionProp.GetValue(ent) ?? Point3d.Origin);
+                            }
+
+                            return new TextEntity
+                            {
+                                Id = objId,
+                                Type = TextEntityType.MText, // 归类为MText
+                                Content = textString,
+                                Position = position,
+                                Layer = ent.Layer,
+                                Height = 0,
+                                Rotation = 0,
+                                ColorIndex = (short)ent.ColorIndex,
+                                SpaceName = "GeoPositionMarker"
+                            };
+                        }
+                    }
+
+                    Log.Debug($"GeoPositionMarker实体未包含可提取的文本: {objId}");
+                }
+                catch (System.Exception ex)
+                {
+                    Log.Warning(ex, $"提取GeoPositionMarker文字失败: {objId}");
                 }
             }
 

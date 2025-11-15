@@ -140,7 +140,9 @@ namespace BiaogPlugin.Services
                             : null,
                         temperature: 0.7,
                         topP: 0.9,
-                        thinkingBudget: useDeepThinking ? 10000 : null,
+                        thinkingBudget: useDeepThinking
+                            ? GetOptimalThinkingBudget(detectedScenario)  // ✅ 场景化动态调整
+                            : null,
                         enableThinking: useDeepThinking
                     );
                 }
@@ -458,6 +460,46 @@ namespace BiaogPlugin.Services
                 ScenarioPromptManager.Scenario.Diagnosis => "错误诊断",
                 ScenarioPromptManager.Scenario.QualityCheck => "质量检查",
                 _ => "通用对话"
+            };
+        }
+
+        /// <summary>
+        /// ✅ 获取最优的思考Token预算（根据场景复杂度动态调整）
+        ///
+        /// 基于阿里云百炼官方最佳实践：
+        /// - thinking_budget用于限制推理过程的最大Token数
+        /// - 过高：延迟增加、成本上升、思考过程冗长
+        /// - 过低：推理深度不足、质量下降
+        /// - 最佳实践：根据任务复杂度动态调整
+        ///
+        /// 参考：https://help.aliyun.com/zh/model-studio/deep-thinking
+        /// </summary>
+        /// <param name="scenario">工作场景</param>
+        /// <returns>最优思考Token预算</returns>
+        private int GetOptimalThinkingBudget(ScenarioPromptManager.Scenario scenario)
+        {
+            return scenario switch
+            {
+                // 算量：需要深度推理（多步骤计算、精确度验证）
+                ScenarioPromptManager.Scenario.Calculation => 5000,
+
+                // 质量检查：需要全面分析（多维度检查、规范对比）
+                ScenarioPromptManager.Scenario.QualityCheck => 4000,
+
+                // 错误诊断：需要中等推理（原因分析、解决方案）
+                ScenarioPromptManager.Scenario.Diagnosis => 3000,
+
+                // 图纸问答：需要简单推理（信息查找、关联分析）
+                ScenarioPromptManager.Scenario.DrawingQA => 2000,
+
+                // 图纸修改：需要简单推理（操作规划、验证）
+                ScenarioPromptManager.Scenario.Modification => 1500,
+
+                // 翻译：需要最小推理（术语理解、上下文）
+                ScenarioPromptManager.Scenario.Translation => 1000,
+
+                // 通用场景：使用中等预算
+                _ => 2000
             };
         }
 
