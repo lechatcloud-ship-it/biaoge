@@ -1511,6 +1511,8 @@ public class ChatMessage
     public string Role { get; set; } = ""; // "user", "assistant", "system", "tool"
     public string Content { get; set; } = "";
     public string? Name { get; set; } // 工具名称（用于role="tool"的消息）
+    public string? ToolCallId { get; set; } // ✅ 商业级最佳实践：支持工具调用ID（Function Calling必需）
+                                               // 参考：阿里云百炼官方文档 - Function Calling要求tool消息必须包含tool_call_id
 }
 
 /// <summary>
@@ -1531,6 +1533,7 @@ public class ChatCompletionResult
 /// </summary>
 public class ToolCall
 {
+    public string Id { get; set; } = ""; // ✅ 商业级最佳实践：工具调用唯一ID（tool_call_id）
     public string Name { get; set; } = "";
     public Dictionary<string, object> Arguments { get; set; } = new();
 }
