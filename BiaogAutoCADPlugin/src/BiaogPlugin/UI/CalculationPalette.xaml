@@ -1,196 +1,89 @@
 <UserControl x:Class="BiaogPlugin.UI.CalculationPalette"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Width="420" Background="#1E1E1E">
+             Width="380" Background="White">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="15">
+        <StackPanel Margin="10">
             <!-- 标题 -->
-            <TextBlock Text="标哥 - 构件识别算量"
-                       FontSize="20" FontWeight="Bold"
-                       Foreground="White" Margin="0,0,0,10"/>
-            <TextBlock Text="基于多策略识别+AI验证"
-                       FontSize="11" Foreground="#888888" Margin="0,0,0,20"/>
+            <TextBlock Text="构件识别算量"
+                       FontSize="14" FontWeight="Bold"
+                       Foreground="#333333" Margin="0,0,0,5"/>
+            <Separator Margin="0,0,0,10"/>
 
-            <!-- 识别选项卡 -->
-            <Border Background="#2D2D30" CornerRadius="8" Padding="15" Margin="0,0,0,15">
+            <!-- 识别选项 -->
+            <GroupBox Header="识别选项" Margin="0,0,0,10" Padding="8">
                 <StackPanel>
-                    <TextBlock Text="识别选项" FontSize="14" FontWeight="Bold"
-                               Foreground="White" Margin="0,0,0,10"/>
-
-                    <!-- 精度模式选择 -->
-                    <TextBlock Text="精度模式:" Foreground="#CCCCCC" Margin="0,0,0,5"/>
-                    <ComboBox x:Name="PrecisionModeComboBox" Margin="0,0,0,8"
-                              Background="#3E3E42" Foreground="White" BorderBrush="#555555"
-                              SelectedIndex="1">
-                        <ComboBox.ItemContainerStyle>
-                            <Style TargetType="ComboBoxItem">
-                                <Setter Property="Background" Value="#2D2D30"/>
-                                <Setter Property="Foreground" Value="White"/>
-                                <Setter Property="Padding" Value="5"/>
-                                <Style.Triggers>
-                                    <Trigger Property="IsHighlighted" Value="True">
-                                        <Setter Property="Background" Value="#007ACC"/>
-                                        <Setter Property="Foreground" Value="White"/>
-                                    </Trigger>
-                                    <Trigger Property="IsSelected" Value="True">
-                                        <Setter Property="Background" Value="#094771"/>
-                                        <Setter Property="Foreground" Value="White"/>
-                                    </Trigger>
-                                </Style.Triggers>
-                            </Style>
-                        </ComboBox.ItemContainerStyle>
-                        <ComboBox.Resources>
-                            <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="#2D2D30"/>
-                            <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="#007ACC"/>
-                        </ComboBox.Resources>
-                        <ComboBoxItem Content="快速估算 (90%精度, 仅规则引擎, 成本¥0)" Tag="QuickEstimate"/>
-                        <ComboBoxItem Content="预算控制 (95%精度, AI验证30%, 成本¥0.02/构件)" Tag="Budget"/>
-                        <ComboBoxItem Content="竣工结算 (99%精度, AI验证100%, 成本¥0.10/构件)" Tag="FinalAccount"/>
+                    <TextBlock Text="精度模式:" Margin="0,0,0,3"/>
+                    <ComboBox x:Name="PrecisionModeComboBox" Margin="0,0,0,8" SelectedIndex="1">
+                        <ComboBoxItem Content="快速估算 (90%)" Tag="QuickEstimate"/>
+                        <ComboBoxItem Content="预算控制 (95%, 推荐)" Tag="Budget"/>
+                        <ComboBoxItem Content="竣工结算 (99%)" Tag="FinalAccount"/>
                     </ComboBox>
-                    <TextBlock x:Name="PrecisionModeDescription"
-                               Text="推荐：预算控制模式，平衡精度和成本"
-                               FontSize="10" Foreground="#4EC9B0" Margin="0,0,0,15"/>
 
-                    <TextBlock Text="置信度阈值:" Foreground="#CCCCCC" Margin="0,5,0,5"/>
-                    <Slider x:Name="ConfidenceThresholdSlider" Minimum="0.5" Maximum="1.0" Value="0.8"
-                            TickFrequency="0.1" IsSnapToTickEnabled="True"/>
-                    <TextBlock x:Name="ConfidenceThresholdText" Text="80%"
-                               FontSize="11" Foreground="#CCCCCC" HorizontalAlignment="Center"/>
-                </StackPanel>
-            </Border>
-
-            <!-- 操作按钮 -->
-            <Button x:Name="RecognizeButton" Content="开始识别构件" Height="40"
-                    Background="#0078D4" Foreground="White" FontSize="14"
-                    BorderThickness="0" Margin="0,0,0,10" Click="RecognizeButton_Click"/>
-
-            <Button x:Name="ExportExcelButton" Content="导出Excel清单" Height="35"
-                    Background="#107C10" Foreground="White"
-                    BorderThickness="0" Margin="0,0,0,15" Click="ExportExcelButton_Click"
-                    IsEnabled="False">
-                <Button.Style>
-                    <Style TargetType="Button">
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="Button">
-                                    <Border Background="{TemplateBinding Background}"
-                                            BorderBrush="{TemplateBinding BorderBrush}"
-                                            BorderThickness="{TemplateBinding BorderThickness}"
-                                            CornerRadius="4">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsEnabled" Value="False">
-                                            <Setter Property="Background" Value="#555555"/>
-                                            <Setter Property="Foreground" Value="#999999"/>
-                                        </Trigger>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter Property="Background" Value="#0D8A0D"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                    </Style>
-                </Button.Style>
-            </Button>
-
-            <!-- 进度卡片 -->
-            <Border x:Name="ProgressCard" Background="#2D2D30" CornerRadius="8"
-                    Padding="15" Margin="0,0,0,15" Visibility="Collapsed">
-                <StackPanel>
-                    <TextBlock x:Name="ProgressText" Text="识别中..." FontSize="12"
-                               Foreground="White" Margin="0,0,0,10"/>
-                    <ProgressBar x:Name="ProgressBar" Height="20"/>
-                </StackPanel>
-            </Border>
-
-            <!-- 统计信息 -->
-            <Border x:Name="StatsCard" Background="#2D2D30" CornerRadius="8"
-                    Padding="15" Margin="0,0,0,15" Visibility="Collapsed">
-                <StackPanel>
-                    <TextBlock Text="识别统计" FontSize="14" FontWeight="Bold"
-                               Foreground="White" Margin="0,0,0,10"/>
-
+                    <TextBlock Text="置信度阈值:" Margin="0,5,0,3"/>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0">
-                            <TextBlock Text="构件总数" FontSize="11" Foreground="#999"/>
-                            <TextBlock x:Name="TotalComponentsText" Text="0" FontSize="18"
-                                       Foreground="#4EC9B0" FontWeight="Bold" Margin="0,2,0,10"/>
-
-                            <TextBlock Text="有效构件" FontSize="11" Foreground="#999"/>
-                            <TextBlock x:Name="ValidComponentsText" Text="0" FontSize="18"
-                                       Foreground="#6A9955" FontWeight="Bold" Margin="0,2,0,10"/>
-
-                            <TextBlock Text="总体积" FontSize="11" Foreground="#999"/>
-                            <TextBlock x:Name="TotalVolumeText" Text="0.00m³" FontSize="16"
-                                       Foreground="#9CDCFE" FontWeight="Bold"/>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="1">
-                            <TextBlock Text="平均置信度" FontSize="11" Foreground="#999"/>
-                            <TextBlock x:Name="AvgConfidenceText" Text="0%" FontSize="18"
-                                       Foreground="#DCDCAA" FontWeight="Bold" Margin="0,2,0,10"/>
-
-                            <TextBlock Text="AI验证率" FontSize="11" Foreground="#999"/>
-                            <TextBlock x:Name="AiVerificationRateText" Text="0%" FontSize="18"
-                                       Foreground="#C586C0" FontWeight="Bold" Margin="0,2,0,10"/>
-
-                            <TextBlock Text="总成本" FontSize="11" Foreground="#999"/>
-                            <TextBlock x:Name="TotalCostText" Text="¥0.00" FontSize="16"
-                                       Foreground="#CE9178" FontWeight="Bold"/>
-                        </StackPanel>
+                        <Slider x:Name="ConfidenceThresholdSlider" Grid.Column="0"
+                                Minimum="0.5" Maximum="1.0" Value="0.8"
+                                TickFrequency="0.1" IsSnapToTickEnabled="True"
+                                VerticalAlignment="Center"/>
+                        <TextBlock x:Name="ConfidenceThresholdText" Grid.Column="1"
+                                   Text="80%" Width="35" TextAlignment="Right"
+                                   VerticalAlignment="Center" Margin="5,0,0,0"/>
                     </Grid>
                 </StackPanel>
-            </Border>
+            </GroupBox>
+
+            <!-- 操作按钮 -->
+            <Button x:Name="RecognizeButton" Content="开始识别构件" Height="28"
+                    Margin="0,0,0,5" Click="RecognizeButton_Click"/>
+            <Button x:Name="ExportExcelButton" Content="导出Excel清单" Height="24"
+                    Margin="0,0,0,10" Click="ExportExcelButton_Click" IsEnabled="False"/>
+
+            <!-- 进度 -->
+            <GroupBox x:Name="ProgressCard" Header="进度" Padding="8" Margin="0,0,0,10" Visibility="Collapsed">
+                <StackPanel>
+                    <ProgressBar x:Name="ProgressBar" Height="18" Margin="0,0,0,5"/>
+                    <TextBlock x:Name="ProgressText" Text="准备中..." FontSize="9" TextWrapping="Wrap"/>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- 统计信息 -->
+            <GroupBox x:Name="StatsCard" Header="统计信息" Padding="8" Margin="0,0,0,10" Visibility="Collapsed">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="构件总数:" Grid.Row="0" Grid.Column="0" Margin="0,2"/>
+                    <TextBlock x:Name="TotalComponentsText" Text="0" Grid.Row="0" Grid.Column="1"
+                               HorizontalAlignment="Right" FontWeight="Bold" Margin="0,2"/>
+
+                    <TextBlock Text="平均置信度:" Grid.Row="1" Grid.Column="0" Margin="0,2"/>
+                    <TextBlock x:Name="AvgConfidenceText" Text="0%" Grid.Row="1" Grid.Column="1"
+                               HorizontalAlignment="Right" FontWeight="Bold" Margin="0,2"/>
+
+                    <TextBlock Text="总体积:" Grid.Row="2" Grid.Column="0" Margin="0,2"/>
+                    <TextBlock x:Name="TotalVolumeText" Text="0.00m³" Grid.Row="2" Grid.Column="1"
+                               HorizontalAlignment="Right" FontWeight="Bold" Margin="0,2"/>
+                </Grid>
+            </GroupBox>
 
             <!-- 构件列表 -->
-            <Border x:Name="ComponentsCard" Background="#2D2D30" CornerRadius="8"
-                    Padding="15" Margin="0,0,0,15" Visibility="Collapsed">
-                <StackPanel>
-                    <TextBlock Text="构件列表" FontSize="14" FontWeight="Bold"
-                               Foreground="White" Margin="0,0,0,10"/>
-
-                    <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
-                        <ItemsControl x:Name="ComponentsList">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Background="#252526" Margin="0,0,0,5" Padding="10"
-                                            CornerRadius="4">
-                                        <StackPanel>
-                                            <TextBlock Text="{Binding Type}" FontWeight="Bold"
-                                                       Foreground="White" FontSize="12"/>
-                                            <TextBlock FontSize="10" Foreground="#CCCCCC">
-                                                <Run Text="数量:"/><Run Text="{Binding Quantity}"/>
-                                                <Run Text=" | 置信度:"/><Run Text="{Binding Confidence, StringFormat={}{0:P}}"/>
-                                            </TextBlock>
-                                            <TextBlock Text="{Binding OriginalText}" FontSize="10"
-                                                       Foreground="#888" TextTrimming="CharacterEllipsis"/>
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </ScrollViewer>
-                </StackPanel>
-            </Border>
-
-            <!-- 日志查看器 -->
-            <Border Background="#252526" CornerRadius="8" Padding="10">
-                <StackPanel>
-                    <TextBlock Text="日志" FontSize="12" FontWeight="Bold"
-                               Foreground="White" Margin="0,0,0,5"/>
-                    <ScrollViewer MaxHeight="150" VerticalScrollBarVisibility="Auto">
-                        <TextBlock x:Name="LogText" FontFamily="Consolas" FontSize="10"
-                                   Foreground="#CCCCCC" TextWrapping="Wrap"/>
-                    </ScrollViewer>
-                </StackPanel>
-            </Border>
+            <GroupBox x:Name="ResultCard" Header="构件清单" Padding="8" Visibility="Collapsed">
+                <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
+                    <ListBox x:Name="ComponentListBox"/>
+                </ScrollViewer>
+            </GroupBox>
         </StackPanel>
     </ScrollViewer>
 </UserControl>
