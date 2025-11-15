@@ -21,6 +21,29 @@ namespace BiaogPlugin.UI
 
             // 初始化UI
             InitializeUI();
+
+            // ✅ 商业级最佳实践：订阅Unloaded事件清理资源
+            Unloaded += TranslationPalette_Unloaded;
+        }
+
+        /// <summary>
+        /// ✅ 商业级最佳实践: UserControl卸载时清理所有资源
+        /// 虽然当前没有需要清理的资源，但保持一致性以符合商业软件质量标准
+        /// </summary>
+        private void TranslationPalette_Unloaded(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 当前无需清理的资源
+                // TranslationController从ServiceLocator获取服务，无需释放
+                // 按钮事件会随UI树销毁自动清理
+
+                Log.Debug("TranslationPalette资源清理完成");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "TranslationPalette资源清理失败");
+            }
         }
 
         private void InitializeUI()

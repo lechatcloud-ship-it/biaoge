@@ -46,6 +46,7 @@ namespace BiaogPlugin.UI
         {
             InitializeComponent();
             Loaded += AIPalette_Loaded;
+            Unloaded += AIPalette_Unloaded; // ✅ 商业级最佳实践：订阅Unloaded事件清理资源
 
             // ✅ 修复：添加焦点管理，防止输入跳转到CAD命令行
             InputTextBox.GotFocus += InputTextBox_GotFocus;
@@ -106,6 +107,57 @@ namespace BiaogPlugin.UI
                 Log.Error(ex, "初始化AI助手服务失败");
                 AddSystemMessage($"❌ 初始化失败：{ex.Message}");
                 SendButton.IsEnabled = false;
+            }
+        }
+
+        /// <summary>
+        /// ✅ 商业级最佳实践: UserControl卸载时清理所有资源，防止内存泄漏
+        /// 参考: Microsoft WPF Best Practices - "Memory Management in WPF"
+        /// https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/optimizing-performance-object-behavior
+        /// </summary>
+        private void AIPalette_Unloaded(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                // 1. ✅ 关键修复：取消SessionManager事件订阅（防止SessionManager持有AIPalette引用）
+                if (_sessionManager != null)
+                {
+                    _sessionManager.SessionChanged -= OnSessionChanged;
+                    _sessionManager.SessionsUpdated -= OnSessionsUpdated;
+                    Log.Debug("SessionManager事件已取消订阅");
+                }
+
+                // 2. ✅ 停止并释放DispatcherTimer（防止Timer持续运行）
+                if (_markdownUpdateTimer != null)
+                {
+                    _markdownUpdateTimer.Stop();
+                    _markdownUpdateTimer.Tick -= MarkdownUpdateTimer_Tick;
+                    _markdownUpdateTimer = null;
+                    Log.Debug("DispatcherTimer已释放");
+                }
+
+                // 3. ✅ 取消所有输入框事件订阅
+                InputTextBox.GotFocus -= InputTextBox_GotFocus;
+                InputTextBox.LostFocus -= InputTextBox_LostFocus;
+                InputTextBox.PreviewKeyDown -= InputTextBox_PreviewKeyDown;
+                InputTextBox.PreviewTextInput -= InputTextBox_PreviewTextInput;
+                InputTextBox.TextInput -= InputTextBox_TextInput;
+                InputTextBox.PreviewMouseDown -= InputTextBox_PreviewMouseDown;
+                InputTextBox.MouseDown -= InputTextBox_MouseDown;
+                Log.Debug("输入框事件已取消订阅");
+
+                // 4. ✅ 清理Markdown缓存字典（释放FlowDocument对象）
+                _markdownCache.Clear();
+                Log.Debug("Markdown缓存已清除");
+
+                // 5. ✅ 取消Loaded事件订阅
+                Loaded -= AIPalette_Loaded;
+
+                Log.Information("AIPalette资源清理完成，防止内存泄漏");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "AIPalette资源清理失败");
             }
         }
 
