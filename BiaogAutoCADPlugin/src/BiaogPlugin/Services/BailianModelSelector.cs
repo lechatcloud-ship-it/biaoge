@@ -38,9 +38,31 @@ namespace BiaogPlugin.Services
             public const string Qwen3VLFlash = "qwen3-vl-flash";
 
             /// <summary>
-            /// qwen3-max-preview - 思考模式融合模型
+            /// qwen3-flash - 思考模式融合模型（2025最新推荐）
+            /// 上下文: 1M tokens (997K输入 + 32K输出)
+            /// 特点: 思考/非思考模式融合，复杂推理能力显著提高
+            /// 适合: 复杂翻译、专业术语理解、工程规范文本
+            /// 计费: 按上下文阶梯计费，性价比极高
+            /// ✅ 推荐用于翻译任务 - 替代qwen3-max-preview
+            /// </summary>
+            public const string Qwen3Flash = "qwen3-flash";
+
+            /// <summary>
+            /// qwen3-plus - 思考模式融合模型（2025最强推理）
+            /// 上下文: 1M tokens (997K输入 + 32K输出)
+            /// 特点: 推理能力超过QwQ，通用能力超过Qwen2.5-Plus
+            /// 适合: 最复杂的推理任务、AI Agent核心
+            /// 计费: 按上下文阶梯计费
+            /// ✅ 业界SOTA水平
+            /// </summary>
+            public const string Qwen3Plus = "qwen3-plus";
+
+            /// <summary>
+            /// qwen3-max-preview - 思考模式融合模型（旧版）
+            /// 上下文: 256K tokens
             /// 特点: 实现思考模式和非思考模式的有效融合
             /// 适合: 复杂推理、深度分析、问题求解
+            /// ⚠️ 建议升级到qwen3-flash或qwen3-plus（1M上下文）
             /// </summary>
             public const string Qwen3MaxPreview = "qwen3-max-preview";
 
@@ -57,17 +79,19 @@ namespace BiaogPlugin.Services
             /// </summary>
             public const string Qwen3CoderFlash = "qwen3-coder-flash";
 
-            // ========== 备用高级模型 ==========
+            // ========== 备用高级模型（旧版，建议使用qwen3系列）==========
 
             /// <summary>
-            /// qwen-max - 旗舰模型，最强能力
+            /// qwen-max - 旗舰模型，最强能力（旧版）
             /// 上下文: 262K tokens
+            /// ⚠️ 建议升级到qwen3-plus（1M上下文）
             /// </summary>
             public const string QwenMax = "qwen-max";
 
             /// <summary>
-            /// qwen-plus - 高性价比模型
+            /// qwen-plus - 高性价比模型（旧版）
             /// 上下文: 1M tokens
+            /// ⚠️ 建议升级到qwen3-flash或qwen3-plus（思考模式融合）
             /// </summary>
             public const string QwenPlus = "qwen-plus";
 
@@ -109,18 +133,19 @@ namespace BiaogPlugin.Services
         {
             return taskType switch
             {
-                // 翻译 - 使用Flash翻译模型（稳定术语定制、格式还原）
-                TaskType.Translation => Models.QwenMTFlash,
+                // ✅ 翻译 - 使用Qwen3-Flash（1M上下文，思考模式融合，专业术语理解强）
+                // 替代qwen-mt-flash: Qwen3-Flash推理能力更强，更好理解复杂工程规范
+                TaskType.Translation => Models.Qwen3Flash,
 
-                // AI对话 - 使用思考模式融合模型（Flash高性能备选Max）
-                TaskType.Conversation when highPerformance => Models.QwenMax,
-                TaskType.Conversation => Models.Qwen3MaxPreview,
+                // AI对话 - 使用思考模式融合模型
+                TaskType.Conversation when highPerformance => Models.Qwen3Plus,  // ✅ 升级到Qwen3-Plus
+                TaskType.Conversation => Models.Qwen3Flash,  // ✅ 升级到Qwen3-Flash
 
                 // 构件识别 - 使用视觉Flash模型（空间感知+2D/3D定位）
                 TaskType.ComponentRecognition => Models.Qwen3VLFlash,
 
-                // 深度思考 - 使用思考模式融合模型
-                TaskType.DeepThinking => Models.Qwen3MaxPreview,
+                // 深度思考 - 使用最强推理模型
+                TaskType.DeepThinking => Models.Qwen3Plus,  // ✅ 升级到Qwen3-Plus
 
                 // 代码/工具调用 - 使用Coder Flash模型（仓库级别理解）
                 TaskType.CodeToolCalling => Models.Qwen3CoderFlash,
@@ -134,7 +159,7 @@ namespace BiaogPlugin.Services
                 // 全模态 - 使用Omni Flash模型
                 TaskType.MultimodalAnalysis => Models.Qwen3OmniFlash,
 
-                _ => Models.Qwen3MaxPreview // 默认使用思考融合模型
+                _ => Models.Qwen3Flash // ✅ 默认使用Qwen3-Flash（1M上下文）
             };
         }
 
@@ -170,11 +195,30 @@ namespace BiaogPlugin.Services
                     Features = new[] { "空间感知", "2D/3D定位", "CAD图纸分析", "构件识别" }
                 },
 
+                Models.Qwen3Flash => new ModelInfo
+                {
+                    Name = "Qwen3-Flash（2025推荐）",
+                    Model = Models.Qwen3Flash,
+                    Description = "思考模式融合，1M上下文，复杂推理能力显著提高",
+                    ContextLength = 1048576,  // 1M tokens
+                    Features = new[] { "1M上下文", "思考模式融合", "复杂翻译", "专业术语理解", "阶梯计费" }
+                },
+
+                Models.Qwen3Plus => new ModelInfo
+                {
+                    Name = "Qwen3-Plus（2025最强）",
+                    Model = Models.Qwen3Plus,
+                    Description = "推理能力超过QwQ，通用能力超过Qwen2.5-Plus，业界SOTA",
+                    ContextLength = 1048576,  // 1M tokens
+                    Features = new[] { "1M上下文", "最强推理", "业界SOTA", "思考模式融合", "阶梯计费" }
+                },
+
                 Models.Qwen3MaxPreview => new ModelInfo
                 {
-                    Name = "思考融合Preview",
+                    Name = "思考融合Preview（旧版）",
                     Model = Models.Qwen3MaxPreview,
-                    Description = "思考模式和非思考模式有效融合",
+                    Description = "思考模式和非思考模式有效融合（建议升级到Qwen3-Flash）",
+                    ContextLength = 262144,  // 256K tokens
                     Features = new[] { "思考融合", "复杂推理", "深度分析", "问题求解" }
                 },
 

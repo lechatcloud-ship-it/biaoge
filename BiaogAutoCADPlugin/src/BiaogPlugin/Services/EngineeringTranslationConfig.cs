@@ -9,24 +9,23 @@ namespace BiaogPlugin.Services
     public static class EngineeringTranslationConfig
     {
         /// <summary>
-        /// qwen-mt-flash模型的Token限制（已废弃，现使用256K大模型）
+        /// Qwen3-Flash/Plus模型的Token限制（2025最新）
         /// </summary>
-        public const int MaxInputTokens = 262144;  // 256K tokens
-        public const int MaxOutputTokens = 262144;
+        public const int MaxInputTokens = 1048576;  // 1M tokens (997K实际输入)
+        public const int MaxOutputTokens = 32768;   // 32K tokens
 
         /// <summary>
         /// 单次翻译的最大字符数
         ///
-        /// ✅ 2025-11-15更新：支持256K上下文大模型（qwen3-max-preview等）
-        /// - 模型输入限制: 256K tokens (262144 tokens)
-        /// - DomainPrompt系统提示词: ~3000 tokens
-        /// - Terms专业术语词汇表: ~2000 tokens
-        /// - 实际可用: 262144 - 3000 - 2000 = 257144 tokens
-        /// - 安全估算: 每字符2个token → 257144 / 2 = 128572字符
-        /// - 保守设置: 100000字符（留有充足余量）
-        /// - 实际场景: 任何AutoCAD图纸都不可能有10万字符的文本，可以一次性翻译
+        /// ✅ 2025-11-15更新：支持1M上下文大模型（qwen3-flash/qwen3-plus）
+        /// - 模型输入限制: 1M tokens (997K可用输入)
+        /// - DomainPrompt系统提示词: ~500 tokens（已简化）
+        /// - 实际可用: 997K - 500 = 996.5K tokens
+        /// - 安全估算: 每字符2个token → 996500 / 2 = 498250字符
+        /// - 保守设置: 400000字符（留有充足余量）
+        /// - 实际场景: 任何AutoCAD图纸都可以一次性翻译（通常<10K字符）
         /// </summary>
-        public const int MaxCharsPerBatch = 100000;
+        public const int MaxCharsPerBatch = 400000;
 
         /// <summary>
         /// 工程建筑领域提示词（英文，根据阿里云文档要求）
@@ -38,37 +37,20 @@ namespace BiaogPlugin.Services
         /// 4. 【保留标识】图号、编号、代号、单位、规范代号等必须保留
         /// </summary>
         public static readonly string DomainPrompt =
-            "You are a PROFESSIONAL ENGINEERING AND ARCHITECTURAL CONSTRUCTION DRAWING TRANSLATION ASSISTANT. " +
+            "You are a professional construction drawing translator. " +
+            "This text is from AutoCAD engineering drawings. " +
             "\n\n" +
-            "⚠️ CRITICAL REQUIREMENT #1: You MUST use INDUSTRY-STANDARD PROFESSIONAL TERMINOLOGY ONLY. " +
-            "⚠️ CRITICAL REQUIREMENT #2: DO NOT use literal word-by-word translations. " +
-            "⚠️ CRITICAL REQUIREMENT #3: Translate using the exact technical terms that professional construction engineers and architects would use. " +
-            "\n\n" +
-            "⚠️ CRITICAL EXAMPLES - PROFESSIONAL TERMINOLOGY (MUST FOLLOW): " +
-            "✅ 'doghouse' → '屋顶设备间' (roof mechanical equipment housing) " +
-            "✅ 'dog house' → '屋顶设备间' (same as above with space) " +
-            "✅ 'penthouse' → '屋顶机房' (roof mechanical room) " +
-            "✅ 'door framed' → '门框' (door frame) " +
-            "✅ 'self closer' → '闭门器' (door closer) " +
-            "✅ 'fire rated' → '防火等级' (fire resistance rating) " +
-            "✅ 'heavy-duty grating' → '重型格栅' (heavy-duty grating) " +
-            "✅ 'fabricated' → '预制' or '加工' (fabricated/prefabricated) " +
-            "✅ 'double tee beam' → '双T梁' (double tee beam) " +
-            "\n\n" +
-            "This text is from AutoCAD engineering and architectural construction drawings (structural, architectural, MEP, interior design). " +
-            "It contains technical specifications, building materials, construction methods, structural engineering, MEP systems, fire protection, and architectural design terminology. " +
-            "\n\n" +
-            "IMPORTANT TRANSLATION RULES: " +
-            "1. PRESERVE: Drawing numbers, sheet numbers, part numbers, reference codes (e.g., 'No.', 'No.1', 'A-101', '#1', '编号', '图号', 'DWG No.'). " +
-            "2. PRESERVE: Measurement units and symbols (e.g., 'mm', 'cm', 'm', 'kg', 'MPa', 'kN', 'kW', 'Pa', '℃'). " +
-            "3. PRESERVE: Alphanumeric identifiers and axis marks (e.g., 'B1', 'C-3', '1F', '2F', 'A轴', '①轴'). " +
-            "4. PRESERVE: Chinese national standards codes (e.g., 'GB 50010', 'GB/T', 'JGJ', 'CJJ'). " +
-            "5. PRESERVE: Material strength grades and codes (e.g., 'C30', 'HPB300', 'HRB400', 'Q235'). " +
-            "6. TRANSLATE: Descriptive text, material names, construction instructions, notes, and annotations using PROFESSIONAL INDUSTRY-STANDARD TERMINOLOGY ONLY. " +
-            "7. ACCURACY: Use official construction industry terminology conforming to international engineering standards (ACI, AISC, ASHRAE, IBC). " +
-            "8. CONTEXT: Maintain the technical context appropriate for professional construction documentation and specifications. " +
-            "\n\n" +
-            "Translate into professional construction engineering domain style with high technical accuracy and industry-standard terminology.";
+            "Core Requirements:\n" +
+            "1. Use industry-standard professional terminology (NOT literal translations)\n" +
+            "2. Preserve numbers, codes, units (e.g., '1F', 'GB 50010', 'C30', 'mm')\n" +
+            "3. Follow international standards (ACI, AISC, ASHRAE, IBC)\n" +
+            "\n" +
+            "Key Examples:\n" +
+            "- doghouse → 屋顶设备间 (NOT 狗屋)\n" +
+            "- heavy-duty grating → 重型格栅\n" +
+            "- fabricated → 预制\n" +
+            "- double tee beam → 双T梁\n" +
+            "- self closer → 闭门器\n";
 
         /// <summary>
         /// 不应翻译的术语/模式规则
@@ -465,101 +447,12 @@ namespace BiaogPlugin.Services
         /// </summary>
         public static string BuildSystemPromptForModel(string sourceLang, string targetLang)
         {
-            var languageDirection = sourceLang.Contains("Chinese") ? "Chinese to English" : "English to Chinese";
-            var targetLanguageName = targetLang.Contains("Chinese") ? "Simplified Chinese (简体中文)" : "English";
+            var targetLanguageName = targetLang.Contains("Chinese") ? "Simplified Chinese" : "English";
 
-            // ✅ 2025-11-15优化：使用精选30个Few-shot示例，避免430+术语导致提示词过长
-            var keyTermsExamples = BuildKeyTermsExamples(sourceLang, targetLang);
-
-            // ✅ 完整系统提示词 - 强化专业术语要求
+            // ✅ 2025-11-15大幅简化：信任Qwen3-Flash/Plus强大理解能力，使用简洁提示词
             return $@"{DomainPrompt}
 
-## CRITICAL FEW-SHOT EXAMPLES (MANDATORY PATTERNS - FOLLOW THESE):
-
-{keyTermsExamples}
-
-## TRANSLATION TASK:
-Translate the following construction drawing text from {languageDirection} to {targetLanguageName}.
-
-## ABSOLUTE REQUIREMENTS:
-1. ⚠️ CRITICAL: Use ONLY industry-standard professional terminology - NO literal translations
-2. ⚠️ MANDATORY: Follow the few-shot examples above for similar terms
-3. ⚠️ FORBIDDEN: DO NOT output explanations or additional content
-4. ⚠️ OUTPUT: Only the translated text
-
-Begin translation:";
-        }
-
-        /// <summary>
-        /// ✅ 2025-11-15新增：构建精选关键术语示例
-        /// 只选择最重要的30个示例，避免提示词超过模型上下文限制
-        /// </summary>
-        private static string BuildKeyTermsExamples(string sourceLang, string targetLang)
-        {
-            // ✅ 精选30个最关键的工程术语（按优先级排序）
-            var keyTerms = new (string en, string zh)[]
-            {
-                // P0 - 最高优先级（用户反馈的错误翻译）
-                ("doghouse", "屋顶设备间"),
-                ("dog house", "屋顶设备间"),
-                ("heavy-duty grating", "重型格栅"),
-                ("fabricated", "预制"),
-                ("double tee beam", "双T梁"),
-                ("penthouse", "屋顶机房"),
-                ("self closer", "闭门器"),
-                ("fire rated", "防火等级"),
-
-                // P1 - 常见构件和材料
-                ("reinforced concrete", "钢筋混凝土"),
-                ("shear wall", "剪力墙"),
-                ("load-bearing wall", "承重墙"),
-                ("suspended ceiling", "吊顶"),
-                ("floor slab", "楼板"),
-                ("parapet", "女儿墙"),
-
-                // P2 - MEP系统
-                ("HVAC", "暖通"),
-                ("fire hydrant", "消火栓"),
-                ("sprinkler system", "喷淋系统"),
-                ("air duct", "风管"),
-                ("cable tray", "桥架"),
-
-                // P3 - 图纸术语
-                ("floor plan", "平面图"),
-                ("elevation", "立面图"),
-                ("section", "剖面图"),
-                ("detail drawing", "详图"),
-                ("opening", "开口"),
-
-                // P4 - 施工术语
-                ("prefabrication", "预制"),
-                ("installation", "安装"),
-                ("engineer's details", "工程师详图"),
-                ("during construction", "施工过程中"),
-                ("shall be installed", "应安装"),
-                ("openable", "可开启的"),
-            };
-
-            var examples = new System.Text.StringBuilder();
-
-            if (sourceLang.Contains("English") && targetLang.Contains("Chinese"))
-            {
-                examples.AppendLine("English → 简体中文 (Professional Engineering Terms):");
-                foreach (var (en, zh) in keyTerms)
-                {
-                    examples.AppendLine($"  ✅ \"{en}\" → \"{zh}\"");
-                }
-            }
-            else if (sourceLang.Contains("Chinese") && targetLang.Contains("English"))
-            {
-                examples.AppendLine("简体中文 → English (Professional Engineering Terms):");
-                foreach (var (en, zh) in keyTerms)
-                {
-                    examples.AppendLine($"  ✅ \"{zh}\" → \"{en}\"");
-                }
-            }
-
-            return examples.ToString();
+Translate to {targetLanguageName}:";
         }
     }
 
