@@ -118,22 +118,11 @@ namespace BiaogPlugin.Services
         {
             try
             {
-                // ✅ P0修复: 添加ObjectId有效性检查
-                if (update.ObjectId.IsNull)
+                // ✅ AutoCAD 2022最佳实践: 完整的ObjectId有效性检查
+                if (update.ObjectId.IsNull || update.ObjectId.IsErased ||
+                    update.ObjectId.IsEffectivelyErased || !update.ObjectId.IsValid)
                 {
-                    Log.Warning("ObjectId为空，跳过更新");
-                    return false;
-                }
-
-                if (update.ObjectId.IsErased)
-                {
-                    Log.Warning($"ObjectId {update.ObjectId.Handle} 已被删除，跳过更新");
-                    return false;
-                }
-
-                if (!update.ObjectId.IsValid)
-                {
-                    Log.Warning($"ObjectId {update.ObjectId.Handle} 无效，跳过更新");
+                    Log.Warning($"ObjectId {update.ObjectId.Handle} 无效或已删除，跳过更新");
                     return false;
                 }
 
@@ -397,8 +386,9 @@ namespace BiaogPlugin.Services
                 {
                     try
                     {
-                        // ✅ P0修复: 添加ObjectId有效性检查
-                        if (objectId.IsNull || objectId.IsErased || !objectId.IsValid)
+                        // ✅ AutoCAD 2022最佳实践: 完整的ObjectId有效性检查
+                        if (objectId.IsNull || objectId.IsErased ||
+                            objectId.IsEffectivelyErased || !objectId.IsValid)
                         {
                             Log.Warning($"ObjectId {objectId.Handle} 无效或已删除");
                             return false;
@@ -491,6 +481,13 @@ namespace BiaogPlugin.Services
                 {
                     foreach (var update in updates)
                     {
+                        // ✅ AutoCAD 2022最佳实践: 验证ObjectId有效性
+                        if (update.ObjectId.IsNull || update.ObjectId.IsErased ||
+                            update.ObjectId.IsEffectivelyErased || !update.ObjectId.IsValid)
+                        {
+                            continue;
+                        }
+
                         var ent = tr.GetObject(update.ObjectId, OpenMode.ForRead) as Entity;
                         if (ent == null) continue;
 

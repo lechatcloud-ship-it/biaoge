@@ -52,10 +52,18 @@ namespace BiaogPlugin.Services
                     var blockTable = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
                     foreach (ObjectId btrId in blockTable)
                     {
+                        // ✅ AutoCAD 2022最佳实践: 验证ObjectId有效性
+                        if (btrId.IsNull || btrId.IsErased || btrId.IsEffectivelyErased || !btrId.IsValid)
+                            continue;
+
                         var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
 
                         foreach (ObjectId objId in btr)
                         {
+                            // ✅ AutoCAD 2022最佳实践: 验证ObjectId有效性
+                            if (objId.IsNull || objId.IsErased || objId.IsEffectivelyErased || !objId.IsValid)
+                                continue;
+
                             var obj = tr.GetObject(objId, OpenMode.ForRead);
                             string? layerName = null;
 
@@ -86,6 +94,10 @@ namespace BiaogPlugin.Services
                     // 构建图层信息列表
                     foreach (ObjectId layerId in layerTable)
                     {
+                        // ✅ AutoCAD 2022最佳实践: 验证ObjectId有效性
+                        if (layerId.IsNull || layerId.IsErased || layerId.IsEffectivelyErased || !layerId.IsValid)
+                            continue;
+
                         var layer = (LayerTableRecord)tr.GetObject(layerId, OpenMode.ForRead);
 
                         var layerInfo = new LayerInfo
@@ -136,10 +148,18 @@ namespace BiaogPlugin.Services
 
                     foreach (ObjectId btrId in blockTable)
                     {
+                        // ✅ AutoCAD 2022最佳实践: 验证ObjectId有效性
+                        if (btrId.IsNull || btrId.IsErased || btrId.IsEffectivelyErased || !btrId.IsValid)
+                            continue;
+
                         var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
 
                         foreach (ObjectId objId in btr)
                         {
+                            // ✅ AutoCAD 2022最佳实践: 验证ObjectId有效性
+                            if (objId.IsNull || objId.IsErased || objId.IsEffectivelyErased || !objId.IsValid)
+                                continue;
+
                             var obj = tr.GetObject(objId, OpenMode.ForRead);
                             DwgTextEntity? textEntity = null;
 

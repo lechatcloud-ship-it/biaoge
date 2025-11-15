@@ -76,6 +76,10 @@ namespace BiaogPlugin.Services
             var layerTable = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
             foreach (ObjectId layerId in layerTable)
             {
+                // ✅ AutoCAD 2022最佳实践: 验证ObjectId有效性
+                if (layerId.IsNull || layerId.IsErased || layerId.IsEffectivelyErased || !layerId.IsValid)
+                    continue;
+
                 var layer = (LayerTableRecord)tr.GetObject(layerId, OpenMode.ForRead);
                 layers.Add(new LayerInfo
                 {
@@ -102,6 +106,10 @@ namespace BiaogPlugin.Services
 
             foreach (ObjectId objId in modelSpace)
             {
+                // ✅ AutoCAD 2022最佳实践: 验证ObjectId有效性
+                if (objId.IsNull || objId.IsErased || objId.IsEffectivelyErased || !objId.IsValid)
+                    continue;
+
                 var entity = tr.GetObject(objId, OpenMode.ForRead);
 
                 if (entity is DBText dbText)
@@ -133,6 +141,10 @@ namespace BiaogPlugin.Services
                     // 提取块参照中的属性
                     foreach (ObjectId attId in blockRef.AttributeCollection)
                     {
+                        // ✅ AutoCAD 2022最佳实践: 验证ObjectId有效性
+                        if (attId.IsNull || attId.IsErased || attId.IsEffectivelyErased || !attId.IsValid)
+                            continue;
+
                         var att = (AttributeReference)tr.GetObject(attId, OpenMode.ForRead);
                         texts.Add(new TextEntityInfo
                         {
@@ -162,6 +174,10 @@ namespace BiaogPlugin.Services
 
             foreach (ObjectId objId in modelSpace)
             {
+                // ✅ AutoCAD 2022最佳实践: 验证ObjectId有效性
+                if (objId.IsNull || objId.IsErased || objId.IsEffectivelyErased || !objId.IsValid)
+                    continue;
+
                 var entity = tr.GetObject(objId, OpenMode.ForRead);
                 var typeName = entity.GetType().Name;
 
