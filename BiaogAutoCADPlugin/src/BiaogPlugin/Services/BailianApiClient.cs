@@ -597,7 +597,8 @@ public class BailianApiClient
                                 source_lang = sourceLang,
                                 target_lang = targetLang,
                                 domains = EngineeringTranslationConfig.DomainPrompt,
-                                terms = EngineeringTranslationConfig.GetApiTerms(sourceLang, targetLang)
+                                terms = EngineeringTranslationConfig.GetApiTerms(sourceLang, targetLang),
+                                tm_list = EngineeringTranslationConfig.GetApiTranslationMemory(sourceLang, targetLang)  // ✅ 翻译记忆
                             }
                         };
                     }
@@ -779,12 +780,14 @@ public class BailianApiClient
                         }
                     },
                     // ✅ 直接在顶层放置translation_options（OpenAI兼容接口）
+                    // ✅ 2025-11-15升级：添加tm_list翻译记忆，引导模型风格
                     translation_options = new
                     {
                         source_lang = sourceLang,
                         target_lang = targetLang,
                         domains = EngineeringTranslationConfig.DomainPrompt,
-                        terms = EngineeringTranslationConfig.GetApiTerms(sourceLang, targetLang)
+                        terms = EngineeringTranslationConfig.GetApiTerms(sourceLang, targetLang),
+                        tm_list = EngineeringTranslationConfig.GetApiTranslationMemory(sourceLang, targetLang)
                     }
                 };
             }
