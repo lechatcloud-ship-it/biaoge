@@ -570,31 +570,57 @@ public class BailianApiClient
                 await semaphore.WaitAsync(cancellationToken);
                 try
                 {
-                    // ✅ 修复：translation_options应该在根级别，不是extra_body
-                    // 参考curl示例：https://help.aliyun.com/zh/model-studio/machine-translation
-                    //
-                    // ✅ 工程建筑专业翻译增强：
-                    // 1. domains - 领域提示词（告诉模型这是工程图纸，使用专业术语）
-                    // 2. terms - 专业术语对照（确保术语翻译准确）
-                    var requestBody = new
+                    // ✅ 智能模型选择：根据模型类型使用不同的API格式
+                    // qwen-mt-flash: 专用翻译模型，使用translation_options
+                    // qwen3-max-preview: 通用对话模型，使用系统提示词（256K上下文，更好的专业术语理解）
+                    object requestBody;
+
+                    if (model.Contains("mt-flash") || model.Contains("mt-plus"))
                     {
-                        model = model,
-                        messages = new[]
+                        // qwen-mt-flash专用翻译API格式
+                        requestBody = new
                         {
-                            new
+                            model = model,
+                            messages = new[]
                             {
-                                role = "user",
-                                content = text
+                                new
+                                {
+                                    role = "user",
+                                    content = text
+                                }
+                            },
+                            translation_options = new  // ✅ 根级别，不是extra_body
+                            {
+                                source_lang = sourceLang,
+                                target_lang = targetLang,
+                                domains = EngineeringTranslationConfig.DomainPrompt,
+                                terms = EngineeringTranslationConfig.GetApiTerms(sourceLang, targetLang)
                             }
-                        },
-                        translation_options = new  // ✅ 根级别，不是extra_body
+                        };
+                    }
+                    else
+                    {
+                        // qwen3-max-preview通用对话模型格式
+                        // 使用系统提示词 + 专业术语上下文
+                        var systemPrompt = EngineeringTranslationConfig.BuildSystemPromptForModel(sourceLang, targetLang);
+                        requestBody = new
                         {
-                            source_lang = sourceLang,
-                            target_lang = targetLang,
-                            domains = EngineeringTranslationConfig.DomainPrompt,  // ✅ 工程建筑领域提示
-                            terms = EngineeringTranslationConfig.GetApiTerms(sourceLang, targetLang)  // ✅ 专业术语
-                        }
-                    };
+                            model = model,
+                            messages = new[]
+                            {
+                                new
+                                {
+                                    role = "system",
+                                    content = systemPrompt
+                                },
+                                new
+                                {
+                                    role = "user",
+                                    content = text
+                                }
+                            }
+                        };
+                    }
 
                     // ✅ 调试日志：记录API调用参数
                     Log.Debug($"[翻译API] 索引{index}: 模型={model}, 源语言={sourceLang}, 目标语言={targetLang}, 原文={text.Substring(0, Math.Min(50, text.Length))}");

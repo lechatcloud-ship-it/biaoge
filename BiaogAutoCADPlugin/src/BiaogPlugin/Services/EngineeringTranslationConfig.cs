@@ -456,6 +456,43 @@ namespace BiaogPlugin.Services
 
             return terms;
         }
+
+        /// <summary>
+        /// 为通用对话模型（qwen3-max-preview）构建系统提示词
+        /// 包含领域知识 + 专业术语词汇表
+        /// </summary>
+        public static string BuildSystemPromptForModel(string sourceLang, string targetLang)
+        {
+            var languageDirection = sourceLang.Contains("Chinese") ? "Chinese to English" : "English to Chinese";
+            var targetLanguageName = targetLang.Contains("Chinese") ? "Simplified Chinese (简体中文)" : "English";
+
+            // 构建专业术语上下文
+            var termsContext = new System.Text.StringBuilder();
+            termsContext.AppendLine("\n\n## PROFESSIONAL TERMINOLOGY REFERENCE (Must Use):\n");
+
+            if (sourceLang.Contains("English") && targetLang.Contains("Chinese"))
+            {
+                termsContext.AppendLine("English → Chinese Professional Terms:\n");
+                foreach (var term in ProfessionalTerms)
+                {
+                    termsContext.AppendLine($"  {term.English} → {term.Chinese}");
+                }
+            }
+            else if (sourceLang.Contains("Chinese") && targetLang.Contains("English"))
+            {
+                termsContext.AppendLine("Chinese → English Professional Terms:\n");
+                foreach (var term in ProfessionalTerms)
+                {
+                    termsContext.AppendLine($"  {term.Chinese} → {term.English}");
+                }
+            }
+
+            // 完整系统提示词
+            return DomainPrompt + termsContext.ToString() +
+                   $"\n\nTRANSLATION TASK: Translate the following construction drawing text from {languageDirection} to {targetLanguageName}. " +
+                   "REMEMBER: Use ONLY the professional terminology from the reference list above. DO NOT use literal translations. " +
+                   "Output ONLY the translated text without explanations.";
+        }
     }
 
     /// <summary>
