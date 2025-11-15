@@ -30,6 +30,7 @@ namespace BiaogPlugin.UI
             InitializeComponent();
             InitializeServices();
             InitializeUI();
+            Unloaded += CalculationPalette_Unloaded; // ✅ 商业级最佳实践：订阅Unloaded事件清理资源
         }
 
         private void InitializeServices()
@@ -57,17 +58,44 @@ namespace BiaogPlugin.UI
 
         private void InitializeUI()
         {
-            // 置信度阈值滑块事件
-            ConfidenceThresholdSlider.ValueChanged += (s, e) =>
-            {
-                ConfidenceThresholdText.Text = $"{ConfidenceThresholdSlider.Value:P0}";
-            };
+            // ✅ 商业级最佳实践：使用命名方法替代Lambda，便于取消订阅
+            ConfidenceThresholdSlider.ValueChanged += ConfidenceThresholdSlider_ValueChanged;
+            PrecisionModeComboBox.SelectionChanged += PrecisionModeComboBox_SelectionChanged;
+        }
 
-            // 精度模式切换事件（简化版本）
-            PrecisionModeComboBox.SelectionChanged += (s, e) =>
+        /// <summary>
+        /// 置信度阈值滑块值变化事件
+        /// </summary>
+        private void ConfidenceThresholdSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            ConfidenceThresholdText.Text = $"{ConfidenceThresholdSlider.Value:P0}";
+        }
+
+        /// <summary>
+        /// 精度模式选择变化事件
+        /// </summary>
+        private void PrecisionModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // 简化版本：不显示描述文本，选项已在ComboBoxItem中说明
+        }
+
+        /// <summary>
+        /// ✅ 商业级最佳实践: UserControl卸载时清理所有资源，防止内存泄漏
+        /// </summary>
+        private void CalculationPalette_Unloaded(object sender, RoutedEventArgs e)
+        {
+            try
             {
-                // 简化版本：不显示描述文本，选项已在ComboBoxItem中说明
-            };
+                // 取消事件订阅
+                ConfidenceThresholdSlider.ValueChanged -= ConfidenceThresholdSlider_ValueChanged;
+                PrecisionModeComboBox.SelectionChanged -= PrecisionModeComboBox_SelectionChanged;
+
+                Log.Debug("CalculationPalette资源清理完成");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "CalculationPalette资源清理失败");
+            }
         }
 
         private async void RecognizeButton_Click(object sender, RoutedEventArgs e)
