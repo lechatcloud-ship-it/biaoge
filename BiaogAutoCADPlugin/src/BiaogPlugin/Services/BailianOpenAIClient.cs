@@ -121,8 +121,11 @@ public class BailianOpenAIClient
 
             Log.Debug($"调用OpenAI SDK: 模型={_model}, 消息数={messages.Count}, 温度={temperature}");
 
+            // 转换自定义ChatMessage为OpenAI SDK格式
+            var openAIMessages = ConvertToOpenAIMessages(messages);
+
             // 调用API
-            var completion = await _chatClient.CompleteChatAsync(messages, options, cancellationToken);
+            var completion = await _chatClient.CompleteChatAsync(openAIMessages, options, cancellationToken);
 
             // 记录Token使用量
             if (completion.Value.Usage != null)
@@ -183,6 +186,9 @@ public class BailianOpenAIClient
 
             Log.Debug($"流式调用OpenAI SDK: 模型={_model}, 消息数={messages.Count}");
 
+            // 转换自定义ChatMessage为OpenAI SDK格式
+            var openAIMessages = ConvertToOpenAIMessages(messages);
+
             var fullContent = new StringBuilder();
             string? finishReason = null;
             var toolCallsDict = new Dictionary<int, StreamingToolCallAccumulator>();
@@ -191,7 +197,7 @@ public class BailianOpenAIClient
 
             // ✅ 官方OpenAI SDK最佳实践：调用CompleteChatStreamingAsync获取流式更新
             // 参考：https://github.com/openai/openai-dotnet
-            var streamingUpdates = _chatClient.CompleteChatStreamingAsync(messages, options, cancellationToken);
+            var streamingUpdates = _chatClient.CompleteChatStreamingAsync(openAIMessages, options, cancellationToken);
 
             // ✅ 关键：不使用ConfigureAwait(false)，保留SynchronizationContext
             // 这样await foreach会在调用线程（UI线程）继续执行，onChunk回调也在UI线程
@@ -219,7 +225,7 @@ public class BailianOpenAIClient
                     {
                         toolCallsDict[index] = new StreamingToolCallAccumulator
                         {
-                            Id = toolCallUpdate.Id ?? "",
+                            Id = toolCallUpdate.ToolCallId ?? "",
                             FunctionName = toolCallUpdate.FunctionName ?? "",
                             FunctionArguments = new StringBuilder()
                         };
@@ -228,15 +234,19 @@ public class BailianOpenAIClient
                     var accumulator = toolCallsDict[index];
 
                     // 累积函数参数
-                    if (!string.IsNullOrEmpty(toolCallUpdate.FunctionArgumentsUpdate))
+                    if (toolCallUpdate.FunctionArgumentsUpdate != null)
                     {
-                        accumulator.FunctionArguments.Append(toolCallUpdate.FunctionArgumentsUpdate);
+                        var argsText = toolCallUpdate.FunctionArgumentsUpdate.ToString();
+                        if (!string.IsNullOrEmpty(argsText))
+                        {
+                            accumulator.FunctionArguments.Append(argsText);
+                        }
                     }
 
                     // 更新ID和函数名（如果提供）
-                    if (!string.IsNullOrEmpty(toolCallUpdate.Id))
+                    if (!string.IsNullOrEmpty(toolCallUpdate.ToolCallId))
                     {
-                        accumulator.Id = toolCallUpdate.Id;
+                        accumulator.Id = toolCallUpdate.ToolCallId;
                     }
                     if (!string.IsNullOrEmpty(toolCallUpdate.FunctionName))
                     {
@@ -332,7 +342,7 @@ public class BailianOpenAIClient
         try
         {
             // 构建包含图片的消息
-            var messages = new List<ChatMessage>
+            var messages = new List<OpenAI.Chat.ChatMessage>
             {
                 new UserChatMessage(
                     ChatMessageContentPart.CreateTextPart(prompt),
@@ -437,6 +447,30 @@ public class BailianOpenAIClient
             _totalInputTokens += inputTokens;
             _totalOutputTokens += outputTokens;
         }
+    }
+
+    /// <summary>
+    /// 将自定义ChatMessage转换为OpenAI SDK的ChatMessage
+    /// </summary>
+    private List<OpenAI.Chat.ChatMessage> ConvertToOpenAIMessages(List<ChatMessage> messages)
+    {
+        var result = new List<OpenAI.Chat.ChatMessage>();
+
+        foreach (var msg in messages)
+        {
+            OpenAI.Chat.ChatMessage openAIMsg = msg.Role.ToLower() switch
+            {
+                "system" => new SystemChatMessage(msg.Content),
+                "user" => new UserChatMessage(msg.Content),
+                "assistant" => new AssistantChatMessage(msg.Content),
+                "tool" => new ToolChatMessage(msg.ToolCallId ?? "", msg.Content),
+                _ => throw new ArgumentException($"未知的消息角色: {msg.Role}")
+            };
+
+            result.Add(openAIMsg);
+        }
+
+        return result;
     }
 
     /// <summary>

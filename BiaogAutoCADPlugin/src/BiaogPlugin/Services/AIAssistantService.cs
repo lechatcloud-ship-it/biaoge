@@ -116,7 +116,7 @@ namespace BiaogPlugin.Services
                     var openAITools = ConvertToOpenAIChatTools(tools);
 
                     agentDecision = await _openAIClient.CompleteStreamingAsync(
-                        messages: ConvertToOpenAIChatMessages(messages),
+                        messages: messages,
                         onChunk: chunk => onContentChunk?.Invoke(chunk),
                         temperature: 0.7f,
                         tools: openAITools  // ✅ 恢复工具调用支持
@@ -180,7 +180,7 @@ namespace BiaogPlugin.Services
                     {
                         // ✅ 使用OpenAI SDK进行流式总结
                         summary = await _openAIClient.CompleteStreamingAsync(
-                            messages: ConvertToOpenAIChatMessages(summaryMessages),
+                            messages: summaryMessages,
                             onChunk: chunk => onContentChunk?.Invoke(chunk),
                             temperature: 0.7f
                         );
