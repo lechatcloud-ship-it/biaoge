@@ -352,6 +352,9 @@ public class BailianApiClient
                 // 克隆请求（因为HttpRequestMessage只能发送一次）
                 var clonedRequest = await CloneHttpRequestAsync(request);
 
+                // ✅ 商业级最佳实践: Dispose上一次重试的response避免资源泄漏
+                lastResponse?.Dispose();
+
                 lastResponse = await _httpClient.SendAsync(clonedRequest, cancellationToken);
 
                 // 检查是否需要重试
@@ -996,22 +999,23 @@ public class BailianApiClient
 
             Log.Debug("测试API连接: {Model}, 端点: {Endpoint}", model, ChatCompletionEndpoint);
 
-            // 发送请求（不使用重试，快速失败）
-            var response = await _httpClient.SendAsync(httpRequest, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
+            // ✅ 商业级最佳实践: HttpResponseMessage必须dispose避免资源泄漏
+            using (var response = await _httpClient.SendAsync(httpRequest, cancellationToken))
             {
-                var responseContent = await response.Content.ReadAsStringAsync();
-                Log.Information("API连接测试成功: {StatusCode}, 响应预览: {Preview}",
-                    response.StatusCode,
-                    responseContent.Length > 100 ? responseContent.Substring(0, 100) : responseContent);
-                return true;
-            }
-            else
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                Log.Warning("API连接测试失败: {StatusCode}, 完整响应: {Error}", response.StatusCode, errorContent);
-                return false;
+                if (response.IsSuccessStatusCode)
+                {
+                    var responseContent = await response.Content.ReadAsStringAsync();
+                    Log.Information("API连接测试成功: {StatusCode}, 响应预览: {Preview}",
+                        response.StatusCode,
+                        responseContent.Length > 100 ? responseContent.Substring(0, 100) : responseContent);
+                    return true;
+                }
+                else
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Log.Warning("API连接测试失败: {StatusCode}, 完整响应: {Error}", response.StatusCode, errorContent);
+                    return false;
+                }
             }
         }
         catch (System.Exception ex)
@@ -1101,17 +1105,20 @@ public class BailianApiClient
 
         Log.Debug($"流式API调用 - SynchronizationContext: {(hasContext ? syncContext.GetType().Name : "null")}");
 
-        var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        response.EnsureSuccessStatusCode();
+        // ✅ 商业级最佳实践: HttpResponseMessage必须dispose避免连接泄漏
+        // 使用HttpCompletionOption.ResponseHeadersRead时，连接会保持打开直到dispose
+        using (var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, cancellationToken))
+        {
+            response.EnsureSuccessStatusCode();
 
-        // 处理流式响应
-        var fullResponse = new StringBuilder();
-        var fullReasoning = new StringBuilder();
-        var toolCalls = new List<ToolCall>();
-        int inputTokens = 0;
-        int outputTokens = 0;
+            // 处理流式响应
+            var fullResponse = new StringBuilder();
+            var fullReasoning = new StringBuilder();
+            var toolCalls = new List<ToolCall>();
+            int inputTokens = 0;
+            int outputTokens = 0;
 
-        using (var stream = await response.Content.ReadAsStreamAsync())
+            using (var stream = await response.Content.ReadAsStreamAsync())
         {
             using (var reader = new StreamReader(stream))
             {
@@ -1223,24 +1230,25 @@ public class BailianApiClient
                     }
                 }
             }
-        }
+            }
 
-        // 记录Token使用量
-        if (inputTokens > 0 || outputTokens > 0)
-        {
-            TrackTokenUsage(inputTokens, outputTokens);
-            Log.Debug($"对话Token使用: 输入{inputTokens}, 输出{outputTokens}");
-        }
+            // 记录Token使用量
+            if (inputTokens > 0 || outputTokens > 0)
+            {
+                TrackTokenUsage(inputTokens, outputTokens);
+                Log.Debug($"对话Token使用: 输入{inputTokens}, 输出{outputTokens}");
+            }
 
-        return new ChatCompletionResult
-        {
-            Content = fullResponse.ToString(),
-            ReasoningContent = fullReasoning.ToString(),
-            ToolCalls = toolCalls,
-            Model = model,
-            InputTokens = inputTokens,
-            OutputTokens = outputTokens
-        };
+            return new ChatCompletionResult
+            {
+                Content = fullResponse.ToString(),
+                ReasoningContent = fullReasoning.ToString(),
+                ToolCalls = toolCalls,
+                Model = model,
+                InputTokens = inputTokens,
+                OutputTokens = outputTokens
+            };
+        }
     }
 
     /// <summary>
