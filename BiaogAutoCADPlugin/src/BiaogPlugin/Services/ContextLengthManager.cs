@@ -8,16 +8,20 @@ namespace BiaogPlugin.Services
     /// <summary>
     /// 上下文长度管理器 - 防止超过模型输入限制
     ///
-    /// 阿里云百炼qwen3-max-preview限制：
-    /// - 上下文长度: 256K tokens
-    /// - 最大输入长度: 252K tokens
-    /// - 思考模式最大输出: 32K tokens
-    /// - 非思考模式最大输出: 64K tokens
+    /// ✅ 阿里云百炼qwen-flash/qwen-plus限制（2025-11-15更新）：
+    /// - 上下文长度: 1M tokens (1,048,576)
+    /// - 最大输入长度: 997K tokens
+    /// - 最大输出长度: 32K tokens
+    /// - RPM: 15000 (每分钟请求数)
+    /// - TPM: 10,000,000 (每分钟Token数)
+    ///
+    /// 保守策略：保持在900K tokens以内，为输出和系统提示留出充足空间
     /// </summary>
     public class ContextLengthManager
     {
-        // 保守估计，保持在200K以内，留出足够的输出空间
-        private const int MaxInputTokens = 200_000;
+        // ✅ 升级到900K tokens（充分利用1M上下文）
+        // 留出 97K 给输出(32K) + 系统提示(~5K) + 安全余量(60K)
+        private const int MaxInputTokens = 900_000;
 
         // 最少保留的消息对数（user + assistant）
         private const int MinMessagePairs = 3;
@@ -205,7 +209,8 @@ namespace BiaogPlugin.Services
         {
             int tokens = EstimateTokens(messages, systemPrompt);
             double rate = GetUsageRate(tokens);
-            int maxOutput = tokens <= 200_000 ? 32_000 : 0; // 思考模式输出限制
+            // ✅ qwen-flash/qwen-plus最大输出固定为32K
+            int maxOutput = tokens <= MaxInputTokens ? 32_000 : 0;
 
             return $"Token使用: {tokens:N0} / {MaxInputTokens:N0} ({rate:P1})\n" +
                    $"消息数: {messages.Count}\n" +

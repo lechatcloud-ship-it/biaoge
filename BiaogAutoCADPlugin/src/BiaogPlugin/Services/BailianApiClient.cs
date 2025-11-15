@@ -575,7 +575,7 @@ public class BailianApiClient
                 {
                     // ✅ 智能模型选择：根据模型类型使用不同的API格式
                     // qwen-mt-flash: 专用翻译模型，使用translation_options
-                    // qwen3-max-preview: 通用对话模型，使用系统提示词（256K上下文，更好的专业术语理解）
+                    // qwen-flash/qwen-plus: 通用对话模型，使用系统提示词（1M上下文，强大的专业术语理解）
                     object requestBody;
 
                     if (model.Contains("mt-flash") || model.Contains("mt-plus"))
@@ -603,8 +603,8 @@ public class BailianApiClient
                     }
                     else
                     {
-                        // qwen3-max-preview通用对话模型格式
-                        // 使用系统提示词 + 专业术语上下文
+                        // qwen-flash/qwen-plus通用对话模型格式
+                        // 使用简洁系统提示词 + 关键Few-shot示例
                         var systemPrompt = EngineeringTranslationConfig.BuildSystemPromptForModel(sourceLang, targetLang);
                         requestBody = new
                         {
@@ -790,7 +790,7 @@ public class BailianApiClient
             }
             else
             {
-                // ✅ 通用对话模型（qwen3-max-preview等）：使用system message
+                // ✅ 通用对话模型（qwen-flash/qwen-plus等）：使用system message
                 Log.Debug($"使用通用对话模型API格式: {model}");
                 var systemPrompt = EngineeringTranslationConfig.BuildSystemPromptForModel(sourceLang, targetLang);
 

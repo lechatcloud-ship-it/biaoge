@@ -17,15 +17,21 @@ namespace BiaogPlugin.Services
         /// <summary>
         /// 单次翻译的最大字符数
         ///
-        /// ✅ 2025-11-15更新：支持1M上下文大模型（qwen-flash/qwen-plus）
-        /// - 模型输入限制: 1M tokens (997K可用输入)
-        /// - DomainPrompt系统提示词: ~500 tokens（已简化）
-        /// - 实际可用: 997K - 500 = 996.5K tokens
+        /// ✅ 2025-11-15更新：充分利用qwen-flash性能参数
+        /// qwen-flash性能参数：
+        /// - 最大输入长度: 997K tokens
+        /// - 最大输出长度: 32K tokens
+        /// - RPM: 15000 (每分钟请求数)
+        /// - TPM: 10,000,000 (每分钟Token数)
+        ///
+        /// 批次大小计算：
+        /// - DomainPrompt系统提示词: ~500 tokens
+        /// - 实际可用输入: 997K - 500 = 996.5K tokens
         /// - 安全估算: 每字符2个token → 996500 / 2 = 498250字符
-        /// - 保守设置: 400000字符（留有充足余量）
+        /// - 优化设置: 450000字符（900K tokens，留97K余量）
         /// - 实际场景: 任何AutoCAD图纸都可以一次性翻译（通常<10K字符）
         /// </summary>
-        public const int MaxCharsPerBatch = 400000;
+        public const int MaxCharsPerBatch = 450000;
 
         /// <summary>
         /// 工程建筑领域提示词（英文，根据阿里云文档要求）
@@ -442,14 +448,14 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
-        /// 为通用对话模型（qwen3-max-preview）构建系统提示词
-        /// 包含领域知识 + 专业术语词汇表
+        /// 为通用对话模型（qwen-flash/qwen-plus）构建系统提示词
+        /// 包含领域知识 + 关键Few-shot示例
         /// </summary>
         public static string BuildSystemPromptForModel(string sourceLang, string targetLang)
         {
             var targetLanguageName = targetLang.Contains("Chinese") ? "Simplified Chinese" : "English";
 
-            // ✅ 2025-11-15大幅简化：信任Qwen3-Flash/Plus强大理解能力，使用简洁提示词
+            // ✅ 2025-11-15大幅简化：信任qwen-flash/qwen-plus强大理解能力
             return $@"{DomainPrompt}
 
 Translate to {targetLanguageName}:";
