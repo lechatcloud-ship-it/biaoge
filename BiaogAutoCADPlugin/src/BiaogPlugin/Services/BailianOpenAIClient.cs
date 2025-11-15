@@ -185,6 +185,9 @@ public class BailianOpenAIClient
 
             var fullContent = new StringBuilder();
             string? finishReason = null;
+            var toolCallsDict = new Dictionary<int, StreamingToolCallAccumulator>();
+            int inputTokens = 0;
+            int outputTokens = 0;
 
             // 流式调用
             var streamingUpdates = _chatClient.CompleteChatStreamingAsync(messages, options, cancellationToken);
@@ -203,11 +206,38 @@ public class BailianOpenAIClient
                     }
                 }
 
-                // 处理工具调用
+                // ✅ 处理工具调用增量更新
                 foreach (var toolCallUpdate in update.ToolCallUpdates)
                 {
-                    // OpenAI SDK会自动处理工具调用的增量更新
-                    // 这里我们只记录完整的工具调用
+                    var index = toolCallUpdate.Index;
+
+                    if (!toolCallsDict.ContainsKey(index))
+                    {
+                        toolCallsDict[index] = new StreamingToolCallAccumulator
+                        {
+                            Id = toolCallUpdate.Id ?? "",
+                            FunctionName = toolCallUpdate.FunctionName ?? "",
+                            FunctionArguments = new StringBuilder()
+                        };
+                    }
+
+                    var accumulator = toolCallsDict[index];
+
+                    // 累积函数参数
+                    if (!string.IsNullOrEmpty(toolCallUpdate.FunctionArgumentsUpdate))
+                    {
+                        accumulator.FunctionArguments.Append(toolCallUpdate.FunctionArgumentsUpdate);
+                    }
+
+                    // 更新ID和函数名（如果提供）
+                    if (!string.IsNullOrEmpty(toolCallUpdate.Id))
+                    {
+                        accumulator.Id = toolCallUpdate.Id;
+                    }
+                    if (!string.IsNullOrEmpty(toolCallUpdate.FunctionName))
+                    {
+                        accumulator.FunctionName = toolCallUpdate.FunctionName;
+                    }
                 }
 
                 // 处理finish reason
@@ -219,11 +249,46 @@ public class BailianOpenAIClient
                 // Token使用量（如果可用）
                 if (update.Usage != null)
                 {
-                    TrackTokenUsage(update.Usage.InputTokenCount, update.Usage.OutputTokenCount);
+                    inputTokens = update.Usage.InputTokenCount;
+                    outputTokens = update.Usage.OutputTokenCount;
+                    TrackTokenUsage(inputTokens, outputTokens);
                 }
             }
 
-            Log.Debug($"流式输出完成: 总长度={fullContent.Length}");
+            // ✅ 转换累积的工具调用为ToolCall列表
+            var toolCalls = new List<ToolCall>();
+            foreach (var kvp in toolCallsDict.OrderBy(x => x.Key))
+            {
+                var acc = kvp.Value;
+                var args = new Dictionary<string, object>();
+
+                try
+                {
+                    var argsJson = acc.FunctionArguments.ToString();
+                    if (!string.IsNullOrEmpty(argsJson))
+                    {
+                        var argDoc = JsonDocument.Parse(argsJson);
+                        foreach (var prop in argDoc.RootElement.EnumerateObject())
+                        {
+                            args[prop.Name] = prop.Value.ToString() ?? "";
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, $"解析工具调用参数失败: {acc.FunctionName}");
+                }
+
+                toolCalls.Add(new ToolCall
+                {
+                    Name = acc.FunctionName,
+                    Arguments = args
+                });
+
+                Log.Debug($"工具调用: {acc.FunctionName}, 参数: {acc.FunctionArguments}");
+            }
+
+            Log.Debug($"流式输出完成: 内容长度={fullContent.Length}, 工具调用={toolCalls.Count}");
 
             // 构建结果（匹配BailianApiClient的格式）
             return new ChatCompletionResult
@@ -231,9 +296,9 @@ public class BailianOpenAIClient
                 Content = fullContent.ToString(),
                 Model = _model,
                 ReasoningContent = "",
-                ToolCalls = new List<ToolCall>(), // 流式输出中工具调用处理更复杂，暂时返回空列表
-                InputTokens = 0,  // 流式输出中token计数可能延迟
-                OutputTokens = 0
+                ToolCalls = toolCalls,
+                InputTokens = inputTokens,
+                OutputTokens = outputTokens
             };
         }
         catch (Exception ex)
@@ -368,3 +433,13 @@ public class BailianOpenAIClient
 }
 
 // ChatCompletionResult, ToolCall等类型定义在BailianApiClient.cs中，此处重用
+
+/// <summary>
+/// 流式工具调用累积器（用于累积增量更新）
+/// </summary>
+internal class StreamingToolCallAccumulator
+{
+    public string Id { get; set; } = "";
+    public string FunctionName { get; set; } = "";
+    public StringBuilder FunctionArguments { get; set; } = new();
+}
