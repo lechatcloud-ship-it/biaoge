@@ -151,21 +151,25 @@ public class BailianOpenAIClient
     }
 
     /// <summary>
-    /// 流式对话补全
+    /// 流式对话补全（支持深度思考模式）
     /// </summary>
     /// <param name="messages">对话消息列表</param>
-    /// <param name="onChunk">流式输出回调</param>
+    /// <param name="onChunk">正文内容流式输出回调</param>
+    /// <param name="onReasoningChunk">思考过程流式输出回调（仅深度思考模式）</param>
     /// <param name="temperature">温度参数</param>
     /// <param name="maxTokens">最大输出token数</param>
     /// <param name="tools">工具列表</param>
+    /// <param name="enableThinking">是否启用深度思考模式（Qwen3-Flash/Plus支持）</param>
     /// <param name="cancellationToken">取消令牌</param>
     /// <returns>完整对话补全结果</returns>
     public async Task<ChatCompletionResult> CompleteStreamingAsync(
         List<ChatMessage> messages,
         Action<string> onChunk,
+        Action<string>? onReasoningChunk = null,
         float temperature = 0.7f,
         int? maxTokens = null,
         IEnumerable<ChatTool>? tools = null,
+        bool enableThinking = false,
         CancellationToken cancellationToken = default)
     {
         try
@@ -184,7 +188,19 @@ public class BailianOpenAIClient
                 }
             }
 
-            Log.Debug($"流式调用OpenAI SDK: 模型={_model}, 消息数={messages.Count}");
+            // ✅ 深度思考模式支持（Qwen3-Flash/Plus）
+            // 参考：https://help.aliyun.com/zh/model-studio/deep-thinking
+            if (enableThinking)
+            {
+                // OpenAI SDK通过AdditionalProperties传递非标准参数
+                options.AdditionalProperties = new Dictionary<string, object>
+                {
+                    ["enable_thinking"] = true
+                };
+                Log.Debug("深度思考模式已启用（enable_thinking=true）");
+            }
+
+            Log.Debug($"流式调用OpenAI SDK: 模型={_model}, 消息数={messages.Count}, 深度思考={enableThinking}");
 
             // 转换自定义ChatMessage为OpenAI SDK格式
             var openAIMessages = ConvertToOpenAIMessages(messages);
