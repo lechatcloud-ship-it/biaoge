@@ -63,29 +63,11 @@ namespace BiaogPlugin.UI
                 ConfidenceThresholdText.Text = $"{ConfidenceThresholdSlider.Value:P0}";
             };
 
-            // 精度模式切换事件
+            // 精度模式切换事件（简化版本）
             PrecisionModeComboBox.SelectionChanged += (s, e) =>
             {
-                var selected = PrecisionModeComboBox.SelectedItem as ComboBoxItem;
-                if (selected != null)
-                {
-                    switch (selected.Tag as string)
-                    {
-                        case "QuickEstimate":
-                            PrecisionModeDescription.Text = "仅规则引擎，速度快，成本¥0";
-                            break;
-                        case "Budget":
-                            PrecisionModeDescription.Text = "推荐：预算控制模式，平衡精度和成本";
-                            break;
-                        case "FinalAccount":
-                            PrecisionModeDescription.Text = "最高精度，适用于竣工结算审计";
-                            break;
-                    }
-                }
+                // 简化版本：不显示描述文本，选项已在ComboBoxItem中说明
             };
-
-            AddLog("支持多策略构件识别（规则引擎+qwen3-vl-flash视觉验证）");
-            AddLog("自动计算工程量和成本估算");
         }
 
         private async void RecognizeButton_Click(object sender, RoutedEventArgs e)
@@ -205,7 +187,7 @@ namespace BiaogPlugin.UI
 
                 // 显示结果卡片
                 StatsCard.Visibility = Visibility.Visible;
-                ComponentsCard.Visibility = Visibility.Visible;
+                ResultCard.Visibility = Visibility.Visible;
 
                 // 启用导出按钮
                 ExportExcelButton.IsEnabled = true;
@@ -334,16 +316,8 @@ namespace BiaogPlugin.UI
             Dispatcher.Invoke(() =>
             {
                 TotalComponentsText.Text = summary.TotalComponents.ToString();
-                ValidComponentsText.Text = summary.ValidCount.ToString();
                 AvgConfidenceText.Text = $"{summary.AverageConfidence:P0}";
                 TotalVolumeText.Text = $"{summary.TotalVolume:F2}m³";
-                TotalCostText.Text = $"¥{summary.TotalCost:N2}";
-
-                // AI验证率
-                var verificationRate = _currentResults != null && _currentResults.Count > 0
-                    ? (_aiVerifiedCount * 100.0 / _currentResults.Count)
-                    : 0;
-                AiVerificationRateText.Text = $"{verificationRate:F1}%";
             });
         }
 
@@ -351,23 +325,17 @@ namespace BiaogPlugin.UI
         {
             Dispatcher.Invoke(() =>
             {
-                ComponentsList.ItemsSource = results.Take(20).ToList(); // 只显示前20个
+                // 简化显示：只显示类型和数量
+                var items = results.Take(20).Select(r =>
+                    $"{r.Type} ({r.Quantity}个) - 置信度{r.Confidence:P0}").ToList();
+                ComponentListBox.ItemsSource = items;
             });
         }
 
         private void AddLog(string message)
         {
-            Dispatcher.Invoke(() =>
-            {
-                var timestamp = DateTime.Now.ToString("HH:mm:ss");
-                LogText.Text += $"[{timestamp}] {message}\n";
-
-                // 限制日志长度
-                if (LogText.Text.Length > 3000)
-                {
-                    LogText.Text = LogText.Text.Substring(LogText.Text.Length - 2000);
-                }
-            });
+            // 简化版本：使用Serilog记录到日志文件，不在UI显示
+            Log.Information("[算量面板] {Message}", message);
         }
     }
 }
