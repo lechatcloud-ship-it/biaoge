@@ -112,11 +112,14 @@ namespace BiaogPlugin.Services
                 if (_useOpenAISDK && _openAIClient != null)
                 {
                     // ✅ OpenAI SDK流式调用：一次调度，无延迟
+                    // 转换工具定义为OpenAI SDK格式
+                    var openAITools = ConvertToOpenAIChatTools(tools);
+
                     agentDecision = await _openAIClient.CompleteStreamingAsync(
                         messages: ConvertToOpenAIChatMessages(messages),
                         onChunk: chunk => onContentChunk?.Invoke(chunk),
                         temperature: 0.7f,
-                        tools: null  // 暂时禁用工具调用，专注流式优化
+                        tools: openAITools  // ✅ 恢复工具调用支持
                     );
                 }
                 else
@@ -169,11 +172,26 @@ namespace BiaogPlugin.Services
                     onContentChunk?.Invoke($"\n[标哥AI助手] 正在总结执行结果...\n");
 
                     var summaryMessages = BuildMessages(systemPrompt);
-                    var summary = await _bailianClient.ChatCompletionStreamAsync(
-                        messages: summaryMessages,
-                        model: AgentModel,
-                        onStreamChunk: chunk => onContentChunk?.Invoke(chunk)
-                    );
+                    ChatCompletionResult summary;
+
+                    if (_useOpenAISDK && _openAIClient != null)
+                    {
+                        // ✅ 使用OpenAI SDK进行流式总结
+                        summary = await _openAIClient.CompleteStreamingAsync(
+                            messages: ConvertToOpenAIChatMessages(summaryMessages),
+                            onChunk: chunk => onContentChunk?.Invoke(chunk),
+                            temperature: 0.7f
+                        );
+                    }
+                    else
+                    {
+                        // 降级方案
+                        summary = await _bailianClient.ChatCompletionStreamAsync(
+                            messages: summaryMessages,
+                            model: AgentModel,
+                            onStreamChunk: chunk => onContentChunk?.Invoke(chunk)
+                        );
+                    }
 
                     _chatHistory.Add(new BiaogPlugin.Services.ChatMessage
                     {
@@ -561,6 +579,48 @@ namespace BiaogPlugin.Services
         {
             _chatHistory.Clear();
             Log.Information("对话历史已清除");
+        }
+
+        /// <summary>
+        /// 转换匿名对象工具定义为OpenAI SDK的ChatTool
+        /// </summary>
+        private List<OpenAI.Chat.ChatTool> ConvertToOpenAIChatTools(List<object> tools)
+        {
+            var result = new List<OpenAI.Chat.ChatTool>();
+
+            foreach (var tool in tools)
+            {
+                try
+                {
+                    // 将匿名对象序列化为JSON
+                    var toolJson = JsonSerializer.Serialize(tool);
+                    var toolDoc = JsonDocument.Parse(toolJson);
+
+                    // 提取function对象
+                    if (toolDoc.RootElement.TryGetProperty("function", out var functionElement))
+                    {
+                        var functionName = functionElement.GetProperty("name").GetString();
+                        var functionDescription = functionElement.GetProperty("description").GetString();
+                        var parameters = functionElement.GetProperty("parameters");
+
+                        // 创建ChatTool
+                        var chatTool = OpenAI.Chat.ChatTool.CreateFunctionTool(
+                            functionName: functionName,
+                            functionDescription: functionDescription,
+                            functionParameters: BinaryData.FromString(parameters.GetRawText())
+                        );
+
+                        result.Add(chatTool);
+                        Log.Debug($"转换工具: {functionName}");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "工具转换失败");
+                }
+            }
+
+            return result;
         }
 
         /// <summary>
