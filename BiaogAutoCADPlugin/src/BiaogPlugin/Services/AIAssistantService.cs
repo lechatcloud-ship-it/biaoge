@@ -30,8 +30,9 @@ namespace BiaogPlugin.Services
         private readonly ContextLengthManager _contextLengthManager;
         private readonly bool _useOpenAISDK;  // ✅ 控制是否使用OpenAI SDK
 
-        // Agent核心模型配置
-        private const string AgentModel = "qwen3-max-preview";
+        // Agent核心模型配置（2025-11-15升级到qwen-plus）
+        // qwen-plus: 1M上下文，高性价比，性能/成本/速度平衡
+        private const string AgentModel = "qwen-plus";
 
         // 对话历史
         private readonly List<BiaogPlugin.Services.ChatMessage> _chatHistory = new();
