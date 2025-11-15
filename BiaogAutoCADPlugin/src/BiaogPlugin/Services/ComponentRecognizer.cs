@@ -422,7 +422,11 @@ public class ComponentRecognizer
             {
                 if (double.TryParse(match.Groups[1].Value, out var value))
                 {
-                    var paramType = match.Value.Substring(0, Math.Min(2, match.Value.IndexOf('=')));
+                    // ✅ 防御性编程：安全获取参数类型
+                    var equalPos = match.Value.IndexOf('=');
+                    if (equalPos <= 0) continue;  // 安全检查
+
+                    var paramType = match.Value.Substring(0, Math.Min(2, equalPos));
                     if (paramType.Contains("CH")) // 窗高
                     {
                         result.Height = value / 1000.0;
