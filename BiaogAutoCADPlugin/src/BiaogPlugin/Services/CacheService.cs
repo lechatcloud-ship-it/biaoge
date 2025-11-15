@@ -9,13 +9,15 @@ namespace BiaogPlugin.Services;
 /// <summary>
 /// 翻译缓存服务（SQLite）
 /// ✅ 优化：使用连接池化 + 异步延迟初始化
+/// ✅ 商业级最佳实践：实现IDisposable释放SemaphoreSlim资源
 /// </summary>
-public class CacheService
+public class CacheService : IDisposable
 {
     private readonly string _dbPath;
     private readonly string _connectionString;
     private bool _initialized = false;
     private readonly System.Threading.SemaphoreSlim _initLock = new(1, 1);
+    private bool _disposed = false;
 
     public CacheService()
     {
@@ -238,6 +240,38 @@ public class CacheService
         }
 
         return new CacheStatistics();
+    }
+
+    /// <summary>
+    /// ✅ 商业级最佳实践：释放非托管资源（SemaphoreSlim）
+    /// 参考：Microsoft Docs - "Implementing a Dispose method"
+    /// https://learn.microsoft.com/en-us/dotnet/standard/garbage-collection/implementing-dispose
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// 受保护的Dispose方法，遵循IDisposable模式
+    /// </summary>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed)
+            return;
+
+        if (disposing)
+        {
+            // ✅ 释放托管资源：SemaphoreSlim
+            // SemaphoreSlim继承自WaitHandle，必须释放系统信号量句柄
+            _initLock?.Dispose();
+            Log.Debug("CacheService资源已释放");
+        }
+
+        // ✅ 如果有非托管资源，在此释放（当前无）
+
+        _disposed = true;
     }
 }
 
