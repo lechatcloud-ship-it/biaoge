@@ -44,15 +44,16 @@ namespace BiaogPlugin.Services
             "⚠️ CRITICAL REQUIREMENT #2: DO NOT use literal word-by-word translations. " +
             "⚠️ CRITICAL REQUIREMENT #3: Translate using the exact technical terms that professional construction engineers and architects would use. " +
             "\n\n" +
-            "FORBIDDEN EXAMPLES (literal translations that are WRONG): " +
-            "❌ WRONG: 'doghouse' → '狗屋' or '狗屋屋顶' (literal translation) " +
-            "✅ CORRECT: 'doghouse' → '屋顶设备间' (professional term for roof mechanical equipment housing) " +
-            "❌ WRONG: 'door framed' → '门框架' (literal translation) " +
-            "✅ CORRECT: 'door framed' → '门框' (professional term) " +
-            "❌ WRONG: 'self closer' → '自动关闭器' (literal translation) " +
-            "✅ CORRECT: 'self closer' → '闭门器' (professional term) " +
-            "❌ WRONG: 'fire rated' → '火评级' (literal translation) " +
-            "✅ CORRECT: 'fire rated' → '防火等级' or '耐火等级' (professional term) " +
+            "⚠️ CRITICAL EXAMPLES - PROFESSIONAL TERMINOLOGY (MUST FOLLOW): " +
+            "✅ 'doghouse' → '屋顶设备间' (roof mechanical equipment housing) " +
+            "✅ 'dog house' → '屋顶设备间' (same as above with space) " +
+            "✅ 'penthouse' → '屋顶机房' (roof mechanical room) " +
+            "✅ 'door framed' → '门框' (door frame) " +
+            "✅ 'self closer' → '闭门器' (door closer) " +
+            "✅ 'fire rated' → '防火等级' (fire resistance rating) " +
+            "✅ 'heavy-duty grating' → '重型格栅' (heavy-duty grating) " +
+            "✅ 'fabricated' → '预制' or '加工' (fabricated/prefabricated) " +
+            "✅ 'double tee beam' → '双T梁' (double tee beam) " +
             "\n\n" +
             "This text is from AutoCAD engineering and architectural construction drawings (structural, architectural, MEP, interior design). " +
             "It contains technical specifications, building materials, construction methods, structural engineering, MEP systems, fire protection, and architectural design terminology. " +
@@ -467,32 +468,98 @@ namespace BiaogPlugin.Services
             var languageDirection = sourceLang.Contains("Chinese") ? "Chinese to English" : "English to Chinese";
             var targetLanguageName = targetLang.Contains("Chinese") ? "Simplified Chinese (简体中文)" : "English";
 
-            // 构建专业术语上下文
-            var termsContext = new System.Text.StringBuilder();
-            termsContext.AppendLine("\n\n## PROFESSIONAL TERMINOLOGY REFERENCE (Must Use):\n");
+            // ✅ 2025-11-15优化：使用精选30个Few-shot示例，避免430+术语导致提示词过长
+            var keyTermsExamples = BuildKeyTermsExamples(sourceLang, targetLang);
+
+            // ✅ 完整系统提示词 - 强化专业术语要求
+            return $@"{DomainPrompt}
+
+## CRITICAL FEW-SHOT EXAMPLES (MANDATORY PATTERNS - FOLLOW THESE):
+
+{keyTermsExamples}
+
+## TRANSLATION TASK:
+Translate the following construction drawing text from {languageDirection} to {targetLanguageName}.
+
+## ABSOLUTE REQUIREMENTS:
+1. ⚠️ CRITICAL: Use ONLY industry-standard professional terminology - NO literal translations
+2. ⚠️ MANDATORY: Follow the few-shot examples above for similar terms
+3. ⚠️ FORBIDDEN: DO NOT output explanations or additional content
+4. ⚠️ OUTPUT: Only the translated text
+
+Begin translation:";
+        }
+
+        /// <summary>
+        /// ✅ 2025-11-15新增：构建精选关键术语示例
+        /// 只选择最重要的30个示例，避免提示词超过模型上下文限制
+        /// </summary>
+        private static string BuildKeyTermsExamples(string sourceLang, string targetLang)
+        {
+            // ✅ 精选30个最关键的工程术语（按优先级排序）
+            var keyTerms = new (string en, string zh)[]
+            {
+                // P0 - 最高优先级（用户反馈的错误翻译）
+                ("doghouse", "屋顶设备间"),
+                ("dog house", "屋顶设备间"),
+                ("heavy-duty grating", "重型格栅"),
+                ("fabricated", "预制"),
+                ("double tee beam", "双T梁"),
+                ("penthouse", "屋顶机房"),
+                ("self closer", "闭门器"),
+                ("fire rated", "防火等级"),
+
+                // P1 - 常见构件和材料
+                ("reinforced concrete", "钢筋混凝土"),
+                ("shear wall", "剪力墙"),
+                ("load-bearing wall", "承重墙"),
+                ("suspended ceiling", "吊顶"),
+                ("floor slab", "楼板"),
+                ("parapet", "女儿墙"),
+
+                // P2 - MEP系统
+                ("HVAC", "暖通"),
+                ("fire hydrant", "消火栓"),
+                ("sprinkler system", "喷淋系统"),
+                ("air duct", "风管"),
+                ("cable tray", "桥架"),
+
+                // P3 - 图纸术语
+                ("floor plan", "平面图"),
+                ("elevation", "立面图"),
+                ("section", "剖面图"),
+                ("detail drawing", "详图"),
+                ("opening", "开口"),
+
+                // P4 - 施工术语
+                ("prefabrication", "预制"),
+                ("installation", "安装"),
+                ("engineer's details", "工程师详图"),
+                ("during construction", "施工过程中"),
+                ("shall be installed", "应安装"),
+                ("openable", "可开启的"),
+            };
+
+            var examples = new System.Text.StringBuilder();
 
             if (sourceLang.Contains("English") && targetLang.Contains("Chinese"))
             {
-                termsContext.AppendLine("English → Chinese Professional Terms:\n");
-                foreach (var term in ProfessionalTerms)
+                examples.AppendLine("English → 简体中文 (Professional Engineering Terms):");
+                foreach (var (en, zh) in keyTerms)
                 {
-                    termsContext.AppendLine($"  {term.English} → {term.Chinese}");
+                    examples.AppendLine($"  ✅ \"{en}\" → \"{zh}\"");
                 }
             }
             else if (sourceLang.Contains("Chinese") && targetLang.Contains("English"))
             {
-                termsContext.AppendLine("Chinese → English Professional Terms:\n");
-                foreach (var term in ProfessionalTerms)
+                examples.AppendLine("简体中文 → English (Professional Engineering Terms):");
+                foreach (var (en, zh) in keyTerms)
                 {
-                    termsContext.AppendLine($"  {term.Chinese} → {term.English}");
+                    examples.AppendLine($"  ✅ \"{zh}\" → \"{en}\"");
                 }
             }
 
-            // 完整系统提示词
-            return DomainPrompt + termsContext.ToString() +
-                   $"\n\nTRANSLATION TASK: Translate the following construction drawing text from {languageDirection} to {targetLanguageName}. " +
-                   "REMEMBER: Use ONLY the professional terminology from the reference list above. DO NOT use literal translations. " +
-                   "Output ONLY the translated text without explanations.";
+            return examples.ToString();
         }
     }
 
