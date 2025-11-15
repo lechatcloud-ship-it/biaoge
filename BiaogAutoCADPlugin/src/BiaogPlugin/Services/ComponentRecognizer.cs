@@ -11,10 +11,14 @@ namespace BiaogPlugin.Services;
 
 /// <summary>
 /// 构件识别服务 - 基于AutoCAD文本实体的多策略识别+AI验证
+/// ✅ 2025-11-15升级：集成DimensionExtractor双重策略
+///   - 策略0（优先）：从Dimension实体直接获取精确几何尺寸
+///   - 策略1（备用）：从文本解析提取尺寸（正则表达式）
 /// </summary>
 public class ComponentRecognizer
 {
     private readonly BailianApiClient _bailianClient;
+    private readonly DimensionExtractor _dimensionExtractor; // ✅ 新增：Dimension几何数据提取器
 
     // 静态正则表达式 - 使用Compiled选项提升性能
     private static readonly Regex QuantityRegex = new(@"(\d+(?:\.\d+)?)\s*(?:个|根|块|片|扇|樘)?",
@@ -248,11 +252,13 @@ public class ComponentRecognizer
     public ComponentRecognizer(BailianApiClient bailianClient)
     {
         _bailianClient = bailianClient;
+        _dimensionExtractor = new DimensionExtractor(); // ✅ 初始化Dimension提取器
     }
 
     /// <summary>
     /// 从AutoCAD文本实体识别构件（AutoCAD 2022优化版）
     /// ✅ 新增：详细的调试日志，记录每个识别步骤（解决问题1：算量功能提取不到构件）
+    /// ✅ 2025-11-15升级：双重策略 - Dimension几何数据优先，文本解析备用
     /// </summary>
     public async Task<List<ComponentRecognitionResult>> RecognizeFromTextEntitiesAsync(
         List<TextEntity> textEntities,
@@ -262,10 +268,40 @@ public class ComponentRecognizer
         Log.Information("开始识别构件: {Count}个文本实体", textEntities.Count);
         Log.Information("═══════════════════════════════════════════════════");
 
+        // ✅ 策略0：提取所有Dimension实体的精确几何数据
+        List<DimensionData> dimensionData = new();
+        Dictionary<ObjectId, DimensionData> dimensionMap = new();
+
+        try
+        {
+            Log.Debug("提取Dimension实体精确几何数据...");
+            dimensionData = _dimensionExtractor.ExtractAllDimensions();
+
+            // 建立ObjectId映射表，用于快速查找
+            foreach (var dim in dimensionData)
+            {
+                dimensionMap[dim.Id] = dim;
+            }
+
+            Log.Information($"✅ 提取到 {dimensionData.Count} 个Dimension实体");
+
+            // 统计Dimension类型分布
+            var dimStats = _dimensionExtractor.GetDimensionTypeStatistics(dimensionData);
+            foreach (var (type, count) in dimStats)
+            {
+                Log.Debug($"  - {type}: {count}个");
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "提取Dimension数据失败，将回退到文本解析策略");
+        }
+
         var results = new List<ComponentRecognitionResult>();
         int processedCount = 0;
         int recognizedCount = 0;
         int skippedCount = 0;
+        int dimensionEnhancedCount = 0; // ✅ 统计使用Dimension数据增强的构件数量
 
         foreach (var entity in textEntities)
         {
@@ -288,8 +324,15 @@ public class ComponentRecognizer
                 recognizedCount++;
                 Log.Debug($"  ✓ 识别为: {regexResult.Type} (置信度: {regexResult.Confidence:P})");
 
-                // 策略2: 提取数量和尺寸
-                ExtractQuantityAndDimensions(entity.Content, regexResult);
+                // ✅ 策略0（优先）：从Dimension实体获取精确尺寸
+                // ✅ 策略1（备用）：从文本解析提取尺寸
+                bool dimensionEnhanced = ExtractQuantityAndDimensions(entity, regexResult, dimensionMap);
+                if (dimensionEnhanced)
+                {
+                    dimensionEnhancedCount++;
+                    Log.Debug($"  ✅ 使用Dimension精确数据增强");
+                }
+
                 if (regexResult.Quantity > 1 || regexResult.Length > 0 || regexResult.Width > 0 || regexResult.Height > 0)
                 {
                     Log.Debug($"  ✓ 提取尺寸: 数量={regexResult.Quantity}, L={regexResult.Length:F2}m, W={regexResult.Width:F2}m, H={regexResult.Height:F2}m");
@@ -324,6 +367,7 @@ public class ComponentRecognizer
         Log.Information("═══════════════════════════════════════════════════");
         Log.Information($"✅ 识别完成: 处理={processedCount}, 识别={recognizedCount}, 跳过={skippedCount}");
         Log.Information($"识别率: {(recognizedCount * 100.0 / Math.Max(processedCount - skippedCount, 1)):F1}%");
+        Log.Information($"✅ Dimension增强: {dimensionEnhancedCount}个构件使用精确几何数据 ({(dimensionEnhancedCount * 100.0 / Math.Max(recognizedCount, 1)):F1}%)");
         Log.Information("═══════════════════════════════════════════════════");
 
         return results;
@@ -357,10 +401,87 @@ public class ComponentRecognizer
     }
 
     /// <summary>
-    /// 提取数量和尺寸（✅ 增强版 - 支持AutoCAD多种标注格式）
+    /// 提取数量和尺寸（✅ 2025-11-15升级：双重策略版）
+    /// ✅ 策略0（优先）：从Dimension实体直接获取精确几何尺寸
+    /// ✅ 策略1（备用）：从文本解析提取尺寸（正则表达式）
     /// </summary>
-    private void ExtractQuantityAndDimensions(string text, ComponentRecognitionResult result)
+    /// <returns>是否使用Dimension数据增强</returns>
+    private bool ExtractQuantityAndDimensions(
+        TextEntity entity,
+        ComponentRecognitionResult result,
+        Dictionary<ObjectId, DimensionData> dimensionMap)
     {
+        string text = entity.Content;
+        bool dimensionEnhanced = false;
+
+        // ✅ 策略0（优先）：从Dimension实体获取精确几何数据
+        if (entity.Type == TextEntityType.Dimension && dimensionMap.ContainsKey(entity.Id))
+        {
+            var dimData = dimensionMap[entity.Id];
+
+            // 根据Dimension类型提取不同的尺寸信息
+            switch (dimData.DimensionType)
+            {
+                case DimensionType.Aligned:
+                case DimensionType.Rotated:
+                    // 线性标注：使用Measurement作为长度
+                    if (dimData.Measurement > 0)
+                    {
+                        result.Length = dimData.Measurement;
+                        result.Confidence += 0.15; // Dimension数据更可靠，增加置信度
+                        dimensionEnhanced = true;
+                        Log.Debug($"✅ 从Dimension获取长度: {result.Length:F3}m (精确值)");
+                    }
+                    break;
+
+                case DimensionType.Diametric:
+                    // 直径标注
+                    if (dimData.Diameter.HasValue)
+                    {
+                        result.Diameter = dimData.Diameter.Value;
+                        result.Confidence += 0.15;
+                        dimensionEnhanced = true;
+                        Log.Debug($"✅ 从Dimension获取直径: Φ{result.Diameter:F3}m (精确值)");
+                    }
+                    break;
+
+                case DimensionType.Radial:
+                case DimensionType.RadialLarge:
+                    // 半径标注：可以推导直径
+                    if (dimData.Radius.HasValue)
+                    {
+                        result.Diameter = dimData.Radius.Value * 2;
+                        result.Confidence += 0.15;
+                        dimensionEnhanced = true;
+                        Log.Debug($"✅ 从Dimension获取半径: R{dimData.Radius.Value:F3}m → Φ{result.Diameter:F3}m (精确值)");
+                    }
+                    break;
+
+                case DimensionType.Arc:
+                    // 弧长标注
+                    if (dimData.Measurement > 0)
+                    {
+                        result.Length = dimData.Measurement;
+                        result.Confidence += 0.15;
+                        dimensionEnhanced = true;
+                        Log.Debug($"✅ 从Dimension获取弧长: {result.Length:F3}m (精确值)");
+                    }
+                    break;
+
+                case DimensionType.LineAngular:
+                case DimensionType.Point3Angular:
+                    // 角度标注：暂时不处理，后续可以用于角钢等构件
+                    Log.Debug($"检测到角度标注: {dimData.Measurement:F1}° (暂不处理)");
+                    break;
+            }
+
+            // ✅ 如果使用了Dimension数据，尝试从文本补充其他维度信息
+            // 比如Dimension只提供长度，但文本中可能有"300×600×2400"的宽高信息
+        }
+
+        // ✅ 策略1（备用）：从文本解析提取尺寸
+        // 即使使用了Dimension数据，仍然解析文本以获取数量和其他未覆盖的维度
+
         // 提取数量
         var quantityMatch = QuantityRegex.Match(text);
         if (quantityMatch.Success && int.TryParse(quantityMatch.Groups[1].Value, out var quantity))
@@ -369,22 +490,35 @@ public class ComponentRecognizer
             result.Confidence += 0.05;
         }
 
-        // ✅ 策略1: 提取长×宽×高格式尺寸（优先级最高）
-        var dimensionMatch = DimensionRegex.Match(text);
-        if (dimensionMatch.Success)
+        // ✅ 策略1: 提取长×宽×高格式尺寸
+        // ✅ 如果Dimension已经提供了某个维度，优先使用Dimension数据，文本只补充缺失的维度
+        var dimensionMatchText = DimensionRegex.Match(text);
+        if (dimensionMatchText.Success)
         {
-            if (double.TryParse(dimensionMatch.Groups[1].Value, out var length))
+            if (double.TryParse(dimensionMatchText.Groups[1].Value, out var length))
             {
-                result.Length = length / 1000.0; // 转换为米
-
-                if (dimensionMatch.Groups.Count >= 3 && double.TryParse(dimensionMatch.Groups[2].Value, out var width))
+                // 仅在未从Dimension获取时才使用文本解析的长度
+                if (result.Length == 0 || !dimensionEnhanced)
                 {
-                    result.Width = width / 1000.0;
+                    result.Length = length / 1000.0; // 转换为米
+                }
 
-                    if (dimensionMatch.Groups.Count >= 4 && !string.IsNullOrEmpty(dimensionMatch.Groups[3].Value) &&
-                        double.TryParse(dimensionMatch.Groups[3].Value, out var height))
+                if (dimensionMatchText.Groups.Count >= 3 && double.TryParse(dimensionMatchText.Groups[2].Value, out var width))
+                {
+                    // 宽度总是从文本补充（Dimension通常只给一个维度）
+                    if (result.Width == 0)
                     {
-                        result.Height = height / 1000.0;
+                        result.Width = width / 1000.0;
+                    }
+
+                    if (dimensionMatchText.Groups.Count >= 4 && !string.IsNullOrEmpty(dimensionMatchText.Groups[3].Value) &&
+                        double.TryParse(dimensionMatchText.Groups[3].Value, out var height))
+                    {
+                        // 高度总是从文本补充
+                        if (result.Height == 0)
+                        {
+                            result.Height = height / 1000.0;
+                        }
                     }
                 }
 
@@ -444,13 +578,20 @@ public class ComponentRecognizer
         }
 
         // ✅ 策略4: 提取直径标注（钢筋等）
-        var diameterMatch = DiameterRegex.Match(text);
-        if (diameterMatch.Success && double.TryParse(diameterMatch.Groups[1].Value, out var diameter))
+        // ✅ 仅在未从Dimension获取直径时才使用文本解析
+        if (!dimensionEnhanced || result.Diameter == 0)
         {
-            result.Diameter = diameter / 1000.0;
-            result.Confidence += 0.02;
-            Log.Debug($"提取到直径: Φ{result.Diameter}m");
+            var diameterMatch = DiameterRegex.Match(text);
+            if (diameterMatch.Success && double.TryParse(diameterMatch.Groups[1].Value, out var diameter))
+            {
+                result.Diameter = diameter / 1000.0;
+                result.Confidence += 0.02;
+                Log.Debug($"提取到直径: Φ{result.Diameter}m");
+            }
         }
+
+        // ✅ 返回是否使用了Dimension数据增强
+        return dimensionEnhanced;
     }
 
     /// <summary>
