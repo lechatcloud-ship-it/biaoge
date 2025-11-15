@@ -239,6 +239,10 @@ namespace BiaogPlugin.Extensions
                 {
                     foreach (ObjectId objId in selectedIds)
                     {
+                        // ✅ AutoCAD 2022最佳实践: 验证ObjectId有效性
+                        if (objId.IsNull || objId.IsErased || objId.IsEffectivelyErased || !objId.IsValid)
+                            continue;
+
                         var obj = tr.GetObject(objId, OpenMode.ForRead);
                         DwgTextEntity? textEntity = null;
 
@@ -407,6 +411,10 @@ namespace BiaogPlugin.Extensions
                 {
                     foreach (ObjectId objId in selResult.Value.GetObjectIds())
                     {
+                        // ✅ AutoCAD 2022最佳实践: 验证ObjectId有效性
+                        if (objId.IsNull || objId.IsErased || objId.IsEffectivelyErased || !objId.IsValid)
+                            continue;
+
                         var obj = tr.GetObject(objId, OpenMode.ForRead);
 
                         if (obj is DBText dbText)
@@ -458,6 +466,10 @@ namespace BiaogPlugin.Extensions
                 {
                     foreach (ObjectId objId in selResult.Value.GetObjectIds())
                     {
+                        // ✅ AutoCAD 2022最佳实践: 验证ObjectId有效性
+                        if (objId.IsNull || objId.IsErased || objId.IsEffectivelyErased || !objId.IsValid)
+                            continue;
+
                         var obj = tr.GetObject(objId, OpenMode.ForRead);
 
                         ed.WriteMessage("\n" + new string('─', 60));
