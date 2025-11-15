@@ -189,10 +189,9 @@ public class BailianOpenAIClient
             int inputTokens = 0;
             int outputTokens = 0;
 
-            // 流式调用
-            var streamingUpdates = _chatClient.CompleteChatStreamingAsync(messages, options, cancellationToken);
-
-            await foreach (var update in streamingUpdates.ConfigureAwait(false))
+            // ⚠️ 关键：不使用ConfigureAwait(false)，保留SynchronizationContext
+            // 这样await foreach会在调用线程（UI线程）继续执行，onChunk回调也在UI线程
+            await foreach (var update in streamingUpdates)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -349,7 +348,13 @@ public class BailianOpenAIClient
 
             var completion = await _chatClient.CompleteChatAsync(messages, options, cancellationToken);
 
-            var content = completion.Value.Content[0].Text;
+            // ✅ 空值安全：检查Content
+            string content = "";
+            if (completion.Value.Content != null && completion.Value.Content.Count > 0 && completion.Value.Content[0] != null)
+            {
+                content = completion.Value.Content[0].Text ?? "";
+            }
+
             Log.Debug($"视觉模型响应: {content.Substring(0, Math.Min(100, content.Length))}...");
 
             return content;
@@ -366,9 +371,16 @@ public class BailianOpenAIClient
     /// </summary>
     private ChatCompletionResult ConvertToChatCompletionResult(ChatCompletion completion)
     {
+        // ✅ 空值安全：检查Content是否为空
+        string content = "";
+        if (completion.Content != null && completion.Content.Count > 0 && completion.Content[0] != null)
+        {
+            content = completion.Content[0].Text ?? "";
+        }
+
         var result = new ChatCompletionResult
         {
-            Content = completion.Content[0].Text,
+            Content = content,
             Model = _model,
             InputTokens = completion.Usage?.InputTokenCount ?? 0,
             OutputTokens = completion.Usage?.OutputTokenCount ?? 0,

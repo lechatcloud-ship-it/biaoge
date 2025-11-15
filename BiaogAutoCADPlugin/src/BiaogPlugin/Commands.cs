@@ -199,6 +199,13 @@ namespace BiaogPlugin
                 {
                     foreach (var objId in selectedIds)
                     {
+                        // ✅ AutoCAD 2022最佳实践：验证ObjectId有效性
+                        if (objId.IsNull || objId.IsErased || objId.IsEffectivelyErased || !objId.IsValid)
+                        {
+                            Log.Debug($"跳过无效的ObjectId: {objId}");
+                            continue;
+                        }
+
                         var obj = tr.GetObject(objId, Autodesk.AutoCAD.DatabaseServices.OpenMode.ForRead);
 
                         DwgTextEntity? textEntity = null;
@@ -2277,6 +2284,13 @@ namespace BiaogPlugin
                     {
                         try
                         {
+                            // ✅ AutoCAD 2022最佳实践：验证ObjectId有效性
+                            if (entity.Id.IsNull || entity.Id.IsErased || entity.Id.IsEffectivelyErased || !entity.Id.IsValid)
+                            {
+                                Log.Debug($"跳过无效的ObjectId: {entity.Id}");
+                                continue;
+                            }
+
                             var obj = tr.GetObject(entity.Id, OpenMode.ForWrite);
                             var newContent = entity.Content.Replace(findText, replaceText, StringComparison.OrdinalIgnoreCase);
 

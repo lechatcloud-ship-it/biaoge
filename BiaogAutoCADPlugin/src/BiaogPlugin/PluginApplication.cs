@@ -282,11 +282,11 @@ namespace BiaogPlugin
                 $"BiaogPlugin-{DateTime.Now:yyyyMMdd}.log"
             );
 
-            // 确保日志目录存在
+            // ✅ 确保日志目录存在（空值安全）
             var logDir = System.IO.Path.GetDirectoryName(logPath);
-            if (!System.IO.Directory.Exists(logDir))
+            if (!string.IsNullOrEmpty(logDir) && !System.IO.Directory.Exists(logDir))
             {
-                System.IO.Directory.CreateDirectory(logDir!);
+                System.IO.Directory.CreateDirectory(logDir);
             }
 
             Log.Logger = new LoggerConfiguration()
@@ -329,6 +329,12 @@ namespace BiaogPlugin
                 var bailianClient = new Services.BailianApiClient(_sharedHttpClient, configManager);
                 Services.ServiceLocator.RegisterService(bailianClient);
                 Log.Debug("BailianApiClient已注册");
+
+                // 4.5. 百炼OpenAI SDK客户端（用于AI助手）
+                // ✅ 使用qwen3-max-preview模型，支持工具调用和流式输出
+                var bailianOpenAIClient = new Services.BailianOpenAIClient("qwen3-max-preview", configManager);
+                Services.ServiceLocator.RegisterService(bailianOpenAIClient);
+                Log.Debug("BailianOpenAIClient已注册（模型: qwen3-max-preview）");
 
                 // 5. 翻译引擎
                 var translationEngine = new Services.TranslationEngine(bailianClient, cacheService);

@@ -106,8 +106,13 @@ namespace BiaogPlugin.Services
         {
             foreach (ObjectId objId in btr)
             {
+                // ✅ AutoCAD 2022最佳实践：验证ObjectId有效性
+                // 参考：AutoCAD DevBlog官方推荐
+                if (objId.IsNull || objId.IsErased || objId.IsEffectivelyErased || !objId.IsValid)
+                    continue;
+
                 var ent = tr.GetObject(objId, OpenMode.ForRead) as Entity;
-                if (ent == null) continue;
+                if (ent == null || ent.IsErased) continue;
 
                 // 1. 直接的文本实体（DBText, MText, Dimension, MLeader）
                 var textEntity = ExtractTextFromEntity(ent, objId);
@@ -341,14 +346,23 @@ namespace BiaogPlugin.Services
 
             // ✅ 动态块处理：使用 EffectiveName 获取真实块名
             // 参考：AutoCAD 2022 .NET Developer's Guide - Dynamic Blocks
-            // https://help.autodesk.com/view/OARX/2022/ENU/?guid=GUID-7E4E5E5E-5E5E-5E5E-5E5E-5E5E5E5E5E5E
-            if (isDynamicBlock)
+            // 最佳实践：先验证DynamicBlockTableRecord的有效性
+            // https://adndevblog.typepad.com/autocad/2012/05/identifying-block-name-from-the-block-reference.html
+            if (isDynamicBlock && blockRef.DynamicBlockTableRecord != ObjectId.Null)
             {
                 try
                 {
-                    var dynamicBtr = (BlockTableRecord)tr.GetObject(blockRef.DynamicBlockTableRecord, OpenMode.ForRead);
-                    effectiveBlockName = dynamicBtr.Name;
-                    Log.Debug($"检测到动态块: {blockRef.Name} -> 实际块名: {effectiveBlockName}");
+                    // ✅ AutoCAD 2022最佳实践：验证ObjectId有效性
+                    var dynId = blockRef.DynamicBlockTableRecord;
+                    if (!dynId.IsErased && !dynId.IsEffectivelyErased && dynId.IsValid)
+                    {
+                        var dynamicBtr = (BlockTableRecord)tr.GetObject(dynId, OpenMode.ForRead);
+                        if (dynamicBtr != null && !dynamicBtr.IsErased)
+                        {
+                            effectiveBlockName = dynamicBtr.Name;
+                            Log.Debug($"检测到动态块: {blockRef.Name} -> 实际块名: {effectiveBlockName}");
+                        }
+                    }
                 }
                 catch (System.Exception ex)
                 {
@@ -361,9 +375,14 @@ namespace BiaogPlugin.Services
 
             foreach (ObjectId attId in attCol)
             {
+                // ✅ AutoCAD 2022最佳实践：验证ObjectId有效性
+                if (attId.IsNull || attId.IsErased || attId.IsEffectivelyErased || !attId.IsValid)
+                    continue;
+
                 try
                 {
                     var attRef = (AttributeReference)tr.GetObject(attId, OpenMode.ForRead);
+                    if (attRef == null || attRef.IsErased) continue;
 
                     // ✅ 关键修复：不跳过不可见属性！
                     // 根据用户要求：**同时提取可见和不可见的属性**
