@@ -9,23 +9,24 @@ namespace BiaogPlugin.Services
     public static class EngineeringTranslationConfig
     {
         /// <summary>
-        /// qwen-mt-flash模型的Token限制
+        /// qwen-mt-flash模型的Token限制（已废弃，现使用256K大模型）
         /// </summary>
-        public const int MaxInputTokens = 8192;
-        public const int MaxOutputTokens = 8192;
+        public const int MaxInputTokens = 262144;  // 256K tokens
+        public const int MaxOutputTokens = 262144;
 
         /// <summary>
         /// 单次翻译的最大字符数
         ///
-        /// ✅ 2025-01-14修正：考虑系统提示词和专业术语占用
-        /// - 模型输入限制: 8192 tokens
-        /// - DomainPrompt系统提示词: ~700 tokens
-        /// - Terms专业术语词汇表: ~300 tokens
-        /// - 实际可用: 8192 - 700 - 300 = 7192 tokens
-        /// - 安全估算: 每字符2个token → 7192 / 2 = 3596字符
-        /// - 保守设置: 3000字符（留有余量）
+        /// ✅ 2025-11-15更新：支持256K上下文大模型（qwen3-max-preview等）
+        /// - 模型输入限制: 256K tokens (262144 tokens)
+        /// - DomainPrompt系统提示词: ~3000 tokens
+        /// - Terms专业术语词汇表: ~2000 tokens
+        /// - 实际可用: 262144 - 3000 - 2000 = 257144 tokens
+        /// - 安全估算: 每字符2个token → 257144 / 2 = 128572字符
+        /// - 保守设置: 100000字符（留有充足余量）
+        /// - 实际场景: 任何AutoCAD图纸都不可能有10万字符的文本，可以一次性翻译
         /// </summary>
-        public const int MaxCharsPerBatch = 3000;
+        public const int MaxCharsPerBatch = 100000;
 
         /// <summary>
         /// 工程建筑领域提示词（英文，根据阿里云文档要求）
