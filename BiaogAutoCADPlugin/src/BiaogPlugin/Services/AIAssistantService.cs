@@ -159,12 +159,14 @@ namespace BiaogPlugin.Services
 
                         string toolResult = await ExecuteTool(toolCall, onContentChunk);
 
-                        // 添加工具结果到历史（官方推荐格式）
+                        // ✅ 商业级最佳实践：添加工具结果到历史（阿里云百炼官方格式）
+                        // 参考：https://help.aliyun.com/zh/model-studio/qwen-function-calling
                         _chatHistory.Add(new BiaogPlugin.Services.ChatMessage
                         {
                             Role = "tool",
                             Content = toolResult,
-                            Name = toolCall.Name
+                            Name = toolCall.Name,
+                            ToolCallId = toolCall.Id // ✅ CRITICAL: 必须包含tool_call_id对应工具调用
                         });
                     }
 
@@ -645,8 +647,17 @@ namespace BiaogPlugin.Services
                         result.Add(new OpenAI.Chat.AssistantChatMessage(msg.Content));
                         break;
                     case "tool":
-                        // 工具消息需要toolCallId，暂时跳过
-                        Log.Warning($"跳过工具消息（OpenAI SDK暂不支持）: {msg.Name}");
+                        // ✅ 商业级最佳实践：正确处理工具消息（Function Calling必需）
+                        // 参考：OpenAI .NET SDK - ToolChatMessage requires toolCallId
+                        if (!string.IsNullOrEmpty(msg.ToolCallId))
+                        {
+                            result.Add(new OpenAI.Chat.ToolChatMessage(msg.ToolCallId, msg.Content));
+                            Log.Debug($"添加工具消息: {msg.Name}, tool_call_id={msg.ToolCallId}");
+                        }
+                        else
+                        {
+                            Log.Warning($"跳过工具消息（缺少tool_call_id）: {msg.Name}");
+                        }
                         break;
                     default:
                         Log.Warning($"未知消息角色: {msg.Role}");

@@ -189,8 +189,13 @@ public class BailianOpenAIClient
             int inputTokens = 0;
             int outputTokens = 0;
 
-            // ⚠️ 关键：不使用ConfigureAwait(false)，保留SynchronizationContext
+            // ✅ 官方OpenAI SDK最佳实践：调用CompleteChatStreamingAsync获取流式更新
+            // 参考：https://github.com/openai/openai-dotnet
+            var streamingUpdates = _chatClient.CompleteChatStreamingAsync(messages, options, cancellationToken);
+
+            // ✅ 关键：不使用ConfigureAwait(false)，保留SynchronizationContext
             // 这样await foreach会在调用线程（UI线程）继续执行，onChunk回调也在UI线程
+            // 参考：OpenAI .NET SDK官方文档 - Streaming Best Practices
             await foreach (var update in streamingUpdates)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -280,11 +285,12 @@ public class BailianOpenAIClient
 
                 toolCalls.Add(new ToolCall
                 {
+                    Id = acc.Id, // ✅ 商业级最佳实践：保存tool_call_id（Function Calling必需）
                     Name = acc.FunctionName,
                     Arguments = args
                 });
 
-                Log.Debug($"工具调用: {acc.FunctionName}, 参数: {acc.FunctionArguments}");
+                Log.Debug($"工具调用: ID={acc.Id}, Name={acc.FunctionName}, 参数: {acc.FunctionArguments}");
             }
 
             Log.Debug($"流式输出完成: 内容长度={fullContent.Length}, 工具调用={toolCalls.Count}");
@@ -410,6 +416,7 @@ public class BailianOpenAIClient
 
                     return new ToolCall
                     {
+                        Id = tc.Id, // ✅ 商业级最佳实践：保存tool_call_id
                         Name = tc.FunctionName,
                         Arguments = args
                     };
