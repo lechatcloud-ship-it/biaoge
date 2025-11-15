@@ -563,10 +563,12 @@ namespace BiaogPlugin
                 {
                     Title = "标哥 - 智能算量控制面板",
                     Content = calculationPalette,
-                    Width = 900,
+                    Width = 450,  // ✅ 修复：匹配CalculationPalette的380px宽度+边距
                     Height = 700,
                     WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen,
-                    ResizeMode = System.Windows.ResizeMode.CanResize
+                    ResizeMode = System.Windows.ResizeMode.CanResize,
+                    MinWidth = 400,  // ✅ 设置最小宽度防止内容被挤压
+                    MinHeight = 600
                 };
 
                 window.ShowDialog();
