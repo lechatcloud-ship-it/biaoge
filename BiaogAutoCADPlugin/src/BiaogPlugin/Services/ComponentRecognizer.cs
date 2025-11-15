@@ -20,10 +20,21 @@ public class ComponentRecognizer
     private static readonly Regex QuantityRegex = new(@"(\d+(?:\.\d+)?)\s*(?:个|根|块|片|扇|樘)?",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-    // 尺寸提取正则 (长x宽x高 或 直径)
-    private static readonly Regex DimensionRegex = new(@"(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(?:[x×]\s*(\d+(?:\.\d+)?))?",
+    // ✅ 增强尺寸提取正则（支持AutoCAD多种标注格式）
+    // 格式1: 长×宽×高 (如: 300×600×2400, 300*600*2400, 300x600x2400)
+    private static readonly Regex DimensionRegex = new(@"(\d+(?:\.\d+)?)\s*[x×X*]\s*(\d+(?:\.\d+)?)\s*(?:[x×X*]\s*(\d+(?:\.\d+)?))?",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex DiameterRegex = new(@"[ΦφØ]?\s*(\d+(?:\.\d+)?)",
+
+    // 格式2: 单个尺寸+单位 (如: 200厚, 240mm, 0.2m)
+    private static readonly Regex ThicknessRegex = new(@"(\d+(?:\.\d+)?)\s*(?:厚|mm|MM|m|M)\b",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    // 格式3: 直径标注 (如: Φ12, φ200, Ø16)
+    private static readonly Regex DiameterRegex = new(@"[ΦφØ]\s*(\d+(?:\.\d+)?)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    // 格式4: 尺寸范围 (如: CH=1800, LD=900, 提取数字部分)
+    private static readonly Regex ParameterRegex = new(@"(?:CH|LD|DH|[BCHL])\s*[=:]\s*(\d+(?:\.\d+)?)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     // ✅ 构件识别规则（AutoCAD 2022优化版 - 大幅扩展中文构件支持）
@@ -346,7 +357,7 @@ public class ComponentRecognizer
     }
 
     /// <summary>
-    /// 提取数量和尺寸
+    /// 提取数量和尺寸（✅ 增强版 - 支持AutoCAD多种标注格式）
     /// </summary>
     private void ExtractQuantityAndDimensions(string text, ComponentRecognitionResult result)
     {
@@ -358,7 +369,7 @@ public class ComponentRecognizer
             result.Confidence += 0.05;
         }
 
-        // 提取尺寸
+        // ✅ 策略1: 提取长×宽×高格式尺寸（优先级最高）
         var dimensionMatch = DimensionRegex.Match(text);
         if (dimensionMatch.Success)
         {
@@ -370,22 +381,71 @@ public class ComponentRecognizer
                 {
                     result.Width = width / 1000.0;
 
-                    if (dimensionMatch.Groups.Count >= 4 && double.TryParse(dimensionMatch.Groups[3].Value, out var height))
+                    if (dimensionMatch.Groups.Count >= 4 && !string.IsNullOrEmpty(dimensionMatch.Groups[3].Value) &&
+                        double.TryParse(dimensionMatch.Groups[3].Value, out var height))
                     {
                         result.Height = height / 1000.0;
                     }
                 }
 
-                result.Confidence += 0.03;
+                result.Confidence += 0.05;
+                Log.Debug($"提取到尺寸: {result.Length}m × {result.Width}m × {result.Height}m");
             }
         }
 
-        // 提取直径（钢筋等）
+        // ✅ 策略2: 提取厚度标注（如: 200厚, 240mm）
+        var thicknessMatch = ThicknessRegex.Match(text);
+        if (thicknessMatch.Success && double.TryParse(thicknessMatch.Groups[1].Value, out var thickness))
+        {
+            // 根据单位判断是否需要转换
+            var originalText = thicknessMatch.Value;
+            if (originalText.Contains("m") && !originalText.Contains("mm"))
+            {
+                // 已经是米，直接使用
+                result.Width = thickness;
+            }
+            else
+            {
+                // 毫米转米
+                result.Width = thickness / 1000.0;
+            }
+
+            result.Confidence += 0.03;
+            Log.Debug($"提取到厚度: {result.Width}m ({originalText})");
+        }
+
+        // ✅ 策略3: 提取参数标注（如: CH=1800, LD=900）
+        var parameterMatches = ParameterRegex.Matches(text);
+        if (parameterMatches.Count > 0)
+        {
+            foreach (Match match in parameterMatches)
+            {
+                if (double.TryParse(match.Groups[1].Value, out var value))
+                {
+                    var paramType = match.Value.Substring(0, Math.Min(2, match.Value.IndexOf('=')));
+                    if (paramType.Contains("CH")) // 窗高
+                    {
+                        result.Height = value / 1000.0;
+                    }
+                    else if (paramType.Contains("B") || paramType.Contains("L")) // 宽度/长度
+                    {
+                        if (result.Length == 0)
+                            result.Length = value / 1000.0;
+                        else if (result.Width == 0)
+                            result.Width = value / 1000.0;
+                    }
+                }
+            }
+            result.Confidence += 0.02;
+        }
+
+        // ✅ 策略4: 提取直径标注（钢筋等）
         var diameterMatch = DiameterRegex.Match(text);
         if (diameterMatch.Success && double.TryParse(diameterMatch.Groups[1].Value, out var diameter))
         {
             result.Diameter = diameter / 1000.0;
             result.Confidence += 0.02;
+            Log.Debug($"提取到直径: Φ{result.Diameter}m");
         }
     }
 
