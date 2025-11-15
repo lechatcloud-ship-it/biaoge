@@ -429,12 +429,12 @@ namespace BiaogPlugin.UI
                 // 清空输入框
                 InputTextBox.Clear();
 
-                // ✅ 关键修复：创建独立的思考框和正文框
+                // ✅ 深度思考模式优化：思考框和正文框分阶段渲染
                 Expander? thinkingExpander = null;
                 RichTextBox? thinkingRichTextBox = null;
                 StreamingMarkdownRenderer? thinkingRenderer = null;
 
-                // 如果启用深度思考，创建思考框
+                // 第1阶段：如果启用深度思考，只创建思考框
                 if (_deepThinking)
                 {
                     thinkingExpander = CreateThinkingExpanderPlaceholder();
@@ -448,24 +448,14 @@ namespace BiaogPlugin.UI
                     ScrollToBottom();
                 }
 
-                // 创建AI正文回复占位符
-                var aiMessageBorder = CreateStreamingAIMessagePlaceholder();
-                ChatHistoryPanel.Children.Add(aiMessageBorder);
-                ScrollToBottom();
-
-                var aiRichTextBox = FindAIRichTextBox(aiMessageBorder);
+                // ✅ 正文框延迟创建：只在收到第一个内容chunk时创建
+                Border? aiMessageBorder = null;
+                RichTextBox? aiRichTextBox = null;
+                StreamingMarkdownRenderer? contentRenderer = null;
                 string fullResponse = "";
 
-                // ✅ 初始化正文Markdown渲染器
-                StreamingMarkdownRenderer? contentRenderer = null;
-                if (aiRichTextBox != null)
-                {
-                    contentRenderer = new StreamingMarkdownRenderer(aiRichTextBox);
-                }
-
-                // ✅ OpenAI SDK流式输出 - 彻底解决延迟问题
+                // ✅ OpenAI SDK流式输出 - 保持流式功能不变
                 // OpenAI SDK的await foreach保留SynchronizationContext，回调已在UI线程执行
-                // ❌ 不再需要Dispatcher.InvokeAsync，避免双重调度延迟！
                 var response = await _aiService.ChatStreamAsync(
                     userMessage: userInput,
                     useDeepThinking: _deepThinking,
@@ -473,6 +463,20 @@ namespace BiaogPlugin.UI
                     {
                         try
                         {
+                            // ✅ 第2阶段：收到第一个内容chunk时，动态创建正文框
+                            if (aiMessageBorder == null)
+                            {
+                                aiMessageBorder = CreateStreamingAIMessagePlaceholder();
+                                ChatHistoryPanel.Children.Add(aiMessageBorder);
+                                ScrollToBottom();
+
+                                aiRichTextBox = FindAIRichTextBox(aiMessageBorder);
+                                if (aiRichTextBox != null)
+                                {
+                                    contentRenderer = new StreamingMarkdownRenderer(aiRichTextBox);
+                                }
+                            }
+
                             fullResponse += chunk;
                             // ✅ 直接调用 - OpenAI SDK已保证UI线程安全
                             contentRenderer?.AppendChunk(chunk);
@@ -513,6 +517,14 @@ namespace BiaogPlugin.UI
                 {
                     Dispatcher.Invoke(() =>
                     {
+                        // ✅ 如果失败前没有收到任何内容chunk，需要先创建正文框
+                        if (aiMessageBorder == null)
+                        {
+                            aiMessageBorder = CreateStreamingAIMessagePlaceholder();
+                            ChatHistoryPanel.Children.Add(aiMessageBorder);
+                            aiRichTextBox = FindAIRichTextBox(aiMessageBorder);
+                        }
+
                         if (aiRichTextBox != null)
                         {
                             // 显示错误信息
@@ -524,6 +536,7 @@ namespace BiaogPlugin.UI
                             }));
                             aiRichTextBox.Document = errorDoc;
                         }
+                        ScrollToBottom();
                     });
                     Log.Error($"AI助手错误: {response.Error}");
                 }

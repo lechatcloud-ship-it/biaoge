@@ -4,12 +4,12 @@ namespace BiaogPlugin.Services
 {
     /// <summary>
     /// 工程建筑翻译配置
-    /// 基于阿里云百炼qwen-mt-flash模型的最佳实践
+    /// 基于阿里云百炼qwen-flash模型的最佳实践
     /// </summary>
     public static class EngineeringTranslationConfig
     {
         /// <summary>
-        /// Qwen3-Flash/Plus模型的Token限制（2025最新）
+        /// Qwen-Flash/Plus模型的Token限制（2025最新）
         /// </summary>
         public const int MaxInputTokens = 1048576;  // 1M tokens (997K实际输入)
         public const int MaxOutputTokens = 32768;   // 32K tokens
@@ -17,7 +17,7 @@ namespace BiaogPlugin.Services
         /// <summary>
         /// 单次翻译的最大字符数
         ///
-        /// ✅ 2025-11-15更新：支持1M上下文大模型（qwen3-flash/qwen3-plus）
+        /// ✅ 2025-11-15更新：支持1M上下文大模型（qwen-flash/qwen-plus）
         /// - 模型输入限制: 1M tokens (997K可用输入)
         /// - DomainPrompt系统提示词: ~500 tokens（已简化）
         /// - 实际可用: 997K - 500 = 996.5K tokens

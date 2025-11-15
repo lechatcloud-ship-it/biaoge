@@ -109,7 +109,10 @@ namespace BiaogPlugin.Services
                 // ✅ 使用OpenAI SDK进行流式调用 - 彻底解决流式延迟问题
                 ChatCompletionResult agentDecision;
 
-                if (_useOpenAISDK && _openAIClient != null)
+                // ⚠️ 关键：深度思考模式必须使用HttpClient路径
+                // 原因：OpenAI .NET SDK目前不支持reasoning_content字段（2025年2月issue仍开放）
+                // 参考：https://github.com/dotnet/extensions/issues/5862
+                if (_useOpenAISDK && _openAIClient != null && !useDeepThinking)
                 {
                     // ✅ OpenAI SDK流式调用：一次调度，无延迟
                     // 转换工具定义为OpenAI SDK格式
@@ -124,7 +127,8 @@ namespace BiaogPlugin.Services
                 }
                 else
                 {
-                    // ✅ 降级方案：使用HttpClient（旧实现）
+                    // ✅ HttpClient路径（支持深度思考模式）
+                    // 当useDeepThinking=true时强制使用此路径，因为需要处理reasoning_content
                     agentDecision = await _bailianClient.ChatCompletionStreamAsync(
                         messages: messages,
                         model: AgentModel,
