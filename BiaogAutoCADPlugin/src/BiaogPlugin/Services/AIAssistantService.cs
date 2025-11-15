@@ -24,9 +24,11 @@ namespace BiaogPlugin.Services
     public class AIAssistantService
     {
         private readonly BailianApiClient _bailianClient;
+        private readonly BailianOpenAIClient? _openAIClient;  // ✅ 添加OpenAI SDK客户端
         private readonly ConfigManager _configManager;
         private readonly DrawingContextManager _contextManager;
         private readonly ContextLengthManager _contextLengthManager;
+        private readonly bool _useOpenAISDK;  // ✅ 控制是否使用OpenAI SDK
 
         // Agent核心模型配置
         private const string AgentModel = "qwen3-max-preview";
@@ -44,7 +46,18 @@ namespace BiaogPlugin.Services
             _contextManager = contextManager;
             _contextLengthManager = new ContextLengthManager();
 
-            Log.Information("标哥AI助手初始化完成");
+            // ✅ 全面迁移到OpenAI SDK
+            try
+            {
+                _openAIClient = new BailianOpenAIClient(AgentModel, configManager);
+                _useOpenAISDK = true;
+                Log.Information("标哥AI助手初始化完成 - 使用OpenAI SDK（流式优化）");
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "OpenAI SDK初始化失败");
+                throw new InvalidOperationException("AI助手初始化失败，请检查API密钥配置", ex);
+            }
         }
 
         /// <summary>
@@ -91,24 +104,38 @@ namespace BiaogPlugin.Services
                 var messages = BuildMessages(systemPrompt);
 
                 // ===== 第3步：Agent决策 =====
-                // ✅ 移除状态消息，直接开始流式输出AI回复
                 Log.Information("开始Agent决策...");
 
-                // ✅ 关键修复：正确分离思考内容和正文内容的回调
-                // 不再将reasoning包裹后发送到同一个回调，而是直接传递两个独立的回调
-                var agentDecision = await _bailianClient.ChatCompletionStreamAsync(
-                    messages: messages,
-                    model: AgentModel,
-                    tools: tools,
-                    onStreamChunk: chunk => onContentChunk?.Invoke(chunk),  // ✅ 正文回调
-                    onReasoningChunk: useDeepThinking
-                        ? reasoning => onReasoningChunk?.Invoke(reasoning)  // ✅ 思考回调（不添加前缀）
-                        : null,
-                    temperature: 0.7,
-                    topP: 0.9,
-                    thinkingBudget: useDeepThinking ? 10000 : null,
-                    enableThinking: useDeepThinking  // ✅ 传递enable_thinking参数
-                );
+                // ✅ 使用OpenAI SDK进行流式调用 - 彻底解决流式延迟问题
+                ChatCompletionResult agentDecision;
+
+                if (_useOpenAISDK && _openAIClient != null)
+                {
+                    // ✅ OpenAI SDK流式调用：一次调度，无延迟
+                    agentDecision = await _openAIClient.CompleteStreamingAsync(
+                        messages: ConvertToOpenAIChatMessages(messages),
+                        onChunk: chunk => onContentChunk?.Invoke(chunk),
+                        temperature: 0.7f,
+                        tools: null  // 暂时禁用工具调用，专注流式优化
+                    );
+                }
+                else
+                {
+                    // ✅ 降级方案：使用HttpClient（旧实现）
+                    agentDecision = await _bailianClient.ChatCompletionStreamAsync(
+                        messages: messages,
+                        model: AgentModel,
+                        tools: tools,
+                        onStreamChunk: chunk => onContentChunk?.Invoke(chunk),
+                        onReasoningChunk: useDeepThinking
+                            ? reasoning => onReasoningChunk?.Invoke(reasoning)
+                            : null,
+                        temperature: 0.7,
+                        topP: 0.9,
+                        thinkingBudget: useDeepThinking ? 10000 : null,
+                        enableThinking: useDeepThinking
+                    );
+                }
 
                 // 添加Agent回复到历史
                 _chatHistory.Add(new BiaogPlugin.Services.ChatMessage
@@ -534,6 +561,39 @@ namespace BiaogPlugin.Services
         {
             _chatHistory.Clear();
             Log.Information("对话历史已清除");
+        }
+
+        /// <summary>
+        /// 转换内部ChatMessage为OpenAI SDK的ChatMessage
+        /// </summary>
+        private List<OpenAI.Chat.ChatMessage> ConvertToOpenAIChatMessages(List<BiaogPlugin.Services.ChatMessage> messages)
+        {
+            var result = new List<OpenAI.Chat.ChatMessage>();
+
+            foreach (var msg in messages)
+            {
+                switch (msg.Role.ToLower())
+                {
+                    case "system":
+                        result.Add(new OpenAI.Chat.SystemChatMessage(msg.Content));
+                        break;
+                    case "user":
+                        result.Add(new OpenAI.Chat.UserChatMessage(msg.Content));
+                        break;
+                    case "assistant":
+                        result.Add(new OpenAI.Chat.AssistantChatMessage(msg.Content));
+                        break;
+                    case "tool":
+                        // 工具消息需要toolCallId，暂时跳过
+                        Log.Warning($"跳过工具消息（OpenAI SDK暂不支持）: {msg.Name}");
+                        break;
+                    default:
+                        Log.Warning($"未知消息角色: {msg.Role}");
+                        break;
+                }
+            }
+
+            return result;
         }
 
         /// <summary>

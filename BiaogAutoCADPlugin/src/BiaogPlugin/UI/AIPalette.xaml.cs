@@ -411,8 +411,9 @@ namespace BiaogPlugin.UI
                     contentRenderer = new StreamingMarkdownRenderer(aiRichTextBox);
                 }
 
-                // ✅ 流式接收AI回复（分离思考和正文）
-                // ⚠️ 重要：虽然syncContext.Post会调度到UI线程，但仍需要Dispatcher确保WPF线程安全
+                // ✅ OpenAI SDK流式输出 - 彻底解决延迟问题
+                // OpenAI SDK的await foreach保留SynchronizationContext，回调已在UI线程执行
+                // ❌ 不再需要Dispatcher.InvokeAsync，避免双重调度延迟！
                 var response = await _aiService.ChatStreamAsync(
                     userMessage: userInput,
                     useDeepThinking: _deepThinking,
@@ -421,23 +422,13 @@ namespace BiaogPlugin.UI
                         try
                         {
                             fullResponse += chunk;
-                            // ✅ 使用Dispatcher确保在WPF UI线程上执行
-                            Dispatcher.InvokeAsync(() =>
-                            {
-                                try
-                                {
-                                    contentRenderer?.AppendChunk(chunk);
-                                    ScrollToBottom();
-                                }
-                                catch (Exception ex)
-                                {
-                                    Log.Error(ex, "内容流式更新失败");
-                                }
-                            }, System.Windows.Threading.DispatcherPriority.Normal);
+                            // ✅ 直接调用 - OpenAI SDK已保证UI线程安全
+                            contentRenderer?.AppendChunk(chunk);
+                            ScrollToBottom();
                         }
                         catch (Exception ex)
                         {
-                            Log.Error(ex, "内容回调失败");
+                            Log.Error(ex, "内容流式更新失败");
                         }
                     },
                     onReasoningChunk: _deepThinking
@@ -446,23 +437,13 @@ namespace BiaogPlugin.UI
                             try
                             {
                                 Log.Debug($"收到思考内容: {reasoning?.Length ?? 0} 字符");
-                                // ✅ 使用Dispatcher确保在WPF UI线程上执行
-                                Dispatcher.InvokeAsync(() =>
-                                {
-                                    try
-                                    {
-                                        thinkingRenderer?.AppendChunk(reasoning);
-                                        ScrollToBottom();
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Log.Error(ex, "思考内容流式更新失败");
-                                    }
-                                }, System.Windows.Threading.DispatcherPriority.Normal);
+                                // ✅ 直接调用 - OpenAI SDK已保证UI线程安全
+                                thinkingRenderer?.AppendChunk(reasoning);
+                                ScrollToBottom();
                             }
                             catch (Exception ex)
                             {
-                                Log.Error(ex, "思考回调失败");
+                                Log.Error(ex, "思考内容流式更新失败");
                             }
                         }
                         : null

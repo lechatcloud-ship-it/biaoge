@@ -111,6 +111,9 @@
 
   <!-- NuGet包 -->
   <ItemGroup>
+    <!-- OpenAI SDK - 官方.NET库，支持.NET Standard 2.0 -->
+    <PackageReference Include="OpenAI" Version="2.1.0" />
+
     <!-- HTTP客户端 -->
     <!-- ✅ 修复：降级到6.0版本以解决.NET Framework 4.8兼容性问题 -->
     <PackageReference Include="Microsoft.Extensions.Http" Version="6.0.0" />
