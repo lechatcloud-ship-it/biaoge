@@ -350,11 +350,25 @@ namespace BiaogPlugin.UI
             {
                 Log.Debug("准备显示AI助手面板...");
 
-                // ✅ 如果未初始化，先初始化
-                if (_aiPaletteSet == null)
+                // ✅ 关键修复：检测是否是第一次初始化
+                bool isFirstTime = (_aiPaletteSet == null);
+
+                if (isFirstTime)
                 {
                     Log.Debug("AI助手面板未初始化，开始初始化...");
                     InitializeAIPalette();
+
+                    // ✅ 第一次创建后，调整Size来触发WPF渲染（修复首次点击不显示的问题）
+                    if (_aiPaletteSet != null)
+                    {
+                        Log.Debug("首次初始化，执行Size调整触发WPF渲染...");
+
+                        // 调整Size触发UI布局计算（不同于目标尺寸）
+                        var tempSize = new System.Drawing.Size(810, 860);
+                        _aiPaletteSet.Size = tempSize;
+
+                        Log.Debug("首次渲染触发完成");
+                    }
                 }
 
                 // ✅ 确保初始化成功
@@ -364,25 +378,21 @@ namespace BiaogPlugin.UI
                     throw new System.InvalidOperationException("无法创建AI助手面板");
                 }
 
-                Log.Debug($"AI助手面板状态: Visible={_aiPaletteSet.Visible}, Dock={_aiPaletteSet.Dock}, Size={_aiPaletteSet.Size}");
+                Log.Debug($"AI助手面板当前状态: Visible={_aiPaletteSet.Visible}, Dock={_aiPaletteSet.Dock}, Size={_aiPaletteSet.Size}");
 
-                // ✅ 按照AutoCAD官方最佳实践：先Size，后Dock
-                // 参考：https://stackoverflow.com/questions/23372182
-                var targetSize = new System.Drawing.Size(800, 850);
+                // ✅ 确保面板以停靠模式显示
+                if (_aiPaletteSet.Dock == DockSides.None)
+                {
+                    _aiPaletteSet.Dock = DockSides.Right;
+                }
 
-                // 第一步：设置Size（调整两次，不同值，触发渲染）
-                _aiPaletteSet.Size = new System.Drawing.Size(810, 860);
-                _aiPaletteSet.Size = targetSize;
-
-                // 第二步：设置Dock（在Size之后）
-                _aiPaletteSet.Dock = DockSides.Right;
-
-                // 第三步：✅ 修复中文输入法焦点跳转：KeepFocus=true保持焦点在面板内
-                _aiPaletteSet.KeepFocus = true;
-
-                // 第四步：显示并激活
+                // ✅ 简化的显示逻辑：直接设置可见并激活
                 _aiPaletteSet.Visible = true;
-                _aiPaletteSet.Activate(0);
+                _aiPaletteSet.Activate(0);  // 激活第一个选项卡
+
+                // ✅ 修复中文输入法焦点跳转：KeepFocus=true保持焦点在面板内
+                // 防止输入中文时焦点跳转到AutoCAD命令行
+                _aiPaletteSet.KeepFocus = true;
 
                 Log.Information($"✓ AI助手面板已显示（Dock={_aiPaletteSet.Dock}, Size={_aiPaletteSet.Size}, Visible={_aiPaletteSet.Visible}）");
             }
