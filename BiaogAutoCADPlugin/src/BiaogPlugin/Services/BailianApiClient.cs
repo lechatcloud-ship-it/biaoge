@@ -756,30 +756,60 @@ public class BailianApiClient
             var sourceLang = string.IsNullOrEmpty(sourceLanguage) ? "auto" : ConvertLanguageCode(sourceLanguage);
             var targetLang = ConvertLanguageCode(targetLanguage);
 
-            // OpenAI 兼容模式请求格式
-            // ✅ 工程建筑专业翻译增强：添加domains和terms
-            var requestBody = new
+            // ✅ 根据模型类型选择不同的API调用格式
+            object requestBody;
+
+            // 判断是否为专用翻译模型（qwen-mt系列）
+            if (model.Contains("mt-flash") || model.Contains("mt-turbo") || model.Contains("mt-plus"))
             {
-                model = model,
-                messages = new[]
+                // ✅ 专用翻译模型：使用translation_options参数（OpenAI兼容模式顶层参数）
+                Log.Debug($"使用专用翻译模型API格式: {model}");
+                requestBody = new
                 {
-                    new
+                    model = model,
+                    messages = new[]
                     {
-                        role = "user",
-                        content = text
-                    }
-                },
-                extra_body = new
-                {
+                        new
+                        {
+                            role = "user",
+                            content = text
+                        }
+                    },
+                    // ✅ 直接在顶层放置translation_options（OpenAI兼容接口）
                     translation_options = new
                     {
                         source_lang = sourceLang,
                         target_lang = targetLang,
-                        domains = EngineeringTranslationConfig.DomainPrompt,  // ✅ 工程建筑领域提示
-                        terms = EngineeringTranslationConfig.GetApiTerms(sourceLang, targetLang)  // ✅ 专业术语
+                        domains = EngineeringTranslationConfig.DomainPrompt,
+                        terms = EngineeringTranslationConfig.GetApiTerms(sourceLang, targetLang)
                     }
-                }
-            };
+                };
+            }
+            else
+            {
+                // ✅ 通用对话模型（qwen3-max-preview等）：使用system message
+                Log.Debug($"使用通用对话模型API格式: {model}");
+                var systemPrompt = EngineeringTranslationConfig.BuildSystemPromptForModel(sourceLang, targetLang);
+
+                requestBody = new
+                {
+                    model = model,
+                    messages = new[]
+                    {
+                        new
+                        {
+                            role = "system",
+                            content = systemPrompt
+                        },
+                        new
+                        {
+                            role = "user",
+                            content = text
+                        }
+                    }
+                    // ❌ 不使用translation_options（通用对话模型不支持）
+                };
+            }
 
             // 创建带Authorization头的请求（线程安全）
             var apiKey = GetApiKey();
