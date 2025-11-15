@@ -216,6 +216,13 @@ namespace BiaogPlugin.Extensions
 
                 using (var tr = db.TransactionManager.StartTransaction())
                 {
+                    // ✅ AutoCAD 2022最佳实践: 验证ObjectId有效性
+                    if (objId.IsNull || objId.IsErased || objId.IsEffectivelyErased || !objId.IsValid)
+                    {
+                        Log.Debug("双击的ObjectId无效或已删除");
+                        return;
+                    }
+
                     var obj = tr.GetObject(objId, OpenMode.ForRead);
                     string? textContent = null;
 

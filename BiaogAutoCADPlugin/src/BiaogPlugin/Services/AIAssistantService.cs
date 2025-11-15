@@ -297,8 +297,9 @@ namespace BiaogPlugin.Services
             var doc = Application.DocumentManager.MdiActiveDocument;
             var db = doc.Database;
 
-            using (var tr = db.TransactionManager.StartTransaction())
+            // ✅ AutoCAD 2022最佳实践: 文档锁必须在事务之前
             using (var docLock = doc.LockDocument())
+            using (var tr = db.TransactionManager.StartTransaction())
             {
                 var extractor = new DwgTextExtractor();
                 var allTexts = extractor.ExtractAllText();
