@@ -555,10 +555,15 @@ namespace BiaogPlugin.Services
                 // 获取块定义
                 var blockDef = (BlockTableRecord)tr.GetObject(blockRef.BlockTableRecord, OpenMode.ForRead);
 
-                // ✅ 跳过匿名块和特殊块（避免处理系统内部块）
-                if (blockDef.IsFromExternalReference)
+                // ✅ 检测外部引用和覆盖引用（但继续提取）
+                // 🐛 修复：用户反馈"很多文本根本翻译不了，比如外键文本等"
+                // 🔧 原因：之前直接跳过外部引用块，导致XRef中的文本无法提取
+                // ✅ 新策略：允许提取XRef文本，但记录日志方便追踪
+                bool isXRef = blockDef.IsFromExternalReference || blockDef.IsFromOverlayReference;
+                if (isXRef)
                 {
-                    return;
+                    Log.Debug($"检测到外部引用块: {blockDef.Name} (XRef)，继续提取文本");
+                    // ⚠️ 注意：外部引用块通常是只读的，更新时会在DwgTextUpdater中特殊处理
                 }
 
                 // 遍历块定义中的所有实体

@@ -350,6 +350,7 @@ namespace BiaogPlugin.UI
                 TotalComponentsText.Text = summary.TotalComponents.ToString();
                 AvgConfidenceText.Text = $"{summary.AverageConfidence:P0}";
                 TotalVolumeText.Text = $"{summary.TotalVolume:F2}m³";
+                TotalAreaText.Text = $"{summary.TotalArea:F2}m²";  // ✅ 修复：添加总面积显示
             });
         }
 

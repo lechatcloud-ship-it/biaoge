@@ -183,7 +183,28 @@ public class BailianApiClient
 
         var original = text;
 
-        // ========== 第1步：移除Markdown代码块标记 ==========
+        // ========== 第1步：移除完整的XML标签块（最优先） ==========
+        // qwen-flash可能返回整个<system>...</system>块
+        // ⚠️ 紧急修复：v1.0.9 XML Prompt导致返回完整系统提示词
+        text = System.Text.RegularExpressions.Regex.Replace(text,
+            @"<system>.*?</system>",
+            "",
+            System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        // 移除各种XML标签对
+        var xmlTags = new[] { "role", "task", "critical_rules", "output_format", "examples", "example", "input", "output", "reminder" };
+        foreach (var tag in xmlTags)
+        {
+            text = System.Text.RegularExpressions.Regex.Replace(text,
+                $@"<{tag}>.*?</{tag}>",
+                "",
+                System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+
+        // 移除单个XML标签
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"</?[a-zA-Z_]+>", "").Trim();
+
+        // ========== 第2步：移除Markdown代码块标记 ==========
         // qwen-flash可能返回 ```text\n翻译内容\n``` 格式
         if (text.StartsWith("```"))
         {
@@ -204,13 +225,26 @@ public class BailianApiClient
             Log.Debug("移除Markdown代码块标记");
         }
 
-        // ========== 第2步：移除系统提示词特征短语 ==========
+        // ========== 第3步：移除系统提示词特征短语 ==========
         var systemPromptKeywords = new[]
         {
-            // ✅ v1.0.7新增：检测中文system prompt关键词
+            // ✅ v1.0.9新增：XML Prompt关键词
+            "CAD/BIM工程图纸专业翻译专家",
+            "将中文CAD工程图纸文本翻译为英文",
+            "将英文CAD工程图纸文本翻译为中文",
+            "仅输出译文本身",
+            "绝对不添加任何前缀",
+            "使用标准工程术语",
+            "参考国际工程规范",
+            "保留所有技术标识符",
+            "错误示例",
+            "正确示例",
+            "直接输出翻译结果",
+            "无需任何修饰或说明",
+
+            // ✅ v1.0.7原有：中文system prompt关键词
             "你是CAD/BIM工程图纸专业翻译",
             "严格遵守：",
-            "使用标准工程术语",
             "保留图号、规范代号",
             "直接输出译文",
             "不加任何解释",
@@ -278,7 +312,7 @@ public class BailianApiClient
             }
         }
 
-        // ========== 第3步：移除常见的解释性前缀 ==========
+        // ========== 第4步：移除常见的解释性前缀 ==========
         var explanatoryPrefixes = new[]
         {
             "Translation:",
