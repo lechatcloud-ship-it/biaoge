@@ -768,6 +768,43 @@ namespace BiaogPlugin
         }
 
         /// <summary>
+        /// 重置AI助手面板 - 修复注册表问题导致的显示异常
+        /// 快捷命令：当AI助手无法弹出时使用此命令
+        /// </summary>
+        [CommandMethod("BIAOGE_RESET_AI", CommandFlags.Modal)]
+        public void ResetAIPanel()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                ed.WriteMessage("\n正在重置AI助手面板...");
+                Log.Information("用户执行AI助手重置命令");
+
+                // 清理现有面板
+                PaletteManager.Cleanup();
+                System.Threading.Thread.Sleep(50);
+
+                // 重新初始化
+                PaletteManager.Initialize();
+                System.Threading.Thread.Sleep(50);
+
+                // 显示AI助手
+                PaletteManager.ShowAIPalette();
+
+                ed.WriteMessage("\n✓ AI助手面板已重置并打开");
+                Log.Information("AI助手重置成功");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "重置AI助手面板失败");
+                ed.WriteMessage($"\n[错误] {ex.Message}");
+                ed.WriteMessage("\n如果问题仍然存在，请运行: BIAOGE_RESETPALETTES");
+            }
+        }
+
+        /// <summary>
         /// ✅ 重置所有面板（修复面板无法显示的问题）
         ///
         /// 用途：当面板突然无法显示时（只闪一下），使用此命令强制清理并重新初始化所有面板。

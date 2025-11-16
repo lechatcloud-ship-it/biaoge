@@ -313,10 +313,10 @@ namespace BiaogPlugin.UI
                 {
                     Log.Debug("开始创建AI助手面板...");
 
-                    // ✅ 使用 GUID 构造函数以持久化面板位置和大小设置
+                    // ✅ 使用新GUID清除旧的注册表配置（修复Dock=Right导致无法显示的问题）
                     _aiPaletteSet = new PaletteSet(
                         "标哥 - AI助手",
-                        new System.Guid("A5B6C7D8-E9F0-1234-5678-9ABCDEF03333")
+                        new System.Guid("B7C8D9E0-F1A2-5678-9BCD-EF0123456789")
                     );
 
                     Log.Debug("PaletteSet已创建，准备设置属性...");
@@ -347,17 +347,26 @@ namespace BiaogPlugin.UI
                     Log.Debug("添加控件到PaletteSet...");
                     _aiPaletteSet.Add("AI助手", elementHost);
 
-                    // ✅ 关键修复：在Add之后设置Size
+                    // ✅ 设置合理的初始尺寸和位置
+                    var screen = System.Windows.Forms.Screen.PrimaryScreen.WorkingArea;
+                    int idealWidth = 600;   // 宽度600
+                    int idealHeight = 800;  // 高度800
+
+                    _aiPaletteSet.Size = new System.Drawing.Size(idealWidth, idealHeight);
+                    _aiPaletteSet.MinimumSize = new System.Drawing.Size(idealWidth, idealHeight);  // 最小尺寸也是600x800，不可再小
+
+                    // ✅ 设置初始位置（屏幕右侧居中，而不是左上角）
+                    int x = screen.Right - idealWidth - 50;  // 距离右边缘50px
+                    int y = screen.Top + (screen.Height - idealHeight) / 2;  // 垂直居中
+                    _aiPaletteSet.Location = new System.Drawing.Point(x, y);
+
                     // ❌ 不要强制设置Dock=Right，会导致面板无法显示（AutoCAD Bug）
-                    // ✅ 正确做法：保持Dock=None（浮动模式），让用户自己拖动到右侧停靠
-                    _aiPaletteSet.Size = new System.Drawing.Size(850, 800);  // 宽度850, 高度800
-                    _aiPaletteSet.MinimumSize = new System.Drawing.Size(700, 600);  // 最小宽度700, 最小高度600
-                    // _aiPaletteSet.Dock = DockSides.Right;  // ❌ 删除强制停靠，避免面板无法显示
+                    // _aiPaletteSet.Dock = DockSides.Right;
 
                     // 保持隐藏，等待用户调用命令
                     _aiPaletteSet.Visible = false;
 
-                    Log.Information("✓ AI助手面板创建成功（停靠右侧，尺寸: 850x800）");
+                    Log.Information($"✓ AI助手面板创建成功（浮动模式，尺寸: {idealWidth}x{idealHeight}, 位置: 右侧居中）");
                 }
                 catch (System.Exception ex)
                 {

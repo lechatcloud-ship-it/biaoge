@@ -45,6 +45,7 @@
       <Commands GroupName="BIAOGE_COMMANDS">
         <Command Local="BIAOGE_INITIALIZE" Global="BIAOGE_INITIALIZE" StartupCommand="True" />
         <Command Local="BIAOGE_AI" Global="BIAOGE_AI" />
+        <Command Local="BIAOGE_RESET_AI" Global="BIAOGE_RESET_AI" />
         <Command Local="BIAOGE_TRANSLATE" Global="BIAOGE_TRANSLATE" />
         <Command Local="BIAOGE_TRANSLATE_ZH" Global="BIAOGE_TRANSLATE_ZH" />
         <Command Local="BIAOGE_TRANSLATE_EN" Global="BIAOGE_TRANSLATE_EN" />
@@ -72,6 +73,7 @@
       <Commands GroupName="BIAOGE_COMMANDS">
         <Command Local="BIAOGE_INITIALIZE" Global="BIAOGE_INITIALIZE" StartupCommand="True" />
         <Command Local="BIAOGE_AI" Global="BIAOGE_AI" />
+        <Command Local="BIAOGE_RESET_AI" Global="BIAOGE_RESET_AI" />
         <Command Local="BIAOGE_TRANSLATE" Global="BIAOGE_TRANSLATE" />
         <Command Local="BIAOGE_TRANSLATE_ZH" Global="BIAOGE_TRANSLATE_ZH" />
         <Command Local="BIAOGE_TRANSLATE_EN" Global="BIAOGE_TRANSLATE_EN" />

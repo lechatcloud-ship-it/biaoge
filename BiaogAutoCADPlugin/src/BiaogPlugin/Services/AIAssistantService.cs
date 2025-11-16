@@ -30,9 +30,10 @@ namespace BiaogPlugin.Services
         private readonly ContextLengthManager _contextLengthManager;
         private readonly bool _useOpenAISDK;  // ✅ 控制是否使用OpenAI SDK
 
-        // Agent核心模型配置（2025-11-15升级到qwen-plus）
-        // qwen-plus: 1M上下文，高性价比，性能/成本/速度平衡
-        private const string AgentModel = "qwen-plus";
+        // Agent核心模型配置（2025-11-16升级到qwen3-coder-flash）
+        // qwen3-coder-flash: 代码专用，工具调用专家，1M上下文，性价比最优
+        // 参考: MODEL_SELECTION_GUIDE.md
+        private const string AgentModel = "qwen3-coder-flash";
 
         // 对话历史
         private readonly List<BiaogPlugin.Services.ChatMessage> _chatHistory = new();
@@ -639,8 +640,14 @@ namespace BiaogPlugin.Services
         public void LoadHistory(List<BiaogPlugin.Services.ChatMessage> messages)
         {
             _chatHistory.Clear();
-            _chatHistory.AddRange(messages);
-            Log.Information($"加载对话历史: {messages.Count}条消息");
+
+            // ✅ v1.0.7修复：过滤掉tool消息，只保留user和assistant消息
+            // tool消息必须紧跟在包含tool_calls的assistant消息之后，
+            // 加载历史时如果包含孤立的tool消息会导致API错误
+            var filteredMessages = messages.Where(m => m.Role == "user" || m.Role == "assistant").ToList();
+
+            _chatHistory.AddRange(filteredMessages);
+            Log.Information($"加载对话历史: {messages.Count}条消息（过滤后{filteredMessages.Count}条）");
         }
 
         /// <summary>
@@ -710,11 +717,17 @@ namespace BiaogPlugin.Services
                         {
                             // 转换为OpenAI SDK的ChatToolCall格式
                             IReadOnlyList<OpenAI.Chat.ChatToolCall> toolCalls = msg.ToolCalls
-                                .Select(tc => OpenAI.Chat.ChatToolCall.CreateFunctionToolCall(
-                                    id: tc.Id,
-                                    functionName: tc.Function.Name,
-                                    functionArguments: BinaryData.FromString(tc.Function.Arguments)
-                                ))
+                                .Select(tc =>
+                                {
+                                    // ✅ v1.0.7修复："数组不能为空。参数名: bytes"
+                                    // BinaryData.FromString不接受空字符串，必须提供有效的JSON
+                                    var args = string.IsNullOrWhiteSpace(tc.Function.Arguments) ? "{}" : tc.Function.Arguments;
+                                    return OpenAI.Chat.ChatToolCall.CreateFunctionToolCall(
+                                        id: tc.Id,
+                                        functionName: tc.Function.Name,
+                                        functionArguments: BinaryData.FromString(args)
+                                    );
+                                })
                                 .ToList();
 
                             // 使用工具调用创建消息
