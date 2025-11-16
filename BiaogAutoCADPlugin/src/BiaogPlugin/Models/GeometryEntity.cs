@@ -110,6 +110,45 @@ namespace BiaogPlugin.Models
         /// </summary>
         public MassPropertiesData? MassProperties { get; set; }
 
+        // ✅ 新增：Ellipse（椭圆）属性
+        /// <summary>
+        /// 长半轴半径（米）- 仅Ellipse有值
+        /// </summary>
+        public double? MajorRadius { get; set; }
+
+        /// <summary>
+        /// 短半轴半径（米）- 仅Ellipse有值
+        /// </summary>
+        public double? MinorRadius { get; set; }
+
+        // ✅ 新增：Spline（样条曲线）属性
+        /// <summary>
+        /// 控制点数量 - 仅Spline有值
+        /// </summary>
+        public int? NumControlPoints { get; set; }
+
+        /// <summary>
+        /// 拟合点数量 - 仅Spline有值
+        /// </summary>
+        public int? NumFitPoints { get; set; }
+
+        /// <summary>
+        /// 样条次数（Degree）- 仅Spline有值
+        /// </summary>
+        public int? SplineDegree { get; set; }
+
+        // ✅ 新增：Face（三维面）属性
+        /// <summary>
+        /// 是否为三角形面 - 仅Face有值
+        /// </summary>
+        public bool? IsTriangle { get; set; }
+
+        // ✅ 新增：Surface（曲面）属性
+        /// <summary>
+        /// 曲面类型名称（DBSurface、NurbSurface等）- 仅Surface有值
+        /// </summary>
+        public string? SurfaceTypeName { get; set; }
+
         public override string ToString()
         {
             return $"[{Type}] Layer={Layer}, Area={Area:F2}m², Volume={Volume:F3}m³";
@@ -159,7 +198,29 @@ namespace BiaogPlugin.Models
         /// <summary>
         /// 圆弧（Arc）
         /// </summary>
-        Arc
+        Arc,
+
+        // ✅ 新增：高级几何类型（AutoCAD 2022完整支持）
+
+        /// <summary>
+        /// 椭圆（Ellipse） - 支持完整椭圆和椭圆弧
+        /// </summary>
+        Ellipse,
+
+        /// <summary>
+        /// 样条曲线（Spline） - NURBS曲线，支持闭合样条
+        /// </summary>
+        Spline,
+
+        /// <summary>
+        /// 三维面（Face） - 3D三角形或四边形面
+        /// </summary>
+        Face,
+
+        /// <summary>
+        /// 曲面（Surface） - DBSurface、NurbSurface、PlaneSurface等
+        /// </summary>
+        Surface
     }
 
     /// <summary>
