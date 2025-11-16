@@ -688,36 +688,53 @@ public class ComponentRecognizer
     }
 
     /// <summary>
-    /// 估算成本（元）
+    /// ✅ 估算成本（元）- 使用动态成本数据库，替代硬编码单价
     /// </summary>
     private decimal EstimateCost(ComponentRecognitionResult result)
     {
-        var unitPrices = new Dictionary<string, decimal>
-        {
-            ["C30混凝土柱"] = 500.0m, // 元/m³
-            ["C35混凝土梁"] = 550.0m,
-            ["C30混凝土板"] = 450.0m,
-            ["HRB400钢筋"] = 4500.0m, // 元/吨
-            ["HPB300钢筋"] = 4000.0m,
-            ["MU10砖墙"] = 200.0m,
-            ["MU15砌块"] = 180.0m,
-            ["M1门"] = 800.0m, // 元/扇
-            ["C1窗"] = 600.0m
-        };
+        // ✅ 从成本数据库查询单价
+        var priceItem = CostDatabase.Instance.GetPrice(result.Type);
 
-        if (unitPrices.TryGetValue(result.Type, out var unitPrice))
+        if (priceItem == null)
         {
-            if (result.Volume > 0)
-            {
-                return Math.Round(unitPrice * (decimal)result.Volume, 2);
-            }
-            else if (result.Quantity > 0)
-            {
-                return Math.Round(unitPrice * result.Quantity, 2);
-            }
+            Log.Debug($"未找到构件[{result.Type}]的成本数据，跳过成本估算");
+            return 0;
         }
 
-        return 0;
+        decimal cost = 0;
+
+        // 根据单位类型计算成本
+        if (priceItem.Unit.Contains("m³") && result.Volume > 0)
+        {
+            // 按体积计算（混凝土构件）
+            cost = priceItem.Price * (decimal)result.Volume;
+        }
+        else if (priceItem.Unit.Contains("m²") && result.Area > 0)
+        {
+            // 按面积计算（砖墙等）
+            cost = priceItem.Price * (decimal)result.Area;
+        }
+        else if (priceItem.Unit.Contains("吨") && result.Volume > 0)
+        {
+            // 按重量计算（钢筋等，需要密度转换）
+            // 钢材密度 7850 kg/m³
+            double weight = result.Volume * 7.85; // 吨
+            cost = priceItem.Price * (decimal)weight;
+        }
+        else if ((priceItem.Unit.Contains("扇") || priceItem.Unit.Contains("个")) && result.Quantity > 0)
+        {
+            // 按数量计算（门窗等）
+            cost = priceItem.Price * result.Quantity;
+        }
+        else if (result.Quantity > 0)
+        {
+            // 默认按数量计算
+            cost = priceItem.Price * result.Quantity;
+        }
+
+        Log.Debug($"成本估算: {result.Type} = {priceItem.Price}{priceItem.Unit} × {result.Quantity} = ¥{cost:F2}");
+
+        return Math.Round(cost, 2);
     }
 
     /// <summary>

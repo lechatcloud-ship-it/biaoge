@@ -358,6 +358,10 @@ namespace BiaogPlugin
                 Services.ServiceLocator.RegisterService(translationHistory);
                 Log.Debug("TranslationHistory已注册");
 
+                // ✅ 9. 成本数据库（动态加载JSON配置）
+                Services.CostDatabase.Instance.Initialize();
+                Log.Debug("CostDatabase已初始化");
+
                 Log.Information("所有服务初始化完成");
 
                 // ✅ UX改进: 检查是否曾经配置过API密钥（只有完全没配置过才弹出首次设置）

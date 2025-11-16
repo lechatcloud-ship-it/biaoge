@@ -160,6 +160,26 @@ namespace BiaogPlugin.Services
                 {
                     geometryData = ExtractArcData(arc, objId, spaceName);
                 }
+                // ✅ 新增：Ellipse（椭圆）支持
+                else if (ent is Ellipse ellipse)
+                {
+                    geometryData = ExtractEllipseData(ellipse, objId, spaceName);
+                }
+                // ✅ 新增：Spline（样条曲线）支持
+                else if (ent is Spline spline)
+                {
+                    geometryData = ExtractSplineData(spline, objId, spaceName);
+                }
+                // ✅ 新增：Face（三维面）支持
+                else if (ent is Face face)
+                {
+                    geometryData = ExtractFaceData(face, objId, spaceName);
+                }
+                // ✅ 新增：DBSurface（曲面）支持
+                else if (ent is Surface surface)
+                {
+                    geometryData = ExtractSurfaceData(surface, objId, spaceName);
+                }
 
                 if (geometryData != null)
                 {
@@ -472,6 +492,275 @@ namespace BiaogPlugin.Services
             catch (Exception ex)
             {
                 Log.Warning(ex, $"提取Arc数据失败: {objId}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// ✅ 提取Ellipse（椭圆）数据 - AutoCAD 2022高级几何类型
+        /// </summary>
+        private GeometryEntity? ExtractEllipseData(Ellipse ellipse, ObjectId objId, string spaceName)
+        {
+            try
+            {
+                // ✅ AutoCAD .NET API关键特性：Ellipse是Curve的派生类，有Area属性
+                // 椭圆面积 = π × 长半轴 × 短半轴
+                // 但AutoCAD已经计算好了，直接使用Area属性
+
+                // 注意：只有闭合的Ellipse才有面积（完整椭圆）
+                if (ellipse.StartAngle != 0 || ellipse.EndAngle != Math.PI * 2)
+                {
+                    // 椭圆弧，不计算面积
+                    return null;
+                }
+
+                double area = Math.Abs(ellipse.Area);
+
+                if (area < 1e-6)
+                {
+                    return null;
+                }
+
+                var bounds = ellipse.GeometricExtents;
+                double length = bounds.MaxPoint.X - bounds.MinPoint.X;
+                double width = bounds.MaxPoint.Y - bounds.MinPoint.Y;
+
+                // 计算长轴和短轴长度
+                double majorRadius = ellipse.MajorRadius;
+                double minorRadius = ellipse.MinorRadius;
+
+                return new GeometryEntity
+                {
+                    Id = objId,
+                    Type = GeometryType.Ellipse,
+                    Layer = ellipse.Layer,
+                    SpaceName = spaceName,
+                    Area = area,
+                    Volume = 0,
+                    Length = majorRadius * 2,   // 长轴
+                    Width = minorRadius * 2,    // 短轴
+                    Height = 0,
+                    Centroid = ellipse.Center,
+                    MajorRadius = majorRadius,
+                    MinorRadius = minorRadius,
+                    StartAngle = ellipse.StartAngle,
+                    EndAngle = ellipse.EndAngle
+                };
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, $"提取Ellipse数据失败: {objId}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// ✅ 提取Spline（样条曲线）数据 - AutoCAD 2022高级几何类型
+        /// </summary>
+        private GeometryEntity? ExtractSplineData(Spline spline, ObjectId objId, string spaceName)
+        {
+            try
+            {
+                // ✅ AutoCAD .NET API关键特性：Spline是Curve的派生类
+                // 只有闭合的Spline才有面积（IsClosed == true）
+                if (!spline.Closed)
+                {
+                    // 开放曲线，没有面积
+                    Log.Debug($"跳过开放Spline曲线: {objId}");
+                    return null;
+                }
+
+                // ✅ 关键：闭合Spline的Area属性
+                double area = Math.Abs(spline.Area);
+
+                if (area < 1e-6)
+                {
+                    return null;
+                }
+
+                var bounds = spline.GeometricExtents;
+                double length = bounds.MaxPoint.X - bounds.MinPoint.X;
+                double width = bounds.MaxPoint.Y - bounds.MinPoint.Y;
+
+                // 获取控制点数量和拟合点数量
+                int numControlPoints = spline.NumControlPoints;
+                int numFitPoints = spline.HasFitData ? spline.NumFitPoints : 0;
+
+                return new GeometryEntity
+                {
+                    Id = objId,
+                    Type = GeometryType.Spline,
+                    Layer = spline.Layer,
+                    SpaceName = spaceName,
+                    Area = area,
+                    Volume = 0,
+                    Length = length,
+                    Width = width,
+                    Height = 0,
+                    Centroid = new Point3d(
+                        (bounds.MinPoint.X + bounds.MaxPoint.X) / 2,
+                        (bounds.MinPoint.Y + bounds.MaxPoint.Y) / 2,
+                        (bounds.MinPoint.Z + bounds.MaxPoint.Z) / 2
+                    ),
+                    NumControlPoints = numControlPoints,
+                    NumFitPoints = numFitPoints,
+                    SplineDegree = spline.Degree
+                };
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, $"提取Spline数据失败: {objId}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// ✅ 提取Face（三维面）数据 - AutoCAD 2022基础3D实体
+        /// </summary>
+        private GeometryEntity? ExtractFaceData(Face face, ObjectId objId, string spaceName)
+        {
+            try
+            {
+                // ✅ Face是3D三角形或四边形面
+                // 通过4个顶点计算面积
+
+                Point3d vertex0, vertex1, vertex2, vertex3;
+
+                // 获取Face的4个顶点（可能只有3个顶点，第4个与第3个重合）
+                for (short i = 0; i < 4; i++)
+                {
+                    var pt = face.GetVertexAt(i);
+                    switch (i)
+                    {
+                        case 0: vertex0 = pt; break;
+                        case 1: vertex1 = pt; break;
+                        case 2: vertex2 = pt; break;
+                        case 3: vertex3 = pt; break;
+                    }
+                }
+
+                // 检查是三角形还是四边形
+                bool isTriangle = face.GetVertexAt(2).IsEqualTo(face.GetVertexAt(3));
+
+                double area;
+                if (isTriangle)
+                {
+                    // 三角形面积：海伦公式或向量叉积
+                    var v1 = face.GetVertexAt(0);
+                    var v2 = face.GetVertexAt(1);
+                    var v3 = face.GetVertexAt(2);
+
+                    var vec1 = v2 - v1;
+                    var vec2 = v3 - v1;
+
+                    // 面积 = 0.5 * |vec1 × vec2|
+                    var crossProduct = vec1.CrossProduct(vec2);
+                    area = 0.5 * crossProduct.Length;
+                }
+                else
+                {
+                    // 四边形面积：分成两个三角形
+                    var v1 = face.GetVertexAt(0);
+                    var v2 = face.GetVertexAt(1);
+                    var v3 = face.GetVertexAt(2);
+                    var v4 = face.GetVertexAt(3);
+
+                    var vec1 = v2 - v1;
+                    var vec2 = v3 - v1;
+                    var cross1 = vec1.CrossProduct(vec2);
+                    double area1 = 0.5 * cross1.Length;
+
+                    var vec3 = v3 - v1;
+                    var vec4 = v4 - v1;
+                    var cross2 = vec3.CrossProduct(vec4);
+                    double area2 = 0.5 * cross2.Length;
+
+                    area = area1 + area2;
+                }
+
+                if (area < 1e-9)
+                {
+                    return null;
+                }
+
+                var bounds = face.GeometricExtents;
+                double length = bounds.MaxPoint.X - bounds.MinPoint.X;
+                double width = bounds.MaxPoint.Y - bounds.MinPoint.Y;
+                double height = bounds.MaxPoint.Z - bounds.MinPoint.Z;
+
+                return new GeometryEntity
+                {
+                    Id = objId,
+                    Type = GeometryType.Face,
+                    Layer = face.Layer,
+                    SpaceName = spaceName,
+                    Area = area,
+                    Volume = 0,
+                    Length = length,
+                    Width = width,
+                    Height = height,
+                    Centroid = new Point3d(
+                        (bounds.MinPoint.X + bounds.MaxPoint.X) / 2,
+                        (bounds.MinPoint.Y + bounds.MaxPoint.Y) / 2,
+                        (bounds.MinPoint.Z + bounds.MaxPoint.Z) / 2
+                    ),
+                    IsTriangle = isTriangle
+                };
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, $"提取Face数据失败: {objId}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// ✅ 提取Surface（曲面）数据 - AutoCAD 2022高级3D实体
+        /// DBSurface、NurbSurface、PlaneSurface等曲面类型
+        /// </summary>
+        private GeometryEntity? ExtractSurfaceData(Surface surface, ObjectId objId, string spaceName)
+        {
+            try
+            {
+                // ✅ AutoCAD .NET API关键方法：Surface.GetArea()
+                // 曲面可以计算表面积，但需要指定精度
+                double area = surface.Area;
+
+                if (area < 1e-6)
+                {
+                    return null;
+                }
+
+                var bounds = surface.GeometricExtents;
+                double length = bounds.MaxPoint.X - bounds.MinPoint.X;
+                double width = bounds.MaxPoint.Y - bounds.MinPoint.Y;
+                double height = bounds.MaxPoint.Z - bounds.MinPoint.Z;
+
+                // 获取曲面类型名称
+                string surfaceTypeName = surface.GetType().Name;
+
+                return new GeometryEntity
+                {
+                    Id = objId,
+                    Type = GeometryType.Surface,
+                    Layer = surface.Layer,
+                    SpaceName = spaceName,
+                    Area = area,
+                    Volume = 0,  // 曲面没有体积，只有表面积
+                    Length = length,
+                    Width = width,
+                    Height = height,
+                    Centroid = new Point3d(
+                        (bounds.MinPoint.X + bounds.MaxPoint.X) / 2,
+                        (bounds.MinPoint.Y + bounds.MaxPoint.Y) / 2,
+                        (bounds.MinPoint.Z + bounds.MaxPoint.Z) / 2
+                    ),
+                    SurfaceTypeName = surfaceTypeName
+                };
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, $"提取Surface数据失败: {objId}");
                 return null;
             }
         }
