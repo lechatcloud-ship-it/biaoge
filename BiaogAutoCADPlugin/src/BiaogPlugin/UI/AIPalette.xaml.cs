@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -906,6 +907,13 @@ namespace BiaogPlugin.UI
 
                 // 清空UI
                 ClearChatHistory();
+
+                // ✅ v1.0.8修复：检查Messages是否为null（JSON反序列化可能导致null）
+                if (session.Messages == null)
+                {
+                    Log.Warning($"会话{session.Id}的Messages为null，初始化为空列表");
+                    session.Messages = new List<BiaogPlugin.Services.ChatMessage>();
+                }
 
                 // ✅ 恢复AI服务的历史记录（关键修复：防止切换会话后历史丢失）
                 if (_aiService != null && session.Messages.Count > 0)

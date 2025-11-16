@@ -282,14 +282,46 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
+        /// 安全获取字典值（防御JSON反序列化null问题）
+        /// </summary>
+        /// <param name="args">参数字典（可能为null）</param>
+        /// <param name="key">键名</param>
+        /// <param name="defaultValue">默认值</param>
+        /// <returns>字符串值</returns>
+        private string GetArgSafe(Dictionary<string, object>? args, string key, string defaultValue = "")
+        {
+            if (args == null)
+            {
+                Log.Warning($"参数字典为null，使用默认值: {key}={defaultValue}");
+                return defaultValue;
+            }
+
+            if (!args.ContainsKey(key))
+            {
+                Log.Warning($"参数字典缺少键: {key}，使用默认值: {defaultValue}");
+                return defaultValue;
+            }
+
+            var value = args[key];
+            if (value == null)
+            {
+                Log.Warning($"参数值为null: {key}，使用默认值: {defaultValue}");
+                return defaultValue;
+            }
+
+            return value.ToString() ?? defaultValue;
+        }
+
+        /// <summary>
         /// 翻译工具 - 执行翻译任务
         /// </summary>
         private async Task<string> ExecuteTranslateTool(Dictionary<string, object> args, Action<string>? onStreamChunk)
         {
             onStreamChunk?.Invoke($"  → 正在执行翻译...\n");
 
-            var text = args["text"].ToString() ?? "";
-            var targetLanguage = args["target_language"].ToString() ?? "en";
+            // ✅ v1.0.8修复：使用安全方法访问参数（防止args为null）
+            var text = GetArgSafe(args, "text");
+            var targetLanguage = GetArgSafe(args, "target_language", "en");
 
             var translated = await _bailianClient.TranslateAsync(
                 text: text,
@@ -308,9 +340,10 @@ namespace BiaogPlugin.Services
         {
             onStreamChunk?.Invoke($"  → 正在执行图纸修改...\n");
 
-            var operation = args["operation"].ToString() ?? "";
-            var original = args.ContainsKey("original_text") ? args["original_text"].ToString() : "";
-            var newValue = args.ContainsKey("new_text") ? args["new_text"].ToString() : "";
+            // ✅ v1.0.8修复：使用安全方法访问参数（防止args为null）
+            var operation = GetArgSafe(args, "operation");
+            var original = GetArgSafe(args, "original_text");
+            var newValue = GetArgSafe(args, "new_text");
 
             // 理解修改意图并执行
             var doc = Application.DocumentManager.MdiActiveDocument;
@@ -384,7 +417,8 @@ namespace BiaogPlugin.Services
                 onStreamChunk?.Invoke($"  → 查询图纸信息...\n");
                 Log.Debug("开始执行查询图纸工具");
 
-                var queryType = args.ContainsKey("query_type") ? args["query_type"].ToString() : "";
+                // ✅ v1.0.8修复：使用安全方法访问参数（防止args为null）
+                var queryType = GetArgSafe(args, "query_type");
                 Log.Debug($"查询类型: {queryType}");
 
                 // ✅ 添加异常处理
@@ -807,11 +841,19 @@ namespace BiaogPlugin.Services
                         var functionDescription = functionElement.GetProperty("description").GetString();
                         var parameters = functionElement.GetProperty("parameters");
 
+                        // ✅ v1.0.8修复：确保parameters不为空（防止BinaryData.FromString报错）
+                        var parametersJson = parameters.GetRawText();
+                        if (string.IsNullOrWhiteSpace(parametersJson))
+                        {
+                            parametersJson = "{}";
+                            Log.Warning($"工具{functionName}的parameters为空，使用空对象");
+                        }
+
                         // 创建ChatTool
                         var chatTool = OpenAI.Chat.ChatTool.CreateFunctionTool(
                             functionName: functionName,
                             functionDescription: functionDescription,
-                            functionParameters: BinaryData.FromString(parameters.GetRawText())
+                            functionParameters: BinaryData.FromString(parametersJson)
                         );
 
                         result.Add(chatTool);
