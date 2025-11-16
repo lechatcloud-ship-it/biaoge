@@ -1627,7 +1627,11 @@ public class ToolCallInfo
 public class FunctionCallInfo
 {
     public string Name { get; set; } = "";
-    public string Arguments { get; set; } = ""; // JSON字符串格式
+    /// <summary>
+    /// 函数参数（JSON字符串格式）
+    /// ✅ v1.0.8+修复：默认值从""改为"{}"，防止BinaryData.FromString("")报错
+    /// </summary>
+    public string Arguments { get; set; } = "{}"; // 默认为空JSON对象，不是空字符串
 }
 
 /// <summary>
