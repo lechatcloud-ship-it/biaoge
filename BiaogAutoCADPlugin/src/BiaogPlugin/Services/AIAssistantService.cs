@@ -649,24 +649,63 @@ namespace BiaogPlugin.Services
                     // 提取function对象
                     if (toolDoc.RootElement.TryGetProperty("function", out var functionElement))
                     {
-                        var functionName = functionElement.GetProperty("name").GetString();
-                        var functionDescription = functionElement.GetProperty("description").GetString();
-                        var parameters = functionElement.GetProperty("parameters");
+                        // 验证必需字段
+                        if (!functionElement.TryGetProperty("name", out var nameElement))
+                        {
+                            Log.Warning("工具定义缺少name字段，跳过");
+                            continue;
+                        }
 
-                        // 创建ChatTool
+                        var functionName = nameElement.GetString();
+                        if (string.IsNullOrWhiteSpace(functionName))
+                        {
+                            Log.Warning("工具name为空，跳过");
+                            continue;
+                        }
+
+                        var functionDescription = functionElement.TryGetProperty("description", out var descElement)
+                            ? descElement.GetString() ?? ""
+                            : "";
+
+                        // ✅ v1.0.8+修复：确保parameters不为空且为有效JSON（防止BinaryData.FromString报错）
+                        var parametersJson = "{}";
+                        if (functionElement.TryGetProperty("parameters", out var parameters))
+                        {
+                            parametersJson = parameters.GetRawText();
+                            if (string.IsNullOrWhiteSpace(parametersJson))
+                            {
+                                parametersJson = "{}";
+                                Log.Warning($"工具{functionName}的parameters为空，使用空对象");
+                            }
+                            else
+                            {
+                                // 验证是否为有效JSON
+                                try
+                                {
+                                    JsonDocument.Parse(parametersJson);
+                                }
+                                catch (JsonException)
+                                {
+                                    Log.Warning($"工具{functionName}的parameters不是有效JSON，使用空对象");
+                                    parametersJson = "{}";
+                                }
+                            }
+                        }
+
+                        // 创建ChatTool（所有参数已验证）
                         var chatTool = OpenAI.Chat.ChatTool.CreateFunctionTool(
                             functionName: functionName,
                             functionDescription: functionDescription,
-                            functionParameters: BinaryData.FromString(parameters.GetRawText())
+                            functionParameters: BinaryData.FromString(parametersJson)
                         );
 
                         result.Add(chatTool);
-                        Log.Debug($"转换工具: {functionName}");
+                        Log.Debug($"成功转换工具定义: {functionName}");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Log.Warning(ex, "工具转换失败");
+                    Log.Error(ex, "工具定义转换失败");
                 }
             }
 
