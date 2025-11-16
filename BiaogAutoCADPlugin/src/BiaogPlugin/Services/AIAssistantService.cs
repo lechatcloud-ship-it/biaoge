@@ -854,12 +854,21 @@ namespace BiaogPlugin.Services
                             IReadOnlyList<OpenAI.Chat.ChatToolCall> toolCalls = msg.ToolCalls
                                 .Select(tc =>
                                 {
-                                    // ✅ v1.0.7修复："数组不能为空。参数名: bytes"
-                                    // BinaryData.FromString不接受空字符串，必须提供有效的JSON
+                                    // ✅ v1.0.8最终修复："数组不能为空。参数名: bytes"
+                                    // 问题：JSON反序列化时Function可能为null（默认值初始化器不运行）
+                                    // 解决：添加Function和Arguments的null检查
+                                    if (tc.Function == null)
+                                    {
+                                        Log.Warning($"工具调用{tc.Id}的Function为null，使用空对象");
+                                        tc.Function = new FunctionCallInfo { Name = "", Arguments = "{}" };
+                                    }
+
                                     var args = string.IsNullOrWhiteSpace(tc.Function.Arguments) ? "{}" : tc.Function.Arguments;
+                                    var functionName = string.IsNullOrWhiteSpace(tc.Function.Name) ? "unknown" : tc.Function.Name;
+
                                     return OpenAI.Chat.ChatToolCall.CreateFunctionToolCall(
                                         id: tc.Id,
-                                        functionName: tc.Function.Name,
+                                        functionName: functionName,
                                         functionArguments: BinaryData.FromString(args)
                                     );
                                 })
