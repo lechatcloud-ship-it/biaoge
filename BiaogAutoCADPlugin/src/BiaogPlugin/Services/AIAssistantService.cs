@@ -837,19 +837,50 @@ namespace BiaogPlugin.Services
                     // 提取function对象
                     if (toolDoc.RootElement.TryGetProperty("function", out var functionElement))
                     {
-                        var functionName = functionElement.GetProperty("name").GetString();
-                        var functionDescription = functionElement.GetProperty("description").GetString();
-                        var parameters = functionElement.GetProperty("parameters");
-
-                        // ✅ v1.0.8修复：确保parameters不为空（防止BinaryData.FromString报错）
-                        var parametersJson = parameters.GetRawText();
-                        if (string.IsNullOrWhiteSpace(parametersJson))
+                        // 验证必需字段
+                        if (!functionElement.TryGetProperty("name", out var nameElement))
                         {
-                            parametersJson = "{}";
-                            Log.Warning($"工具{functionName}的parameters为空，使用空对象");
+                            Log.Warning("工具定义缺少name字段，跳过");
+                            continue;
                         }
 
-                        // 创建ChatTool
+                        var functionName = nameElement.GetString();
+                        if (string.IsNullOrWhiteSpace(functionName))
+                        {
+                            Log.Warning("工具name为空，跳过");
+                            continue;
+                        }
+
+                        var functionDescription = functionElement.TryGetProperty("description", out var descElement)
+                            ? descElement.GetString() ?? ""
+                            : "";
+
+                        // ✅ v1.0.8+修复：确保parameters不为空且为有效JSON（防止BinaryData.FromString报错）
+                        var parametersJson = "{}";
+                        if (functionElement.TryGetProperty("parameters", out var parameters))
+                        {
+                            parametersJson = parameters.GetRawText();
+                            if (string.IsNullOrWhiteSpace(parametersJson))
+                            {
+                                parametersJson = "{}";
+                                Log.Warning($"工具{functionName}的parameters为空，使用空对象");
+                            }
+                            else
+                            {
+                                // 验证是否为有效JSON
+                                try
+                                {
+                                    JsonDocument.Parse(parametersJson);
+                                }
+                                catch (JsonException)
+                                {
+                                    Log.Warning($"工具{functionName}的parameters不是有效JSON，使用空对象");
+                                    parametersJson = "{}";
+                                }
+                            }
+                        }
+
+                        // 创建ChatTool（所有参数已验证）
                         var chatTool = OpenAI.Chat.ChatTool.CreateFunctionTool(
                             functionName: functionName,
                             functionDescription: functionDescription,
@@ -857,12 +888,12 @@ namespace BiaogPlugin.Services
                         );
 
                         result.Add(chatTool);
-                        Log.Debug($"转换工具: {functionName}");
+                        Log.Debug($"成功转换工具定义: {functionName}");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Log.Warning(ex, "工具转换失败");
+                    Log.Error(ex, "工具定义转换失败");
                 }
             }
 
@@ -893,28 +924,91 @@ namespace BiaogPlugin.Services
                         if (msg.ToolCalls != null && msg.ToolCalls.Count > 0)
                         {
                             // 转换为OpenAI SDK的ChatToolCall格式
-                            IReadOnlyList<OpenAI.Chat.ChatToolCall> toolCalls = msg.ToolCalls
-                                .Select(tc =>
+                            var validToolCalls = new List<OpenAI.Chat.ChatToolCall>();
+
+                            foreach (var tc in msg.ToolCalls)
+                            {
+                                try
                                 {
-                                    // ✅ v1.0.8最终修复："数组不能为空。参数名: bytes"
+                                    // ✅ v1.0.8+最终修复："数组不能为空。参数名: bytes"
                                     // 问题：JSON反序列化时Function可能为null（默认值初始化器不运行）
-                                    // 解决：添加Function和Arguments的null检查
+                                    // 解决：添加完整的null检查和JSON验证
+
+                                    // 第1步：检查ToolCallInfo对象本身
+                                    if (tc == null)
+                                    {
+                                        Log.Warning("跳过null的ToolCallInfo对象");
+                                        continue;
+                                    }
+
+                                    // 第2步：检查Id（OpenAI要求tool_call_id必须非空）
+                                    if (string.IsNullOrWhiteSpace(tc.Id))
+                                    {
+                                        Log.Warning("跳过缺少Id的ToolCallInfo对象");
+                                        continue;
+                                    }
+
+                                    // 第3步：检查并修复Function
                                     if (tc.Function == null)
                                     {
                                         Log.Warning($"工具调用{tc.Id}的Function为null，使用空对象");
-                                        tc.Function = new FunctionCallInfo { Name = "", Arguments = "{}" };
+                                        tc.Function = new FunctionCallInfo { Name = "unknown", Arguments = "{}" };
                                     }
 
-                                    var args = string.IsNullOrWhiteSpace(tc.Function.Arguments) ? "{}" : tc.Function.Arguments;
-                                    var functionName = string.IsNullOrWhiteSpace(tc.Function.Name) ? "unknown" : tc.Function.Name;
+                                    // 第4步：验证并修复Arguments
+                                    var args = tc.Function.Arguments;
+                                    if (string.IsNullOrWhiteSpace(args))
+                                    {
+                                        args = "{}";
+                                        Log.Debug($"工具调用{tc.Id}的Arguments为空，使用空对象");
+                                    }
+                                    else
+                                    {
+                                        // 验证是否为有效JSON
+                                        try
+                                        {
+                                            JsonDocument.Parse(args);
+                                        }
+                                        catch (JsonException)
+                                        {
+                                            Log.Warning($"工具调用{tc.Id}的Arguments不是有效JSON: {args}，使用空对象");
+                                            args = "{}";
+                                        }
+                                    }
 
-                                    return OpenAI.Chat.ChatToolCall.CreateFunctionToolCall(
+                                    // 第5步：验证并修复FunctionName
+                                    var functionName = tc.Function.Name;
+                                    if (string.IsNullOrWhiteSpace(functionName))
+                                    {
+                                        functionName = "unknown";
+                                        Log.Warning($"工具调用{tc.Id}的FunctionName为空，使用'unknown'");
+                                    }
+
+                                    // 第6步：创建ChatToolCall（此时所有参数都已验证）
+                                    var chatToolCall = OpenAI.Chat.ChatToolCall.CreateFunctionToolCall(
                                         id: tc.Id,
                                         functionName: functionName,
                                         functionArguments: BinaryData.FromString(args)
                                     );
-                                })
-                                .ToList();
+
+                                    validToolCalls.Add(chatToolCall);
+                                    Log.Debug($"成功转换工具调用: {functionName} (id={tc.Id})");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Log.Error(ex, $"转换工具调用失败，跳过: tc.Id={tc?.Id}, tc.Function.Name={tc?.Function?.Name}");
+                                }
+                            }
+
+                            // 如果没有有效的工具调用，将此消息视为普通assistant消息
+                            if (validToolCalls.Count == 0)
+                            {
+                                Log.Warning($"assistant消息声称有{msg.ToolCalls.Count}个工具调用，但全部无效，退化为普通消息");
+                                result.Add(new OpenAI.Chat.AssistantChatMessage(msg.Content ?? ""));
+                                break;
+                            }
+
+                            IReadOnlyList<OpenAI.Chat.ChatToolCall> toolCalls = validToolCalls;
 
                             // 使用工具调用创建消息
                             var assistantMessage = new OpenAI.Chat.AssistantChatMessage(toolCalls);
