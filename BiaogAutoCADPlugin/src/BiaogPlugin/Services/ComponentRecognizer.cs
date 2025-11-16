@@ -20,6 +20,7 @@ public class ComponentRecognizer
 {
     private readonly BailianApiClient _bailianClient;
     private readonly DimensionExtractor _dimensionExtractor; // ✅ 新增：Dimension几何数据提取器
+    private readonly GeometryExtractor _geometryExtractor;   // ✅ 新增：几何实体提取器（Polyline、Region、Solid3d等）
 
     // 静态正则表达式 - 使用Compiled选项提升性能
     private static readonly Regex QuantityRegex = new(@"(\d+(?:\.\d+)?)\s*(?:个|根|块|片|扇|樘)?",
@@ -254,6 +255,7 @@ public class ComponentRecognizer
     {
         _bailianClient = bailianClient;
         _dimensionExtractor = new DimensionExtractor(); // ✅ 初始化Dimension提取器
+        _geometryExtractor = new GeometryExtractor();   // ✅ 初始化几何实体提取器
     }
 
     /// <summary>
@@ -370,6 +372,19 @@ public class ComponentRecognizer
         Log.Information($"识别率: {(recognizedCount * 100.0 / Math.Max(processedCount - skippedCount, 1)):F1}%");
         Log.Information($"✅ Dimension增强: {dimensionEnhancedCount}个构件使用精确几何数据 ({(dimensionEnhancedCount * 100.0 / Math.Max(recognizedCount, 1)):F1}%)");
         Log.Information("═══════════════════════════════════════════════════");
+
+        // ✅ 新增：提取几何实体并匹配到构件（解决面积为0的问题）
+        try
+        {
+            Log.Information("开始提取几何实体并匹配到构件...");
+            var geometries = _geometryExtractor.ExtractAllGeometry();
+            int matchedCount = MatchGeometryToComponents(results, geometries);
+            Log.Information($"✅ 几何匹配完成: {matchedCount}个构件使用实际几何面积/体积");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "几何实体提取或匹配失败，使用计算的面积/体积");
+        }
 
         return results;
     }
@@ -703,6 +718,159 @@ public class ComponentRecognizer
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// ✅ 将几何实体数据匹配到识别的构件（解决面积为0的根本问题）
+    ///
+    /// 匹配策略：
+    /// 1. 同图层匹配：几何实体与构件在同一图层
+    /// 2. 空间位置匹配：几何实体的质心与构件文本位置接近（距离 < 5m）
+    /// 3. 尺寸验证：几何实体的尺寸与构件解析的尺寸相近（允许20%误差）
+    ///
+    /// 匹配结果：
+    /// - 使用几何实体的实际面积/体积覆盖计算值
+    /// - 提高构件识别置信度（+0.1）
+    /// - 标记为"几何增强"状态
+    /// </summary>
+    private int MatchGeometryToComponents(
+        List<ComponentRecognitionResult> components,
+        List<GeometryEntity> geometries)
+    {
+        int matchedCount = 0;
+
+        // 按图层分组几何实体，加速查找
+        var geometryByLayer = geometries
+            .GroupBy(g => g.Layer)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        foreach (var component in components)
+        {
+            // 策略1：同图层匹配
+            if (!geometryByLayer.ContainsKey(component.Layer))
+            {
+                continue;
+            }
+
+            var candidateGeometries = geometryByLayer[component.Layer];
+            GeometryEntity? bestMatch = null;
+            double bestScore = 0;
+
+            foreach (var geometry in candidateGeometries)
+            {
+                // 策略2：空间位置匹配（质心距离）
+                double distance = component.Position.DistanceTo(geometry.Centroid);
+                if (distance > 5.0) // 超过5米认为不相关
+                {
+                    continue;
+                }
+
+                // 策略3：尺寸验证（可选，防止误匹配）
+                double sizeScore = CalculateSizeMatchScore(component, geometry);
+
+                // 综合评分：距离越近越好，尺寸越匹配越好
+                double score = (5.0 - distance) / 5.0 * 0.6 + sizeScore * 0.4;
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestMatch = geometry;
+                }
+            }
+
+            // 应用最佳匹配
+            if (bestMatch != null && bestScore > 0.3) // 最低匹配分数阈值
+            {
+                // ✅ 使用几何实体的实际面积/体积覆盖计算值
+                if (bestMatch.Area > 0)
+                {
+                    component.Area = bestMatch.Area;
+                }
+
+                if (bestMatch.Volume > 0)
+                {
+                    component.Volume = bestMatch.Volume;
+                }
+
+                // 如果几何实体提供了尺寸且构件缺少尺寸，使用几何实体的尺寸
+                if (component.Length == 0 && bestMatch.Length > 0)
+                {
+                    component.Length = bestMatch.Length;
+                }
+
+                if (component.Width == 0 && bestMatch.Width > 0)
+                {
+                    component.Width = bestMatch.Width;
+                }
+
+                if (component.Height == 0 && bestMatch.Height > 0)
+                {
+                    component.Height = bestMatch.Height;
+                }
+
+                // 提高置信度
+                component.Confidence = Math.Min(component.Confidence + 0.1, 1.0);
+
+                // 标记为几何增强
+                if (component.Status == "有效")
+                {
+                    component.Status = "几何增强";
+                }
+
+                // 重新计算成本（基于更新后的面积/体积）
+                component.Cost = EstimateCost(component);
+
+                matchedCount++;
+
+                Log.Debug($"✅ 构件[{component.Type}]匹配到几何实体[{bestMatch.Type}]: " +
+                         $"面积={bestMatch.Area:F2}m², 体积={bestMatch.Volume:F3}m³, 匹配分数={bestScore:F2}");
+            }
+        }
+
+        return matchedCount;
+    }
+
+    /// <summary>
+    /// 计算构件与几何实体的尺寸匹配分数（0-1）
+    /// </summary>
+    private double CalculateSizeMatchScore(ComponentRecognitionResult component, GeometryEntity geometry)
+    {
+        // 如果构件没有尺寸信息，无法验证，返回中等分数
+        if (component.Length == 0 && component.Width == 0 && component.Height == 0)
+        {
+            return 0.5;
+        }
+
+        double lengthScore = 1.0;
+        double widthScore = 1.0;
+        double heightScore = 1.0;
+
+        // 长度匹配
+        if (component.Length > 0 && geometry.Length > 0)
+        {
+            double ratio = Math.Min(component.Length, geometry.Length) /
+                          Math.Max(component.Length, geometry.Length);
+            lengthScore = ratio;
+        }
+
+        // 宽度匹配
+        if (component.Width > 0 && geometry.Width > 0)
+        {
+            double ratio = Math.Min(component.Width, geometry.Width) /
+                          Math.Max(component.Width, geometry.Width);
+            widthScore = ratio;
+        }
+
+        // 高度匹配
+        if (component.Height > 0 && geometry.Height > 0)
+        {
+            double ratio = Math.Min(component.Height, geometry.Height) /
+                          Math.Max(component.Height, geometry.Height);
+            heightScore = ratio;
+        }
+
+        // 综合评分（平均值）
+        return (lengthScore + widthScore + heightScore) / 3.0;
     }
 }
 
