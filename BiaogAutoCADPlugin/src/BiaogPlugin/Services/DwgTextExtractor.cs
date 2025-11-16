@@ -552,18 +552,31 @@ namespace BiaogPlugin.Services
 
             try
             {
-                // 获取块定义
-                var blockDef = (BlockTableRecord)tr.GetObject(blockRef.BlockTableRecord, OpenMode.ForRead);
+                // ✅ 添加异常处理：XRef块可能未加载、损坏或权限不足
+                BlockTableRecord blockDef;
+                try
+                {
+                    blockDef = (BlockTableRecord)tr.GetObject(blockRef.BlockTableRecord, OpenMode.ForRead);
+                }
+                catch (Autodesk.AutoCAD.Runtime.Exception ex)
+                {
+                    Log.Warning(ex, $"无法访问块定义 {blockRef.Name}，可能是未加载的XRef或已损坏");
+                    return; // 跳过此块
+                }
 
                 // ✅ 检测外部引用和覆盖引用（但继续提取）
                 // 🐛 修复：用户反馈"很多文本根本翻译不了，比如外键文本等"
                 // 🔧 原因：之前直接跳过外部引用块，导致XRef中的文本无法提取
                 // ✅ 新策略：允许提取XRef文本，但记录日志方便追踪
+                // ⚠️ 限制：XRef块是只读的，翻译后无法更新（DwgTextUpdater会自动跳过）
                 bool isXRef = blockDef.IsFromExternalReference || blockDef.IsFromOverlayReference;
                 if (isXRef)
                 {
-                    Log.Debug($"检测到外部引用块: {blockDef.Name} (XRef)，继续提取文本");
-                    // ⚠️ 注意：外部引用块通常是只读的，更新时会在DwgTextUpdater中特殊处理
+                    Log.Debug($"检测到外部引用块: {blockDef.Name} (XRef)，包含 {blockDef.Count} 个实体，继续提取文本（注意：XRef只读）");
+                    if (blockDef.Count > 10000)
+                    {
+                        Log.Warning($"XRef块 {blockDef.Name} 实体数量过多({blockDef.Count})，可能影响提取性能");
+                    }
                 }
 
                 // 遍历块定义中的所有实体

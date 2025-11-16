@@ -191,18 +191,20 @@ public class BailianApiClient
             "",
             System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
-        // 移除各种XML标签对
-        var xmlTags = new[] { "role", "task", "critical_rules", "output_format", "examples", "example", "input", "output", "reminder" };
-        foreach (var tag in xmlTags)
-        {
-            text = System.Text.RegularExpressions.Regex.Replace(text,
-                $@"<{tag}>.*?</{tag}>",
-                "",
-                System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        }
+        // ✅ 性能优化：合并所有已知XML标签为单个正则表达式（避免多次遍历）
+        // 使用反向引用\1确保开闭标签匹配
+        text = System.Text.RegularExpressions.Regex.Replace(text,
+            @"<(role|task|critical_rules|output_format|examples|example|input|output|reminder)>.*?</\1>",
+            "",
+            System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
-        // 移除单个XML标签
-        text = System.Text.RegularExpressions.Regex.Replace(text, @"</?[a-zA-Z_]+>", "").Trim();
+        // ✅ 安全优化：仅移除已知的系统XML标签（避免误删合法内容如<GB 50010>）
+        // 旧实现：@"</?[a-zA-Z_]+>" 会误删所有尖括号内容
+        // 新实现：仅删除已知的系统标签（role, task等），保留工程规范引用
+        text = System.Text.RegularExpressions.Regex.Replace(text,
+            @"</?(?:system|role|task|critical_rules|output_format|examples|example|input|output|reminder)>",
+            "",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase).Trim();
 
         // ========== 第2步：移除Markdown代码块标记 ==========
         // qwen-flash可能返回 ```text\n翻译内容\n``` 格式
