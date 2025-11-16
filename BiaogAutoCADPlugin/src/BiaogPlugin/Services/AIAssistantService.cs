@@ -139,16 +139,23 @@ namespace BiaogPlugin.Services
                 if (agentDecision.ToolCalls.Count > 0)
                 {
                     assistantMessage.ToolCalls = agentDecision.ToolCalls
-                        .Select((tc, index) => new ToolCallInfo
+                        .Select((tc, index) =>
                         {
-                            Id = tc.Id,
-                            Type = "function",
-                            Function = new FunctionCallInfo
+                            // ✅ v1.0.7修复：确保Arguments永远不为空（防止BinaryData.FromString报错）
+                            var serializedArgs = System.Text.Json.JsonSerializer.Serialize(tc.Arguments ?? new Dictionary<string, object>());
+                            var safeArgs = string.IsNullOrWhiteSpace(serializedArgs) ? "{}" : serializedArgs;
+
+                            return new ToolCallInfo
                             {
-                                Name = tc.Name,
-                                Arguments = System.Text.Json.JsonSerializer.Serialize(tc.Arguments)
-                            },
-                            Index = index
+                                Id = tc.Id,
+                                Type = "function",
+                                Function = new FunctionCallInfo
+                                {
+                                    Name = tc.Name,
+                                    Arguments = safeArgs
+                                },
+                                Index = index
+                            };
                         })
                         .ToList();
 
