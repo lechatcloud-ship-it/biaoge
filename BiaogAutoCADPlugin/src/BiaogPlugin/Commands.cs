@@ -767,6 +767,80 @@ namespace BiaogPlugin
             }
         }
 
+        /// <summary>
+        /// ✅ 重置所有面板（修复面板无法显示的问题）
+        ///
+        /// 用途：当面板突然无法显示时（只闪一下），使用此命令强制清理并重新初始化所有面板。
+        ///
+        /// 常见原因：
+        /// - AutoCAD保存了错误的窗口位置/大小到注册表
+        /// - PaletteSet状态异常（Visible=true但实际不可见）
+        /// - WPF ElementHost渲染失败
+        ///
+        /// 参考：AutoCAD .NET API - PaletteSet Best Practices
+        /// </summary>
+        [CommandMethod("BIAOGE_RESETPALETTES", CommandFlags.Modal)]
+        public void ResetPalettes()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                ed.WriteMessage("\n========================================");
+                ed.WriteMessage("\n  标哥插件 - 面板重置工具");
+                ed.WriteMessage("\n========================================");
+                ed.WriteMessage("\n");
+
+                Log.Information("用户执行面板重置命令");
+
+                // 第1步：清理所有现有面板
+                ed.WriteMessage("\n[1/3] 正在清理现有面板...");
+                PaletteManager.Cleanup();
+                Log.Information("面板清理完成");
+                ed.WriteMessage(" ✓");
+
+                // 第2步：等待50ms让AutoCAD释放资源
+                System.Threading.Thread.Sleep(50);
+
+                // 第3步：重新初始化所有面板
+                ed.WriteMessage("\n[2/3] 正在重新初始化面板...");
+                PaletteManager.Initialize();
+                Log.Information("面板初始化完成");
+                ed.WriteMessage(" ✓");
+
+                // 第4步：显示AI助手面板（验证修复是否成功）
+                ed.WriteMessage("\n[3/3] 正在打开AI助手面板...");
+                PaletteManager.ShowAIPalette();
+                Log.Information("AI助手面板已显示");
+                ed.WriteMessage(" ✓");
+
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n✓ 面板重置成功！");
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n提示：");
+                ed.WriteMessage("\n  - 如果AI助手面板仍无法显示，请查看日志文件");
+                ed.WriteMessage("\n  - 日志位置：%APPDATA%\\Biaoge\\Logs\\");
+                ed.WriteMessage("\n  - 或运行 BIAOGE_DIAGNOSTIC 生成诊断报告");
+                ed.WriteMessage("\n========================================\n");
+
+                Log.Information("面板重置命令执行成功");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "重置面板失败");
+                ed.WriteMessage("\n");
+                ed.WriteMessage($"\n❌ 错误：{ex.Message}");
+                ed.WriteMessage("\n");
+                ed.WriteMessage("\n请尝试以下操作：");
+                ed.WriteMessage("\n  1. 运行 NETUNLOAD 卸载插件");
+                ed.WriteMessage("\n  2. 关闭AutoCAD");
+                ed.WriteMessage("\n  3. 重新启动AutoCAD");
+                ed.WriteMessage("\n  4. 运行 NETLOAD 重新加载插件");
+                ed.WriteMessage("\n========================================\n");
+            }
+        }
+
         #endregion
 
         #region 面板Toggle命令
