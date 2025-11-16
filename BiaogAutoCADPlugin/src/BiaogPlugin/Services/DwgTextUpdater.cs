@@ -129,6 +129,27 @@ namespace BiaogPlugin.Services
                 var ent = tr.GetObject(update.ObjectId, OpenMode.ForWrite) as Entity;
                 if (ent == null) return false;
 
+                // ✅ 修复：检测XRef外部引用块（只读，无法修改）
+                // 🐛 问题：DwgTextExtractor现在会提取XRef文本，但XRef块是只读的
+                // 🔧 解决：检测到XRef文本时跳过更新，避免错误
+                if (ent.OwnerId != ObjectId.Null && !ent.OwnerId.IsErased && ent.OwnerId.IsValid)
+                {
+                    try
+                    {
+                        var owner = tr.GetObject(ent.OwnerId, OpenMode.ForRead) as BlockTableRecord;
+                        if (owner != null && (owner.IsFromExternalReference || owner.IsFromOverlayReference))
+                        {
+                            Log.Debug($"文本 {update.ObjectId.Handle} 属于外部引用块 {owner.Name}，无法修改（XRef只读）");
+                            return false; // XRef文本跳过更新
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Log.Warning(ex, $"检测XRef块失败: {update.ObjectId.Handle}");
+                        // 继续尝试更新，如果真是XRef会在后续OpenMode.ForWrite时失败
+                    }
+                }
+
                 // ✅ 关键修复：检测中文并自动切换字体
                 bool containsChinese = ContainsChinese(update.NewContent);
 
