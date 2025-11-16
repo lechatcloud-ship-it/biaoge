@@ -583,7 +583,9 @@ namespace BiaogPlugin.Services
                 foreach (ObjectId entityId in blockDef)
                 {
                     var ent = tr.GetObject(entityId, OpenMode.ForRead) as Entity;
-                    if (ent == null) continue;
+                    // ✅ P1修复：跳过null和已删除的实体
+                    // 已删除的实体仍在集合中，但IsErased=true，应该跳过
+                    if (ent == null || ent.IsErased) continue;
 
                     // 1. 提取块内的直接文本（DBText, MText）
                     if (ent is DBText dbText)

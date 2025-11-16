@@ -132,7 +132,8 @@ namespace BiaogPlugin.Services
                 // ✅ 修复：检测XRef外部引用块（只读，无法修改）
                 // 🐛 问题：DwgTextExtractor现在会提取XRef文本，但XRef块是只读的
                 // 🔧 解决：检测到XRef文本时跳过更新，避免错误
-                if (ent.OwnerId != ObjectId.Null && !ent.OwnerId.IsErased && ent.OwnerId.IsValid)
+                // ✅ P1修复：使用IsNull属性而非比较运算符（符合AutoCAD 2022官方推荐）
+                if (!ent.OwnerId.IsNull && !ent.OwnerId.IsErased && ent.OwnerId.IsValid)
                 {
                     try
                     {
