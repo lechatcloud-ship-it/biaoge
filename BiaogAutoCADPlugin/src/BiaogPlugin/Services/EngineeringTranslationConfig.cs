@@ -742,12 +742,12 @@ namespace BiaogPlugin.Services
             }
             else
             {
-                // 英文 → 中文
+                // 任意语言 → 中文
                 return @"<system>
 <role>CAD/BIM工程图纸专业翻译专家</role>
 
 <task>
-将英文CAD工程图纸文本翻译为中文
+将CAD工程图纸文本翻译为中文（支持任意源语言，自动识别）
 </task>
 
 <critical_rules>
