@@ -328,14 +328,55 @@ public class BailianApiClient
             .Replace("<end_of_turn>", "")
             .Trim();
 
-        // ========== 第6步：移除注释和说明性文本 ==========
+        // ========== 第6步：提取"原文+译文"格式中的译文 ==========
+        // 匹配格式：原文：xxx 译文：yyy 或 Source: xxx Target: yyy
+        var sourceTargetMatch = System.Text.RegularExpressions.Regex.Match(text,
+            @"(?:原文[:：].*?)?译文[:：]\s*(.+?)(?:\n|$)|(?:Source:.*?)?Target:\s*(.+?)(?:\n|$)",
+            System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        if (sourceTargetMatch.Success)
+        {
+            var extractedTranslation = sourceTargetMatch.Groups[1].Success
+                ? sourceTargetMatch.Groups[1].Value
+                : sourceTargetMatch.Groups[2].Value;
+
+            if (!string.IsNullOrWhiteSpace(extractedTranslation))
+            {
+                text = extractedTranslation.Trim();
+                Log.Debug("提取原文+译文格式中的译文");
+            }
+        }
+
+        // ========== 第7步：移除注释和说明性文本 ==========
         // 模式：(注: xxx) 或 [注释: xxx] 或 <!-- xxx -->
         text = System.Text.RegularExpressions.Regex.Replace(text, @"\(注[:：].*?\)", "");
         text = System.Text.RegularExpressions.Regex.Replace(text, @"\[注释[:：].*?\]", "");
         text = System.Text.RegularExpressions.Regex.Replace(text, @"<!--.*?-->", "");
         text = text.Trim();
 
-        // ========== 第7步：检测并警告异常情况 ==========
+        // ========== 第8步：移除解释性后缀 ==========
+        // 移除以"注意"、"说明"、"备注"等开头的后缀段落
+        var explanationPatterns = new[]
+        {
+            @"\n+注意[:：].*",
+            @"\n+Note:.*",
+            @"\n+说明[:：].*",
+            @"\n+Explanation:.*",
+            @"\n+备注[:：].*",
+            @"\n+Remark:.*",
+            @"\n+提示[:：].*",
+            @"\n+Tip:.*"
+        };
+
+        foreach (var pattern in explanationPatterns)
+        {
+            text = System.Text.RegularExpressions.Regex.Replace(text, pattern, "",
+                System.Text.RegularExpressions.RegexOptions.Singleline |
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        }
+        text = text.Trim();
+
+        // ========== 第9步：检测并警告异常情况 ==========
         if (string.IsNullOrWhiteSpace(text) || text.Length < 2)
         {
             Log.Warning($"翻译结果清洗后为空！原始响应前100字符: {original.Substring(0, Math.Min(100, original.Length))}");
