@@ -615,7 +615,7 @@ namespace BiaogPlugin.Services
         /// </summary>
         private List<BiaogPlugin.Services.ChatMessage> BuildMessages(string systemPrompt)
         {
-            // ✅ 使用ContextLengthManager智能裁剪，防止超过252K输入限制
+            // ✅ 使用ContextLengthManager智能裁剪，防止超过1M输入限制
             var trimmedHistory = _contextLengthManager.TrimMessages(_chatHistory, systemPrompt);
 
             var messages = new List<BiaogPlugin.Services.ChatMessage>
@@ -624,6 +624,13 @@ namespace BiaogPlugin.Services
             };
 
             messages.AddRange(trimmedHistory);
+
+            // ✅ v1.0.7最终修复：验证消息链是否符合Function Calling规范
+            if (!ValidateMessageChain(messages, out string validationError))
+            {
+                Log.Error($"消息链验证失败: {validationError}");
+                throw new InvalidOperationException($"消息历史不符合Function Calling规范: {validationError}");
+            }
 
             // 记录Token使用情况
             int estimatedTokens = _contextLengthManager.EstimateTokens(messages, "");
@@ -644,17 +651,138 @@ namespace BiaogPlugin.Services
         /// <summary>
         /// 加载对话历史（用于切换会话）
         /// </summary>
+        /// <remarks>
+        /// ✅ v1.0.7最终修复：根据阿里云百炼官方规范正确处理消息历史
+        /// 参考：https://help.aliyun.com/zh/model-studio/qwen-function-calling
+        ///
+        /// 关键规则：
+        /// 1. 保留完整的消息链：user → assistant(with tool_calls) → tool → assistant(summary)
+        /// 2. 只删除"孤立"的tool消息（前面没有对应tool_calls的assistant）
+        /// 3. 不能简单过滤所有tool消息，这会破坏Function Calling的上下文
+        /// </remarks>
         public void LoadHistory(List<BiaogPlugin.Services.ChatMessage> messages)
         {
             _chatHistory.Clear();
 
-            // ✅ v1.0.7修复：过滤掉tool消息，只保留user和assistant消息
-            // tool消息必须紧跟在包含tool_calls的assistant消息之后，
-            // 加载历史时如果包含孤立的tool消息会导致API错误
-            var filteredMessages = messages.Where(m => m.Role == "user" || m.Role == "assistant").ToList();
+            if (messages == null || messages.Count == 0)
+            {
+                Log.Information("加载对话历史: 无历史消息");
+                return;
+            }
 
-            _chatHistory.AddRange(filteredMessages);
-            Log.Information($"加载对话历史: {messages.Count}条消息（过滤后{filteredMessages.Count}条）");
+            // ✅ 正确的消息验证和过滤逻辑
+            var validatedMessages = new List<BiaogPlugin.Services.ChatMessage>();
+            BiaogPlugin.Services.ChatMessage? lastAssistantWithToolCalls = null;
+
+            for (int i = 0; i < messages.Count; i++)
+            {
+                var msg = messages[i];
+
+                switch (msg.Role.ToLower())
+                {
+                    case "system":
+                    case "user":
+                        // system和user消息总是保留
+                        validatedMessages.Add(msg);
+                        lastAssistantWithToolCalls = null; // 重置tool_calls追踪
+                        break;
+
+                    case "assistant":
+                        // assistant消息总是保留
+                        validatedMessages.Add(msg);
+
+                        // 如果包含tool_calls，记录下来供后续tool消息验证
+                        if (msg.ToolCalls != null && msg.ToolCalls.Count > 0)
+                        {
+                            lastAssistantWithToolCalls = msg;
+                            Log.Debug($"记录assistant消息（含{msg.ToolCalls.Count}个tool_calls）");
+                        }
+                        else
+                        {
+                            lastAssistantWithToolCalls = null;
+                        }
+                        break;
+
+                    case "tool":
+                        // ✅ CRITICAL: tool消息必须紧跟在包含tool_calls的assistant消息之后
+                        if (lastAssistantWithToolCalls != null)
+                        {
+                            // 验证tool_call_id是否匹配
+                            bool hasMatchingToolCall = lastAssistantWithToolCalls.ToolCalls!
+                                .Any(tc => tc.Id == msg.ToolCallId);
+
+                            if (hasMatchingToolCall)
+                            {
+                                validatedMessages.Add(msg);
+                                Log.Debug($"保留有效tool消息: {msg.Name}, tool_call_id={msg.ToolCallId}");
+                            }
+                            else
+                            {
+                                Log.Warning($"跳过tool消息（tool_call_id不匹配）: {msg.Name}, " +
+                                          $"tool_call_id={msg.ToolCallId}");
+                            }
+                        }
+                        else
+                        {
+                            Log.Warning($"跳过孤立的tool消息（前面没有对应的assistant with tool_calls）: " +
+                                      $"{msg.Name}, tool_call_id={msg.ToolCallId}");
+                        }
+                        break;
+
+                    default:
+                        Log.Warning($"跳过未知角色的消息: {msg.Role}");
+                        break;
+                }
+            }
+
+            _chatHistory.AddRange(validatedMessages);
+            Log.Information($"加载对话历史: {messages.Count}条原始消息 → {validatedMessages.Count}条有效消息");
+        }
+
+        /// <summary>
+        /// 验证消息历史是否符合阿里云百炼Function Calling规范
+        /// </summary>
+        /// <remarks>
+        /// 验证规则：
+        /// 1. tool消息必须紧跟在包含tool_calls的assistant消息之后
+        /// 2. tool_call_id必须与assistant消息中的tool_calls[].id匹配
+        /// 3. 不应存在孤立的tool消息
+        /// </remarks>
+        private bool ValidateMessageChain(List<BiaogPlugin.Services.ChatMessage> messages, out string error)
+        {
+            error = string.Empty;
+            BiaogPlugin.Services.ChatMessage? lastAssistant = null;
+
+            for (int i = 0; i < messages.Count; i++)
+            {
+                var msg = messages[i];
+
+                if (msg.Role.ToLower() == "assistant")
+                {
+                    lastAssistant = msg;
+                }
+                else if (msg.Role.ToLower() == "tool")
+                {
+                    // tool消息必须有对应的assistant消息
+                    if (lastAssistant == null || lastAssistant.ToolCalls == null || lastAssistant.ToolCalls.Count == 0)
+                    {
+                        error = $"消息{i}: tool消息前面没有包含tool_calls的assistant消息 " +
+                               $"(tool_call_id={msg.ToolCallId}, name={msg.Name})";
+                        return false;
+                    }
+
+                    // 验证tool_call_id匹配
+                    bool hasMatch = lastAssistant.ToolCalls.Any(tc => tc.Id == msg.ToolCallId);
+                    if (!hasMatch)
+                    {
+                        error = $"消息{i}: tool_call_id不匹配 " +
+                               $"(tool_call_id={msg.ToolCallId}, available_ids=[{string.Join(", ", lastAssistant.ToolCalls.Select(tc => tc.Id))}])";
+                        return false;
+                    }
+                }
+            }
+
+            return true;
         }
 
         /// <summary>
