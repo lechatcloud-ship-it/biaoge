@@ -314,8 +314,8 @@ namespace BiaogPlugin.UI
                     var elementHost = new System.Windows.Forms.Integration.ElementHost
                     {
                         Dock = System.Windows.Forms.DockStyle.Fill,
-                        Child = _aiPalette,
-                        AutoSize = true
+                        Child = _aiPalette
+                        // ❌ 删除 AutoSize = true（与Dock冲突，导致尺寸为0）
                     };
 
                     // ✅ 添加控件到 PaletteSet
@@ -357,18 +357,6 @@ namespace BiaogPlugin.UI
                 {
                     Log.Debug("AI助手面板未初始化，开始初始化...");
                     InitializeAIPalette();
-
-                    // ✅ 第一次创建后，调整Size来触发WPF渲染（修复首次点击不显示的问题）
-                    if (_aiPaletteSet != null)
-                    {
-                        Log.Debug("首次初始化，执行Size调整触发WPF渲染...");
-
-                        // 调整Size触发UI布局计算（不同于目标尺寸）
-                        var tempSize = new System.Drawing.Size(810, 860);
-                        _aiPaletteSet.Size = tempSize;
-
-                        Log.Debug("首次渲染触发完成");
-                    }
                 }
 
                 // ✅ 确保初始化成功
@@ -390,11 +378,26 @@ namespace BiaogPlugin.UI
                 _aiPaletteSet.Visible = true;
                 _aiPaletteSet.Activate(0);  // 激活第一个选项卡
 
+                // ✅ 关键修复：AutoCAD PaletteSet已知Bug - 必须在Visible之后多次resize触发渲染
+                // 参考：https://forums.autodesk.com/t5/net/paletteset-tabs-not-visible-on-startup/td-p/8194322
+                if (isFirstTime)
+                {
+                    Log.Debug("首次显示，执行多次resize触发标签页渲染（修复AutoCAD PaletteSet Bug）...");
+
+                    // 第一次resize：临时尺寸
+                    _aiPaletteSet.Size = new System.Drawing.Size(850, 900);
+
+                    // 第二次resize：恢复目标尺寸（触发布局重新计算）
+                    _aiPaletteSet.Size = new System.Drawing.Size(800, 850);
+
+                    Log.Debug("多次resize完成，标签页应该已渲染");
+                }
+
                 // ✅ 修复中文输入法焦点跳转：KeepFocus=true保持焦点在面板内
                 // 防止输入中文时焦点跳转到AutoCAD命令行
                 _aiPaletteSet.KeepFocus = true;
 
-                Log.Information($"✓ AI助手面板已显示（Dock={_aiPaletteSet.Dock}, Size={_aiPaletteSet.Size}, Visible={_aiPaletteSet.Visible}）");
+                Log.Information($"✓ AI助手面板已显示（Dock={_aiPaletteSet.Dock}, Size={_aiPaletteSet.Size}, Visible={_aiPaletteSet.Visible}, Count={_aiPaletteSet.Count}）");
             }
             catch (System.Exception ex)
             {

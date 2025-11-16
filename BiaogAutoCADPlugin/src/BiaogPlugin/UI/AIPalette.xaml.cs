@@ -76,6 +76,34 @@ namespace BiaogPlugin.UI
         {
             try
             {
+                Log.Information("=== AIPalette_Loaded 开始执行 ===");
+
+                // ✅ 紧急诊断：跳过所有服务初始化，只显示基础面板
+                Log.Information("诊断模式：跳过服务初始化，仅测试面板显示");
+
+                // 添加欢迎消息（不依赖任何服务）
+                try
+                {
+                    AddSystemMessage("✅ AI助手面板加载成功！");
+                    AddSystemMessage("⚠️ 当前为诊断模式，服务未初始化");
+                    AddSystemMessage("请查看日志文件了解详情：%APPDATA%\\Biaoge\\Logs\\");
+                    Log.Information("欢迎消息添加成功");
+                }
+                catch (Exception msgEx)
+                {
+                    Log.Error(msgEx, "添加欢迎消息失败");
+                }
+
+                // 暂时禁用发送按钮
+                if (SendButton != null)
+                {
+                    SendButton.IsEnabled = false;
+                    Log.Information("发送按钮已禁用（诊断模式）");
+                }
+
+                Log.Information("=== AIPalette_Loaded 完成（诊断模式） ===");
+
+                /* 原始代码已注释 - 用于诊断
                 // 从ServiceLocator获取服务
                 _configManager = ServiceLocator.GetService<ConfigManager>();
                 _bailianClient = ServiceLocator.GetService<BailianApiClient>();
@@ -101,12 +129,29 @@ namespace BiaogPlugin.UI
                 LoadCurrentSession();
 
                 Log.Information("会话管理器初始化成功");
+                */
             }
             catch (Exception ex)
             {
-                Log.Error(ex, "初始化AI助手服务失败");
-                AddSystemMessage($"❌ 初始化失败：{ex.Message}");
-                SendButton.IsEnabled = false;
+                Log.Error(ex, "❌ AIPalette_Loaded 异常");
+                try
+                {
+                    AddSystemMessage($"❌ 初始化失败：{ex.Message}");
+                    AddSystemMessage($"详细错误：{ex.GetType().Name}");
+                    if (ex.InnerException != null)
+                    {
+                        AddSystemMessage($"内部异常：{ex.InnerException.Message}");
+                    }
+                }
+                catch
+                {
+                    Log.Error("无法添加错误消息到UI");
+                }
+
+                if (SendButton != null)
+                {
+                    SendButton.IsEnabled = false;
+                }
             }
         }
 

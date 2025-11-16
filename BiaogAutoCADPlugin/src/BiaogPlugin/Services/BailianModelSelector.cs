@@ -89,13 +89,6 @@ namespace BiaogPlugin.Services
             public const string QwenMax = "qwen-max";
 
             /// <summary>
-            /// qwen-plus - 高性价比模型（旧版）
-            /// 上下文: 1M tokens
-            /// ⚠️ 建议升级到qwen3-flash或qwen3-plus（思考模式融合）
-            /// </summary>
-            public const string QwenPlus = "qwen-plus";
-
-            /// <summary>
             /// qwq-max-preview - 深度思考模型，显示完整思维链
             /// 适合: 复杂推理、数学、编程
             /// </summary>
@@ -246,15 +239,6 @@ namespace BiaogPlugin.Services
                     Description = "旗舰模型，最强能力",
                     ContextLength = 262144,
                     Features = new[] { "最强能力", "复杂推理", "高质量" }
-                },
-
-                Models.QwenPlus => new ModelInfo
-                {
-                    Name = "通义千问Plus",
-                    Model = Models.QwenPlus,
-                    Description = "高性价比，效果速度成本均衡",
-                    ContextLength = 1000000,
-                    Features = new[] { "均衡", "超长上下文", "性价比高" }
                 },
 
                 Models.QwQMaxPreview => new ModelInfo
