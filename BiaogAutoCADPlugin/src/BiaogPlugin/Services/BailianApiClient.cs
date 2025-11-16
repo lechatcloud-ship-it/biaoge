@@ -210,12 +210,21 @@ public class BailianApiClient
         // qwen-flash可能返回 ```text\n翻译内容\n``` 格式
         if (text.StartsWith("```"))
         {
-            // 移除开头的 ```language
+            // ✅ P0修复：完善边界条件处理
+            // 移除开头的 ```language 或 ```
             var firstNewline = text.IndexOf('\n');
             if (firstNewline > 0)
             {
+                // 有换行符：移除开头的```language\n
                 text = text.Substring(firstNewline + 1);
             }
+            else if (firstNewline == -1)
+            {
+                // ✅ 新增：无换行符情况（如"```主梁```"）
+                // 直接移除开头的```
+                text = text.Substring(3);
+            }
+            // firstNewline == 0 的情况：文本以\n开头（极少见），保持不变
 
             // 移除结尾的 ```
             if (text.EndsWith("```"))
