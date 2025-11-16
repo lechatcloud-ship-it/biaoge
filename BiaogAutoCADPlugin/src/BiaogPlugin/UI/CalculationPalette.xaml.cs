@@ -108,7 +108,9 @@ namespace BiaogPlugin.UI
 
             try
             {
+                // ✅ 交互反馈：禁用按钮并修改文本
                 RecognizeButton.IsEnabled = false;
+                RecognizeButton.Content = "识别构件中...";
                 ProgressCard.Visibility = Visibility.Visible;
                 ProgressBar.Value = 0;
                 _aiVerifiedCount = 0;
@@ -295,7 +297,9 @@ namespace BiaogPlugin.UI
             }
             finally
             {
+                // ✅ 恢复按钮状态和文本
                 RecognizeButton.IsEnabled = true;
+                RecognizeButton.Content = "开始识别构件";
                 ProgressCard.Visibility = Visibility.Collapsed;
                 ProgressText.Text = "就绪";
                 ProgressBar.Value = 0;

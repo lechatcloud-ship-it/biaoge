@@ -30,9 +30,10 @@ namespace BiaogPlugin.Services
         private readonly ContextLengthManager _contextLengthManager;
         private readonly bool _useOpenAISDK;  // ✅ 控制是否使用OpenAI SDK
 
-        // Agent核心模型配置（2025-11-15升级到qwen-plus）
-        // qwen-plus: 1M上下文，高性价比，性能/成本/速度平衡
-        private const string AgentModel = "qwen-plus";
+        // Agent核心模型配置（2025-11-16升级到qwen3-coder-flash）
+        // qwen3-coder-flash: 代码专用，工具调用专家，1M上下文，性价比最优
+        // 参考: MODEL_SELECTION_GUIDE.md
+        private const string AgentModel = "qwen3-coder-flash";
 
         // 对话历史
         private readonly List<BiaogPlugin.Services.ChatMessage> _chatHistory = new();
@@ -65,14 +66,10 @@ namespace BiaogPlugin.Services
         /// Agent对话 - 智能分析和执行任务
         /// </summary>
         /// <param name="userMessage">用户消息</param>
-        /// <param name="useDeepThinking">是否启用深度思考</param>
         /// <param name="onContentChunk">正文内容流式回调</param>
-        /// <param name="onReasoningChunk">深度思考内容流式回调</param>
         public async Task<AssistantResponse> ChatStreamAsync(
             string userMessage,
-            bool useDeepThinking = false,
-            Action<string>? onContentChunk = null,
-            Action<string>? onReasoningChunk = null)
+            Action<string>? onContentChunk = null)
         {
             try
             {
@@ -94,7 +91,7 @@ namespace BiaogPlugin.Services
 
                 // ===== 第2步：消息初始化 =====
                 var drawingContext = _contextManager.GetCurrentDrawingContext();
-                var systemPrompt = BuildAgentSystemPrompt(drawingContext, detectedScenario, useDeepThinking);
+                var systemPrompt = BuildAgentSystemPrompt(drawingContext, detectedScenario, false);
 
                 _chatHistory.Add(new BiaogPlugin.Services.ChatMessage
                 {
@@ -105,54 +102,67 @@ namespace BiaogPlugin.Services
                 var messages = BuildMessages(systemPrompt);
 
                 // ===== 第3步：Agent决策 =====
-                Log.Information("开始Agent决策...");
+                Log.Information("开始Agent决策（深度思考模式）...");
 
-                // ✅ 使用OpenAI SDK进行流式调用 - 彻底解决流式延迟问题
+                // ✅ 使用 OpenAI SDK 进行流式调用（HttpClient 不支持流式）
+                // ⚠️ 注意：OpenAI SDK 不支持 reasoning_content，无法读取思考过程
+                // 解决方案：UI 显示"深度思考中..."状态即可
                 ChatCompletionResult agentDecision;
 
-                // ⚠️ 关键：深度思考模式必须使用HttpClient路径
-                // 原因：OpenAI .NET SDK目前不支持reasoning_content字段（2025年2月issue仍开放）
-                // 参考：https://github.com/dotnet/extensions/issues/5862
-                if (_useOpenAISDK && _openAIClient != null && !useDeepThinking)
+                if (_useOpenAISDK && _openAIClient != null)
                 {
-                    // ✅ OpenAI SDK流式调用：一次调度，无延迟
-                    // 转换工具定义为OpenAI SDK格式
+                    // 转换工具定义为 OpenAI SDK 格式
                     var openAITools = ConvertToOpenAIChatTools(tools);
 
                     agentDecision = await _openAIClient.CompleteStreamingAsync(
                         messages: messages,
                         onChunk: chunk => onContentChunk?.Invoke(chunk),
                         temperature: 0.7f,
-                        tools: openAITools  // ✅ 恢复工具调用支持
+                        tools: openAITools,
+                        enableThinking: false  // OpenAI SDK 不支持 enable_thinking 参数
                     );
                 }
                 else
                 {
-                    // ✅ HttpClient路径（支持深度思考模式）
-                    // 当useDeepThinking=true时强制使用此路径，因为需要处理reasoning_content
-                    agentDecision = await _bailianClient.ChatCompletionStreamAsync(
-                        messages: messages,
-                        model: AgentModel,
-                        tools: tools,
-                        onStreamChunk: chunk => onContentChunk?.Invoke(chunk),
-                        onReasoningChunk: useDeepThinking
-                            ? reasoning => onReasoningChunk?.Invoke(reasoning)
-                            : null,
-                        temperature: 0.7,
-                        topP: 0.9,
-                        thinkingBudget: useDeepThinking
-                            ? GetOptimalThinkingBudget(detectedScenario)  // ✅ 场景化动态调整
-                            : null,
-                        enableThinking: useDeepThinking
-                    );
+                    throw new InvalidOperationException("必须使用 OpenAI SDK 以支持流式输出");
                 }
 
-                // 添加Agent回复到历史
-                _chatHistory.Add(new BiaogPlugin.Services.ChatMessage
+                // ✅ CRITICAL FIX: 保存assistant消息时必须包含ToolCalls信息
+                // 参考：阿里云百炼Function Calling规范 - assistant消息如果调用工具必须包含tool_calls数组
+                var assistantMessage = new BiaogPlugin.Services.ChatMessage
                 {
                     Role = "assistant",
                     Content = agentDecision.Content
-                });
+                };
+
+                // ✅ 如果有工具调用，必须保存完整的ToolCalls信息（防止会话恢复时丢失导致API错误）
+                if (agentDecision.ToolCalls.Count > 0)
+                {
+                    assistantMessage.ToolCalls = agentDecision.ToolCalls
+                        .Select((tc, index) =>
+                        {
+                            // ✅ v1.0.7修复：确保Arguments永远不为空（防止BinaryData.FromString报错）
+                            var serializedArgs = System.Text.Json.JsonSerializer.Serialize(tc.Arguments ?? new Dictionary<string, object>());
+                            var safeArgs = string.IsNullOrWhiteSpace(serializedArgs) ? "{}" : serializedArgs;
+
+                            return new ToolCallInfo
+                            {
+                                Id = tc.Id,
+                                Type = "function",
+                                Function = new FunctionCallInfo
+                                {
+                                    Name = tc.Name,
+                                    Arguments = safeArgs
+                                },
+                                Index = index
+                            };
+                        })
+                        .ToList();
+
+                    Log.Debug($"保存assistant消息（含{assistantMessage.ToolCalls.Count}个工具调用）");
+                }
+
+                _chatHistory.Add(assistantMessage);
 
                 // ===== 第4步：工具执行 =====
                 if (agentDecision.ToolCalls.Count > 0)
@@ -272,14 +282,46 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
+        /// 安全获取字典值（防御JSON反序列化null问题）
+        /// </summary>
+        /// <param name="args">参数字典（可能为null）</param>
+        /// <param name="key">键名</param>
+        /// <param name="defaultValue">默认值</param>
+        /// <returns>字符串值</returns>
+        private string GetArgSafe(Dictionary<string, object>? args, string key, string defaultValue = "")
+        {
+            if (args == null)
+            {
+                Log.Warning($"参数字典为null，使用默认值: {key}={defaultValue}");
+                return defaultValue;
+            }
+
+            if (!args.ContainsKey(key))
+            {
+                Log.Warning($"参数字典缺少键: {key}，使用默认值: {defaultValue}");
+                return defaultValue;
+            }
+
+            var value = args[key];
+            if (value == null)
+            {
+                Log.Warning($"参数值为null: {key}，使用默认值: {defaultValue}");
+                return defaultValue;
+            }
+
+            return value.ToString() ?? defaultValue;
+        }
+
+        /// <summary>
         /// 翻译工具 - 执行翻译任务
         /// </summary>
         private async Task<string> ExecuteTranslateTool(Dictionary<string, object> args, Action<string>? onStreamChunk)
         {
             onStreamChunk?.Invoke($"  → 正在执行翻译...\n");
 
-            var text = args["text"].ToString() ?? "";
-            var targetLanguage = args["target_language"].ToString() ?? "en";
+            // ✅ v1.0.8修复：使用安全方法访问参数（防止args为null）
+            var text = GetArgSafe(args, "text");
+            var targetLanguage = GetArgSafe(args, "target_language", "en");
 
             var translated = await _bailianClient.TranslateAsync(
                 text: text,
@@ -298,9 +340,10 @@ namespace BiaogPlugin.Services
         {
             onStreamChunk?.Invoke($"  → 正在执行图纸修改...\n");
 
-            var operation = args["operation"].ToString() ?? "";
-            var original = args.ContainsKey("original_text") ? args["original_text"].ToString() : "";
-            var newValue = args.ContainsKey("new_text") ? args["new_text"].ToString() : "";
+            // ✅ v1.0.8修复：使用安全方法访问参数（防止args为null）
+            var operation = GetArgSafe(args, "operation");
+            var original = GetArgSafe(args, "original_text");
+            var newValue = GetArgSafe(args, "new_text");
 
             // 理解修改意图并执行
             var doc = Application.DocumentManager.MdiActiveDocument;
@@ -374,7 +417,8 @@ namespace BiaogPlugin.Services
                 onStreamChunk?.Invoke($"  → 查询图纸信息...\n");
                 Log.Debug("开始执行查询图纸工具");
 
-                var queryType = args.ContainsKey("query_type") ? args["query_type"].ToString() : "";
+                // ✅ v1.0.8修复：使用安全方法访问参数（防止args为null）
+                var queryType = GetArgSafe(args, "query_type");
                 Log.Debug($"查询类型: {queryType}");
 
                 // ✅ 添加异常处理
@@ -605,7 +649,7 @@ namespace BiaogPlugin.Services
         /// </summary>
         private List<BiaogPlugin.Services.ChatMessage> BuildMessages(string systemPrompt)
         {
-            // ✅ 使用ContextLengthManager智能裁剪，防止超过252K输入限制
+            // ✅ 使用ContextLengthManager智能裁剪，防止超过1M输入限制
             var trimmedHistory = _contextLengthManager.TrimMessages(_chatHistory, systemPrompt);
 
             var messages = new List<BiaogPlugin.Services.ChatMessage>
@@ -614,6 +658,13 @@ namespace BiaogPlugin.Services
             };
 
             messages.AddRange(trimmedHistory);
+
+            // ✅ v1.0.7最终修复：验证消息链是否符合Function Calling规范
+            if (!ValidateMessageChain(messages, out string validationError))
+            {
+                Log.Error($"消息链验证失败: {validationError}");
+                throw new InvalidOperationException($"消息历史不符合Function Calling规范: {validationError}");
+            }
 
             // 记录Token使用情况
             int estimatedTokens = _contextLengthManager.EstimateTokens(messages, "");
@@ -629,6 +680,143 @@ namespace BiaogPlugin.Services
         {
             _chatHistory.Clear();
             Log.Information("对话历史已清除");
+        }
+
+        /// <summary>
+        /// 加载对话历史（用于切换会话）
+        /// </summary>
+        /// <remarks>
+        /// ✅ v1.0.7最终修复：根据阿里云百炼官方规范正确处理消息历史
+        /// 参考：https://help.aliyun.com/zh/model-studio/qwen-function-calling
+        ///
+        /// 关键规则：
+        /// 1. 保留完整的消息链：user → assistant(with tool_calls) → tool → assistant(summary)
+        /// 2. 只删除"孤立"的tool消息（前面没有对应tool_calls的assistant）
+        /// 3. 不能简单过滤所有tool消息，这会破坏Function Calling的上下文
+        /// </remarks>
+        public void LoadHistory(List<BiaogPlugin.Services.ChatMessage> messages)
+        {
+            _chatHistory.Clear();
+
+            if (messages == null || messages.Count == 0)
+            {
+                Log.Information("加载对话历史: 无历史消息");
+                return;
+            }
+
+            // ✅ 正确的消息验证和过滤逻辑
+            var validatedMessages = new List<BiaogPlugin.Services.ChatMessage>();
+            BiaogPlugin.Services.ChatMessage? lastAssistantWithToolCalls = null;
+
+            for (int i = 0; i < messages.Count; i++)
+            {
+                var msg = messages[i];
+
+                switch (msg.Role.ToLower())
+                {
+                    case "system":
+                    case "user":
+                        // system和user消息总是保留
+                        validatedMessages.Add(msg);
+                        lastAssistantWithToolCalls = null; // 重置tool_calls追踪
+                        break;
+
+                    case "assistant":
+                        // assistant消息总是保留
+                        validatedMessages.Add(msg);
+
+                        // 如果包含tool_calls，记录下来供后续tool消息验证
+                        if (msg.ToolCalls != null && msg.ToolCalls.Count > 0)
+                        {
+                            lastAssistantWithToolCalls = msg;
+                            Log.Debug($"记录assistant消息（含{msg.ToolCalls.Count}个tool_calls）");
+                        }
+                        else
+                        {
+                            lastAssistantWithToolCalls = null;
+                        }
+                        break;
+
+                    case "tool":
+                        // ✅ CRITICAL: tool消息必须紧跟在包含tool_calls的assistant消息之后
+                        if (lastAssistantWithToolCalls != null)
+                        {
+                            // 验证tool_call_id是否匹配
+                            bool hasMatchingToolCall = lastAssistantWithToolCalls.ToolCalls!
+                                .Any(tc => tc.Id == msg.ToolCallId);
+
+                            if (hasMatchingToolCall)
+                            {
+                                validatedMessages.Add(msg);
+                                Log.Debug($"保留有效tool消息: {msg.Name}, tool_call_id={msg.ToolCallId}");
+                            }
+                            else
+                            {
+                                Log.Warning($"跳过tool消息（tool_call_id不匹配）: {msg.Name}, " +
+                                          $"tool_call_id={msg.ToolCallId}");
+                            }
+                        }
+                        else
+                        {
+                            Log.Warning($"跳过孤立的tool消息（前面没有对应的assistant with tool_calls）: " +
+                                      $"{msg.Name}, tool_call_id={msg.ToolCallId}");
+                        }
+                        break;
+
+                    default:
+                        Log.Warning($"跳过未知角色的消息: {msg.Role}");
+                        break;
+                }
+            }
+
+            _chatHistory.AddRange(validatedMessages);
+            Log.Information($"加载对话历史: {messages.Count}条原始消息 → {validatedMessages.Count}条有效消息");
+        }
+
+        /// <summary>
+        /// 验证消息历史是否符合阿里云百炼Function Calling规范
+        /// </summary>
+        /// <remarks>
+        /// 验证规则：
+        /// 1. tool消息必须紧跟在包含tool_calls的assistant消息之后
+        /// 2. tool_call_id必须与assistant消息中的tool_calls[].id匹配
+        /// 3. 不应存在孤立的tool消息
+        /// </remarks>
+        private bool ValidateMessageChain(List<BiaogPlugin.Services.ChatMessage> messages, out string error)
+        {
+            error = string.Empty;
+            BiaogPlugin.Services.ChatMessage? lastAssistant = null;
+
+            for (int i = 0; i < messages.Count; i++)
+            {
+                var msg = messages[i];
+
+                if (msg.Role.ToLower() == "assistant")
+                {
+                    lastAssistant = msg;
+                }
+                else if (msg.Role.ToLower() == "tool")
+                {
+                    // tool消息必须有对应的assistant消息
+                    if (lastAssistant == null || lastAssistant.ToolCalls == null || lastAssistant.ToolCalls.Count == 0)
+                    {
+                        error = $"消息{i}: tool消息前面没有包含tool_calls的assistant消息 " +
+                               $"(tool_call_id={msg.ToolCallId}, name={msg.Name})";
+                        return false;
+                    }
+
+                    // 验证tool_call_id匹配
+                    bool hasMatch = lastAssistant.ToolCalls.Any(tc => tc.Id == msg.ToolCallId);
+                    if (!hasMatch)
+                    {
+                        error = $"消息{i}: tool_call_id不匹配 " +
+                               $"(tool_call_id={msg.ToolCallId}, available_ids=[{string.Join(", ", lastAssistant.ToolCalls.Select(tc => tc.Id))}])";
+                        return false;
+                    }
+                }
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -730,7 +918,116 @@ namespace BiaogPlugin.Services
                         result.Add(new OpenAI.Chat.UserChatMessage(msg.Content));
                         break;
                     case "assistant":
-                        result.Add(new OpenAI.Chat.AssistantChatMessage(msg.Content));
+                        // ✅ CRITICAL FIX: assistant消息如果包含工具调用，必须传递ToolCalls参数
+                        // 参考：阿里云百炼Function Calling - assistant消息调用工具时必须包含tool_calls数组
+                        // 参考：OpenAI .NET SDK - AssistantChatMessage构造函数仅接受IReadOnlyList<ChatToolCall>
+                        if (msg.ToolCalls != null && msg.ToolCalls.Count > 0)
+                        {
+                            // 转换为OpenAI SDK的ChatToolCall格式
+                            var validToolCalls = new List<OpenAI.Chat.ChatToolCall>();
+
+                            foreach (var tc in msg.ToolCalls)
+                            {
+                                try
+                                {
+                                    // ✅ v1.0.8+最终修复："数组不能为空。参数名: bytes"
+                                    // 问题：JSON反序列化时Function可能为null（默认值初始化器不运行）
+                                    // 解决：添加完整的null检查和JSON验证
+
+                                    // 第1步：检查ToolCallInfo对象本身
+                                    if (tc == null)
+                                    {
+                                        Log.Warning("跳过null的ToolCallInfo对象");
+                                        continue;
+                                    }
+
+                                    // 第2步：检查Id（OpenAI要求tool_call_id必须非空）
+                                    if (string.IsNullOrWhiteSpace(tc.Id))
+                                    {
+                                        Log.Warning("跳过缺少Id的ToolCallInfo对象");
+                                        continue;
+                                    }
+
+                                    // 第3步：检查并修复Function
+                                    if (tc.Function == null)
+                                    {
+                                        Log.Warning($"工具调用{tc.Id}的Function为null，使用空对象");
+                                        tc.Function = new FunctionCallInfo { Name = "unknown", Arguments = "{}" };
+                                    }
+
+                                    // 第4步：验证并修复Arguments
+                                    var args = tc.Function.Arguments;
+                                    if (string.IsNullOrWhiteSpace(args))
+                                    {
+                                        args = "{}";
+                                        Log.Debug($"工具调用{tc.Id}的Arguments为空，使用空对象");
+                                    }
+                                    else
+                                    {
+                                        // 验证是否为有效JSON
+                                        try
+                                        {
+                                            JsonDocument.Parse(args);
+                                        }
+                                        catch (JsonException)
+                                        {
+                                            Log.Warning($"工具调用{tc.Id}的Arguments不是有效JSON: {args}，使用空对象");
+                                            args = "{}";
+                                        }
+                                    }
+
+                                    // 第5步：验证并修复FunctionName
+                                    var functionName = tc.Function.Name;
+                                    if (string.IsNullOrWhiteSpace(functionName))
+                                    {
+                                        functionName = "unknown";
+                                        Log.Warning($"工具调用{tc.Id}的FunctionName为空，使用'unknown'");
+                                    }
+
+                                    // 第6步：创建ChatToolCall（此时所有参数都已验证）
+                                    var chatToolCall = OpenAI.Chat.ChatToolCall.CreateFunctionToolCall(
+                                        id: tc.Id,
+                                        functionName: functionName,
+                                        functionArguments: BinaryData.FromString(args)
+                                    );
+
+                                    validToolCalls.Add(chatToolCall);
+                                    Log.Debug($"成功转换工具调用: {functionName} (id={tc.Id})");
+                                }
+                                catch (Exception ex)
+                                {
+                                    Log.Error(ex, $"转换工具调用失败，跳过: tc.Id={tc?.Id}, tc.Function.Name={tc?.Function?.Name}");
+                                }
+                            }
+
+                            // 如果没有有效的工具调用，将此消息视为普通assistant消息
+                            if (validToolCalls.Count == 0)
+                            {
+                                Log.Warning($"assistant消息声称有{msg.ToolCalls.Count}个工具调用，但全部无效，退化为普通消息");
+                                result.Add(new OpenAI.Chat.AssistantChatMessage(msg.Content ?? ""));
+                                break;
+                            }
+
+                            IReadOnlyList<OpenAI.Chat.ChatToolCall> toolCalls = validToolCalls;
+
+                            // 使用工具调用创建消息
+                            var assistantMessage = new OpenAI.Chat.AssistantChatMessage(toolCalls);
+
+                            // 如果有文本内容，添加到Content集合
+                            if (!string.IsNullOrEmpty(msg.Content))
+                            {
+                                assistantMessage.Content.Add(
+                                    OpenAI.Chat.ChatMessageContentPart.CreateTextPart(msg.Content)
+                                );
+                            }
+
+                            result.Add(assistantMessage);
+                            Log.Debug($"添加assistant消息（含{toolCalls.Count}个工具调用）");
+                        }
+                        else
+                        {
+                            result.Add(new OpenAI.Chat.AssistantChatMessage(msg.Content));
+                        }
                         break;
                     case "tool":
                         // ✅ 商业级最佳实践：正确处理工具消息（Function Calling必需）

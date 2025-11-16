@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using BiaogPlugin.Models;
 using BiaogPlugin.Extensions;
+using Autodesk.AutoCAD.DatabaseServices;
 
 namespace BiaogPlugin.Services;
 

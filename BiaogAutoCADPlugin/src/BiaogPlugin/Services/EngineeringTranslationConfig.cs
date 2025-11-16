@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace BiaogPlugin.Services
 {
@@ -9,29 +10,33 @@ namespace BiaogPlugin.Services
     public static class EngineeringTranslationConfig
     {
         /// <summary>
-        /// Qwen-Flash/Plus模型的Token限制（2025最新）
+        /// Qwen-MT-Flash专用翻译模型的Token限制（2025最新官方规格）
         /// </summary>
-        public const int MaxInputTokens = 1048576;  // 1M tokens (997K实际输入)
-        public const int MaxOutputTokens = 32768;   // 32K tokens
+        public const int MaxInputTokens = 8192;   // qwen-mt-flash输入限制
+        public const int MaxOutputTokens = 8192;  // qwen-mt-flash输出限制
 
         /// <summary>
         /// 单次翻译的最大字符数
         ///
-        /// ✅ 2025-11-15更新：充分利用qwen-flash性能参数
-        /// qwen-flash性能参数：
-        /// - 最大输入长度: 997K tokens
-        /// - 最大输出长度: 32K tokens
-        /// - RPM: 15000 (每分钟请求数)
-        /// - TPM: 10,000,000 (每分钟Token数)
+        /// ✅ P0修复：修正为qwen-mt-flash实际限制（8K上下文，NOT 1M）
+        /// qwen-mt-flash性能参数（官方文档）：
+        /// - 最大输入长度: 8192 tokens
+        /// - 最大输出长度: 8192 tokens
+        /// - 总上下文: 16384 tokens
+        /// - RPM: 1000 QPS（单条并发）
+        /// - 成功率: 99.8%
         ///
         /// 批次大小计算：
         /// - DomainPrompt系统提示词: ~500 tokens
-        /// - 实际可用输入: 997K - 500 = 996.5K tokens
-        /// - 安全估算: 每字符2个token → 996500 / 2 = 498250字符
-        /// - 优化设置: 450000字符（900K tokens，留97K余量）
-        /// - 实际场景: 任何AutoCAD图纸都可以一次性翻译（通常<10K字符）
+        /// - Terms术语表: ~200 tokens (约100条术语)
+        /// - TM翻译记忆: ~300 tokens (10个示例)
+        /// - 实际可用输入: 8192 - 500 - 200 - 300 = 7192 tokens
+        /// - 安全估算: 每字符2个token → 7192 / 2 = 3596字符
+        /// - 优化设置: 3500字符（留96 tokens余量）
+        ///
+        /// ⚠️ 注意：1M上下文是qwen-flash/qwen-plus通用对话模型的能力，NOT qwen-mt-flash
         /// </summary>
-        public const int MaxCharsPerBatch = 450000;
+        public const int MaxCharsPerBatch = 3500;
 
         /// <summary>
         /// 工程建筑领域提示词（英文，符合阿里云百炼Prompt Engineering最佳实践）
@@ -665,16 +670,42 @@ namespace BiaogPlugin.Services
 
         /// <summary>
         /// 为通用对话模型（qwen-flash/qwen-plus）构建系统提示词
-        /// 包含领域知识 + 关键Few-shot示例
+        /// ✅ v1.0.7优化：极简提示词 + 中文指令 + Few-Shot示例，确保纯净输出
         /// </summary>
         public static string BuildSystemPromptForModel(string sourceLang, string targetLang)
         {
-            var targetLanguageName = targetLang.Contains("Chinese") ? "Simplified Chinese" : "English";
+            var isToEnglish = targetLang.Contains("English");
 
-            // ✅ 2025-11-15大幅简化：信任qwen-flash/qwen-plus强大理解能力
-            return $@"{DomainPrompt}
+            if (isToEnglish)
+            {
+                // 中文 → 英文
+                return @"你是CAD/BIM工程图纸专业翻译。严格遵守：
+1. 使用标准工程术语
+2. 保留图号、规范代号、材料牌号、单位、轴线编号
+3. 直接输出译文，不加任何解释
 
-Translate to {targetLanguageName}:";
+示例：
+用户：主梁（ML-1）C30混凝土
+翻译：Main Beam (ML-1) C30 Concrete
+
+用户：轴网：A-D/1-10
+翻译：Grid: A-D/1-10";
+            }
+            else
+            {
+                // 英文 → 中文
+                return @"你是CAD/BIM工程图纸专业翻译。严格遵守：
+1. 使用标准工程术语
+2. 保留图号、规范代号、材料牌号、单位、轴线编号
+3. 直接输出译文，不加任何解释
+
+示例：
+用户：Main Beam (ML-1) C30 Concrete
+翻译：主梁（ML-1）C30混凝土
+
+用户：Grid: A-D/1-10
+翻译：轴网：A-D/1-10";
+            }
         }
     }
 
