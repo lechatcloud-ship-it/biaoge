@@ -350,7 +350,14 @@ namespace BiaogPlugin.UI
                 TotalComponentsText.Text = summary.TotalComponents.ToString();
                 AvgConfidenceText.Text = $"{summary.AverageConfidence:P0}";
                 TotalVolumeText.Text = $"{summary.TotalVolume:F2}m³";
-                TotalAreaText.Text = $"{summary.TotalArea:F2}m²";  // ✅ 修复：添加总面积显示
+
+                // ✅ P0修复：处理NaN/Infinity等特殊值
+                // 🐛 问题：TotalArea可能为NaN、Infinity或负数，导致显示异常
+                TotalAreaText.Text = double.IsNaN(summary.TotalArea) || double.IsInfinity(summary.TotalArea)
+                    ? "N/A"
+                    : summary.TotalArea < 0
+                        ? "0.00m²"  // 负值归零（异常数据保护）
+                        : $"{summary.TotalArea:F2}m²";
             });
         }
 
