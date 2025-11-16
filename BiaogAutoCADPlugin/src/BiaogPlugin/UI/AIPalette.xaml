@@ -101,13 +101,26 @@
                         <TextBlock TextWrapping="Wrap" Foreground="#CCCCCC" FontSize="12" LineHeight="18">
                             <Run Text="我可以帮您："/>
                             <LineBreak/>
-                            <Run Text="• 翻译图纸中的文本（自动调用qwen-mt-flash）"/>
+                            <Run Text="• 翻译图纸中的文本" Foreground="#4EC9B0"/>
                             <LineBreak/>
-                            <Run Text="• 识别和修改CAD构件（自动调用qwen3-coder-flash）"/>
+                            <Run Text="• 识别和修改CAD构件" Foreground="#4EC9B0"/>
                             <LineBreak/>
-                            <Run Text="• 分析图纸内容（自动调用qwen3-vl-flash）"/>
+                            <Run Text="• 分析图纸内容" Foreground="#4EC9B0"/>
                             <LineBreak/>
-                            <Run Text="• 回答关于图纸的问题（查询上下文）"/>
+                            <Run Text="• 回答关于图纸的问题" Foreground="#4EC9B0"/>
+                            <LineBreak/>
+                            <LineBreak/>
+                            <Run Text="💡 快捷指令示例：" FontWeight="SemiBold" Foreground="#DCDCAA"/>
+                            <LineBreak/>
+                            <Run Text="• 翻译当前图纸为中文" Foreground="#9CDCFE"/>
+                            <LineBreak/>
+                            <Run Text="• 统计图中有多少个图层" Foreground="#9CDCFE"/>
+                            <LineBreak/>
+                            <Run Text="• 查找所有尺寸标注" Foreground="#9CDCFE"/>
+                            <LineBreak/>
+                            <Run Text="• 修改所有文字颜色为红色" Foreground="#9CDCFE"/>
+                            <LineBreak/>
+                            <Run Text="• 分析当前图纸的结构布局" Foreground="#9CDCFE"/>
                         </TextBlock>
                     </StackPanel>
                 </Border>

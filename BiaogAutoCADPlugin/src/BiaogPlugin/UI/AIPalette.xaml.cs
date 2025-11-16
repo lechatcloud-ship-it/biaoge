@@ -975,10 +975,17 @@ namespace BiaogPlugin.UI
         {
             try
             {
-                // 清空聊天面板（保留欢迎消息）
+                // ✅ 清空聊天面板（保留欢迎消息）
+                // 欢迎消息是XAML中定义的第一个子元素，从后往前删除其他所有消息
                 while (ChatHistoryPanel.Children.Count > 1)
                 {
                     ChatHistoryPanel.Children.RemoveAt(ChatHistoryPanel.Children.Count - 1);
+                }
+
+                // ✅ 确保欢迎消息可见（防止被误隐藏）
+                if (ChatHistoryPanel.Children.Count > 0 && ChatHistoryPanel.Children[0] is UIElement welcomeMsg)
+                {
+                    welcomeMsg.Visibility = Visibility.Visible;
                 }
 
                 // 清空AI服务的历史
@@ -995,7 +1002,7 @@ namespace BiaogPlugin.UI
                     _sessionManager.SaveCurrentSession();
                 }
 
-                Log.Information("已清空对话历史");
+                Log.Information($"已清空对话历史（保留欢迎消息，当前子元素数：{ChatHistoryPanel.Children.Count}）");
             }
             catch (Exception ex)
             {
