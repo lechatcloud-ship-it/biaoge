@@ -65,14 +65,10 @@ namespace BiaogPlugin.Services
         /// Agent对话 - 智能分析和执行任务
         /// </summary>
         /// <param name="userMessage">用户消息</param>
-        /// <param name="useDeepThinking">是否启用深度思考</param>
         /// <param name="onContentChunk">正文内容流式回调</param>
-        /// <param name="onReasoningChunk">深度思考内容流式回调</param>
         public async Task<AssistantResponse> ChatStreamAsync(
             string userMessage,
-            bool useDeepThinking = false,
-            Action<string>? onContentChunk = null,
-            Action<string>? onReasoningChunk = null)
+            Action<string>? onContentChunk = null)
         {
             try
             {
@@ -94,7 +90,7 @@ namespace BiaogPlugin.Services
 
                 // ===== 第2步：消息初始化 =====
                 var drawingContext = _contextManager.GetCurrentDrawingContext();
-                var systemPrompt = BuildAgentSystemPrompt(drawingContext, detectedScenario, useDeepThinking);
+                var systemPrompt = BuildAgentSystemPrompt(drawingContext, detectedScenario, false);
 
                 _chatHistory.Add(new BiaogPlugin.Services.ChatMessage
                 {
@@ -105,54 +101,60 @@ namespace BiaogPlugin.Services
                 var messages = BuildMessages(systemPrompt);
 
                 // ===== 第3步：Agent决策 =====
-                Log.Information("开始Agent决策...");
+                Log.Information("开始Agent决策（深度思考模式）...");
 
-                // ✅ 使用OpenAI SDK进行流式调用 - 彻底解决流式延迟问题
+                // ✅ 使用 OpenAI SDK 进行流式调用（HttpClient 不支持流式）
+                // ⚠️ 注意：OpenAI SDK 不支持 reasoning_content，无法读取思考过程
+                // 解决方案：UI 显示"深度思考中..."状态即可
                 ChatCompletionResult agentDecision;
 
-                // ⚠️ 关键：深度思考模式必须使用HttpClient路径
-                // 原因：OpenAI .NET SDK目前不支持reasoning_content字段（2025年2月issue仍开放）
-                // 参考：https://github.com/dotnet/extensions/issues/5862
-                if (_useOpenAISDK && _openAIClient != null && !useDeepThinking)
+                if (_useOpenAISDK && _openAIClient != null)
                 {
-                    // ✅ OpenAI SDK流式调用：一次调度，无延迟
-                    // 转换工具定义为OpenAI SDK格式
+                    // 转换工具定义为 OpenAI SDK 格式
                     var openAITools = ConvertToOpenAIChatTools(tools);
 
                     agentDecision = await _openAIClient.CompleteStreamingAsync(
                         messages: messages,
                         onChunk: chunk => onContentChunk?.Invoke(chunk),
                         temperature: 0.7f,
-                        tools: openAITools  // ✅ 恢复工具调用支持
+                        tools: openAITools,
+                        enableThinking: false  // OpenAI SDK 不支持 enable_thinking 参数
                     );
                 }
                 else
                 {
-                    // ✅ HttpClient路径（支持深度思考模式）
-                    // 当useDeepThinking=true时强制使用此路径，因为需要处理reasoning_content
-                    agentDecision = await _bailianClient.ChatCompletionStreamAsync(
-                        messages: messages,
-                        model: AgentModel,
-                        tools: tools,
-                        onStreamChunk: chunk => onContentChunk?.Invoke(chunk),
-                        onReasoningChunk: useDeepThinking
-                            ? reasoning => onReasoningChunk?.Invoke(reasoning)
-                            : null,
-                        temperature: 0.7,
-                        topP: 0.9,
-                        thinkingBudget: useDeepThinking
-                            ? GetOptimalThinkingBudget(detectedScenario)  // ✅ 场景化动态调整
-                            : null,
-                        enableThinking: useDeepThinking
-                    );
+                    throw new InvalidOperationException("必须使用 OpenAI SDK 以支持流式输出");
                 }
 
-                // 添加Agent回复到历史
-                _chatHistory.Add(new BiaogPlugin.Services.ChatMessage
+                // ✅ CRITICAL FIX: 保存assistant消息时必须包含ToolCalls信息
+                // 参考：阿里云百炼Function Calling规范 - assistant消息如果调用工具必须包含tool_calls数组
+                var assistantMessage = new BiaogPlugin.Services.ChatMessage
                 {
                     Role = "assistant",
                     Content = agentDecision.Content
-                });
+                };
+
+                // ✅ 如果有工具调用，必须保存完整的ToolCalls信息（防止会话恢复时丢失导致API错误）
+                if (agentDecision.ToolCalls.Count > 0)
+                {
+                    assistantMessage.ToolCalls = agentDecision.ToolCalls
+                        .Select((tc, index) => new ToolCallInfo
+                        {
+                            Id = tc.Id,
+                            Type = "function",
+                            Function = new FunctionCallInfo
+                            {
+                                Name = tc.Name,
+                                Arguments = System.Text.Json.JsonSerializer.Serialize(tc.Arguments)
+                            },
+                            Index = index
+                        })
+                        .ToList();
+
+                    Log.Debug($"保存assistant消息（含{assistantMessage.ToolCalls.Count}个工具调用）");
+                }
+
+                _chatHistory.Add(assistantMessage);
 
                 // ===== 第4步：工具执行 =====
                 if (agentDecision.ToolCalls.Count > 0)
@@ -632,6 +634,16 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
+        /// 加载对话历史（用于切换会话）
+        /// </summary>
+        public void LoadHistory(List<BiaogPlugin.Services.ChatMessage> messages)
+        {
+            _chatHistory.Clear();
+            _chatHistory.AddRange(messages);
+            Log.Information($"加载对话历史: {messages.Count}条消息");
+        }
+
+        /// <summary>
         /// 转换匿名对象工具定义为OpenAI SDK的ChatTool
         /// </summary>
         private List<OpenAI.Chat.ChatTool> ConvertToOpenAIChatTools(List<object> tools)
@@ -691,7 +703,38 @@ namespace BiaogPlugin.Services
                         result.Add(new OpenAI.Chat.UserChatMessage(msg.Content));
                         break;
                     case "assistant":
-                        result.Add(new OpenAI.Chat.AssistantChatMessage(msg.Content));
+                        // ✅ CRITICAL FIX: assistant消息如果包含工具调用，必须传递ToolCalls参数
+                        // 参考：阿里云百炼Function Calling - assistant消息调用工具时必须包含tool_calls数组
+                        // 参考：OpenAI .NET SDK - AssistantChatMessage构造函数仅接受IReadOnlyList<ChatToolCall>
+                        if (msg.ToolCalls != null && msg.ToolCalls.Count > 0)
+                        {
+                            // 转换为OpenAI SDK的ChatToolCall格式
+                            IReadOnlyList<OpenAI.Chat.ChatToolCall> toolCalls = msg.ToolCalls
+                                .Select(tc => OpenAI.Chat.ChatToolCall.CreateFunctionToolCall(
+                                    id: tc.Id,
+                                    functionName: tc.Function.Name,
+                                    functionArguments: BinaryData.FromString(tc.Function.Arguments)
+                                ))
+                                .ToList();
+
+                            // 使用工具调用创建消息
+                            var assistantMessage = new OpenAI.Chat.AssistantChatMessage(toolCalls);
+
+                            // 如果有文本内容，添加到Content集合
+                            if (!string.IsNullOrEmpty(msg.Content))
+                            {
+                                assistantMessage.Content.Add(
+                                    OpenAI.Chat.ChatMessageContentPart.CreateTextPart(msg.Content)
+                                );
+                            }
+
+                            result.Add(assistantMessage);
+                            Log.Debug($"添加assistant消息（含{toolCalls.Count}个工具调用）");
+                        }
+                        else
+                        {
+                            result.Add(new OpenAI.Chat.AssistantChatMessage(msg.Content));
+                        }
                         break;
                     case "tool":
                         // ✅ 商业级最佳实践：正确处理工具消息（Function Calling必需）

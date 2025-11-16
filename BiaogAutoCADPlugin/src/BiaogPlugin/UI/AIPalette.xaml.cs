@@ -23,7 +23,6 @@ namespace BiaogPlugin.UI
         private ConfigManager? _configManager;
         private BailianApiClient? _bailianClient;
         private DrawingContextManager? _contextManager;
-        private bool _deepThinking = false;
         private bool _isProcessing = false;
 
         // ✅ 会话管理
@@ -78,32 +77,6 @@ namespace BiaogPlugin.UI
             {
                 Log.Information("=== AIPalette_Loaded 开始执行 ===");
 
-                // ✅ 紧急诊断：跳过所有服务初始化，只显示基础面板
-                Log.Information("诊断模式：跳过服务初始化，仅测试面板显示");
-
-                // 添加欢迎消息（不依赖任何服务）
-                try
-                {
-                    AddSystemMessage("✅ AI助手面板加载成功！");
-                    AddSystemMessage("⚠️ 当前为诊断模式，服务未初始化");
-                    AddSystemMessage("请查看日志文件了解详情：%APPDATA%\\Biaoge\\Logs\\");
-                    Log.Information("欢迎消息添加成功");
-                }
-                catch (Exception msgEx)
-                {
-                    Log.Error(msgEx, "添加欢迎消息失败");
-                }
-
-                // 暂时禁用发送按钮
-                if (SendButton != null)
-                {
-                    SendButton.IsEnabled = false;
-                    Log.Information("发送按钮已禁用（诊断模式）");
-                }
-
-                Log.Information("=== AIPalette_Loaded 完成（诊断模式） ===");
-
-                /* 原始代码已注释 - 用于诊断
                 // 从ServiceLocator获取服务
                 _configManager = ServiceLocator.GetService<ConfigManager>();
                 _bailianClient = ServiceLocator.GetService<BailianApiClient>();
@@ -129,7 +102,7 @@ namespace BiaogPlugin.UI
                 LoadCurrentSession();
 
                 Log.Information("会话管理器初始化成功");
-                */
+                Log.Information("=== AIPalette_Loaded 完成 ===");
             }
             catch (Exception ex)
             {
@@ -397,32 +370,6 @@ namespace BiaogPlugin.UI
         }
 
         /// <summary>
-        /// 深度思考模式切换
-        /// </summary>
-        private void DeepThinkingToggle_Click(object sender, RoutedEventArgs e)
-        {
-            _deepThinking = !_deepThinking;
-
-            if (_deepThinking)
-            {
-                // ✅ 使用Tag标记状态，让样式的Trigger处理背景色
-                DeepThinkingToggle.Tag = "Active";
-                DeepThinkingToggle.Content = "🧠 深度思考 ✓";
-                DeepThinkingIndicator.Text = "🧠 深度思考模式";
-                DeepThinkingIndicator.Foreground = new SolidColorBrush(Color.FromRgb(0, 120, 212));
-            }
-            else
-            {
-                // ✅ 清除Tag，恢复默认样式
-                DeepThinkingToggle.Tag = null;
-                DeepThinkingToggle.Content = "🧠 深度思考";
-                DeepThinkingIndicator.Text = "";
-            }
-
-            Log.Information($"深度思考模式: {(_deepThinking ? "已启用" : "已关闭")}");
-        }
-
-        /// <summary>
         /// 清除对话历史
         /// </summary>
         private void ClearHistory_Click(object sender, RoutedEventArgs e)
@@ -474,24 +421,22 @@ namespace BiaogPlugin.UI
                 // 清空输入框
                 InputTextBox.Clear();
 
-                // ✅ 深度思考模式优化：思考框和正文框分阶段渲染
-                Expander? thinkingExpander = null;
-                RichTextBox? thinkingRichTextBox = null;
-                StreamingMarkdownRenderer? thinkingRenderer = null;
-
-                // 第1阶段：如果启用深度思考，只创建思考框
-                if (_deepThinking)
+                // ✅ 启发式深度思考检测：如果1.5秒内没收到chunk，显示"深度思考中..."
+                bool hasReceivedFirstChunk = false;
+                var thinkingTimer = new DispatcherTimer
                 {
-                    thinkingExpander = CreateThinkingExpanderPlaceholder();
-                    ChatHistoryPanel.Children.Add(thinkingExpander);
-
-                    thinkingRichTextBox = FindThinkingRichTextBox(thinkingExpander);
-                    if (thinkingRichTextBox != null)
+                    Interval = TimeSpan.FromMilliseconds(1500)
+                };
+                thinkingTimer.Tick += (s, args) =>
+                {
+                    if (!hasReceivedFirstChunk)
                     {
-                        thinkingRenderer = new StreamingMarkdownRenderer(thinkingRichTextBox);
+                        StatusText.Text = "🧠 深度思考中...";
+                        Log.Debug("检测到可能的深度思考（1.5秒未收到响应）");
                     }
-                    ScrollToBottom();
-                }
+                    thinkingTimer.Stop();
+                };
+                thinkingTimer.Start();
 
                 // ✅ 正文框延迟创建：只在收到第一个内容chunk时创建
                 Border? aiMessageBorder = null;
@@ -503,14 +448,16 @@ namespace BiaogPlugin.UI
                 // OpenAI SDK的await foreach保留SynchronizationContext，回调已在UI线程执行
                 var response = await _aiService.ChatStreamAsync(
                     userMessage: userInput,
-                    useDeepThinking: _deepThinking,
                     onContentChunk: chunk =>
                     {
                         try
                         {
-                            // ✅ 第2阶段：收到第一个内容chunk时，动态创建正文框
+                            // ✅ 收到第一个内容chunk时，动态创建正文框
                             if (aiMessageBorder == null)
                             {
+                                hasReceivedFirstChunk = true;
+                                thinkingTimer.Stop(); // 停止检测
+
                                 aiMessageBorder = CreateStreamingAIMessagePlaceholder();
                                 ChatHistoryPanel.Children.Add(aiMessageBorder);
                                 ScrollToBottom();
@@ -520,6 +467,9 @@ namespace BiaogPlugin.UI
                                 {
                                     contentRenderer = new StreamingMarkdownRenderer(aiRichTextBox);
                                 }
+
+                                // ✅ 收到第一个chunk时，改为"正在回复..."
+                                StatusText.Text = "正在回复...";
                             }
 
                             fullResponse += chunk;
@@ -531,29 +481,12 @@ namespace BiaogPlugin.UI
                         {
                             Log.Error(ex, "内容流式更新失败");
                         }
-                    },
-                    onReasoningChunk: _deepThinking
-                        ? reasoning =>
-                        {
-                            try
-                            {
-                                Log.Debug($"收到思考内容: {reasoning?.Length ?? 0} 字符");
-                                // ✅ 直接调用 - OpenAI SDK已保证UI线程安全
-                                thinkingRenderer?.AppendChunk(reasoning);
-                                ScrollToBottom();
-                            }
-                            catch (Exception ex)
-                            {
-                                Log.Error(ex, "思考内容流式更新失败");
-                            }
-                        }
-                        : null
+                    }
                 );
 
                 // ✅ 完成流式输出，强制最终更新
                 Dispatcher.Invoke(() =>
                 {
-                    thinkingRenderer?.Complete();
                     contentRenderer?.Complete();
                     ScrollToBottom();
                 });
@@ -603,6 +536,9 @@ namespace BiaogPlugin.UI
             {
                 _isProcessing = false;
                 SendButton.IsEnabled = !string.IsNullOrWhiteSpace(InputTextBox.Text);
+
+                // ✅ v1.0.7修复：每次对话后自动保存会话历史到本地
+                SaveCurrentSessionMessages();
 
                 // ✅ 性能优化：修剪聊天历史，防止内存占用过高
                 TrimChatHistory();
@@ -654,7 +590,7 @@ namespace BiaogPlugin.UI
         }
 
         /// <summary>
-        /// 创建AI消息占位符（使用StackPanel以支持深度思考内容）
+        /// 创建AI消息占位符
         /// </summary>
         private Border CreateAIMessagePlaceholder()
         {
@@ -762,125 +698,6 @@ namespace BiaogPlugin.UI
                 Log.Debug($"移除最旧消息，当前消息数: {ChatHistoryPanel.Children.Count}");
             }
         }
-
-        #region 深度思考内容处理
-
-        /// <summary>
-        /// 创建深度思考折叠区域占位符（用于流式显示）
-        /// </summary>
-        private Expander CreateThinkingExpanderPlaceholder()
-        {
-            // ✅ 创建Header文本（白色）
-            var headerText = new TextBlock
-            {
-                Text = "🧠 深度思考过程...",
-                Foreground = Brushes.White,  // ✅ 白色文本
-                FontSize = 13
-            };
-
-            var expander = new Expander
-            {
-                Header = headerText,  // ✅ 使用白色TextBlock作为Header
-                IsExpanded = true,  // ✅ 初始展开，让用户看到思考过程
-                Background = new SolidColorBrush(Color.FromRgb(60, 60, 60)),  // 深色背景
-                Foreground = Brushes.White,  // ✅ Expander箭头颜色也设为白色
-                BorderBrush = new SolidColorBrush(Color.FromRgb(100, 100, 100)),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(8),
-                Margin = new Thickness(0, 0, 40, 15),  // ✅ 增加底部边距15px，避免遮挡下方文本
-                HorizontalAlignment = HorizontalAlignment.Left
-            };
-
-            // ✅ 使用RichTextBox支持Markdown渲染
-            var thinkingRichTextBox = new RichTextBox
-            {
-                IsReadOnly = true,
-                BorderThickness = new Thickness(0),
-                Background = Brushes.Transparent,
-                Foreground = new SolidColorBrush(Color.FromRgb(200, 200, 200)),  // ✅ 改为更亮的灰色，在深色背景上更易读
-                FontSize = 12,
-                FontFamily = new FontFamily("Consolas, Segoe UI"),
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,  // ✅ 允许滚动
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
-                // ✅ 移除MaxHeight限制，让深度思考内容完全显示
-            };
-
-            // 初始化空文档
-            thinkingRichTextBox.Document = new FlowDocument();
-
-            expander.Content = thinkingRichTextBox;
-            return expander;
-        }
-
-        /// <summary>
-        /// 从Expander中查找思考内容的RichTextBox
-        /// </summary>
-        private RichTextBox? FindThinkingRichTextBox(Expander expander)
-        {
-            return expander.Content as RichTextBox;
-        }
-
-        /// <summary>
-        /// 解析并分离深度思考内容（已废弃，使用流式API）
-        /// </summary>
-        private (string? thinkingContent, string mainContent) ParseThinkingContent(string fullText)
-        {
-            // 检测 <think>...</think> 标签
-            const string startTag = "<think>";
-            const string endTag = "</think>";
-
-            int thinkStart = fullText.IndexOf(startTag);
-            int thinkEnd = fullText.IndexOf(endTag);
-
-            if (thinkStart >= 0 && thinkEnd > thinkStart)
-            {
-                // 提取思考内容
-                string thinkingContent = fullText.Substring(
-                    thinkStart + startTag.Length,
-                    thinkEnd - thinkStart - startTag.Length
-                ).Trim();
-
-                // 提取正文内容（移除<think>...</think>部分）
-                string mainContent = fullText.Remove(thinkStart, thinkEnd - thinkStart + endTag.Length).Trim();
-
-                return (thinkingContent, mainContent);
-            }
-
-            // 没有思考内容，返回全部作为正文
-            return (null, fullText);
-        }
-
-        /// <summary>
-        /// 创建深度思考折叠区域（已废弃，使用CreateThinkingExpanderPlaceholder）
-        /// </summary>
-        private Expander CreateThinkingExpander(string thinkingContent)
-        {
-            var expander = new Expander
-            {
-                Header = $"🧠 深度思考过程 ({thinkingContent.Length} 字)",
-                IsExpanded = false,
-                Background = new SolidColorBrush(Color.FromRgb(245, 245, 245)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(200, 200, 200)),
-                BorderThickness = new Thickness(1),
-                Padding = new Thickness(8),
-                Margin = new Thickness(0, 0, 0, 8)
-            };
-
-            var thinkingTextBlock = new TextBlock
-            {
-                Text = thinkingContent,
-                Foreground = new SolidColorBrush(Color.FromRgb(100, 100, 100)),
-                FontSize = 12,
-                TextWrapping = TextWrapping.Wrap,
-                LineHeight = 18,
-                FontFamily = new FontFamily("Consolas, Microsoft YaHei UI")
-            };
-
-            expander.Content = thinkingTextBlock;
-            return expander;
-        }
-
-        #endregion
 
         #region 会话管理
 
@@ -1090,7 +907,14 @@ namespace BiaogPlugin.UI
                 // 清空UI
                 ClearChatHistory();
 
-                // 加载历史消息
+                // ✅ 恢复AI服务的历史记录（关键修复：防止切换会话后历史丢失）
+                if (_aiService != null && session.Messages.Count > 0)
+                {
+                    _aiService.LoadHistory(session.Messages);
+                    Log.Debug($"恢复AI服务历史: {session.Messages.Count}条消息");
+                }
+
+                // 加载历史消息到UI
                 foreach (var message in session.Messages)
                 {
                     if (message.Role == "user")

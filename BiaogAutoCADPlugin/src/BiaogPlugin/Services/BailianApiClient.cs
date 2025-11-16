@@ -170,6 +170,10 @@ public class BailianApiClient
     /// 清理翻译文本中的特殊标识符和提示词泄露
     /// 阿里云百炼模型可能返回 <|endofcontent|> 等特殊token，或者返回DomainPrompt内容
     /// </summary>
+    /// <summary>
+    /// ✅ P0增强：深度清洗qwen-flash等通用对话模型的翻译响应
+    /// 处理各种可能的无关内容：提示词、解释、markdown格式、注释等
+    /// </summary>
     private string CleanTranslationText(string text)
     {
         if (string.IsNullOrEmpty(text))
@@ -177,110 +181,172 @@ public class BailianApiClient
             return text;
         }
 
-        // ✅ 修复严重Bug：移除API响应中可能包含的DomainPrompt提示词内容
-        // 问题：有时API会将提示词内容包含在翻译结果中，导致图纸出现大段英文提示词
-        // 解决：检测并移除所有DomainPrompt相关的内容
+        var original = text;
 
-        // 1. 移除完整的DomainPrompt（如果API完整返回了提示词）
-        if (text.Contains("This text is from AutoCAD engineering"))
+        // ========== 第1步：移除Markdown代码块标记 ==========
+        // qwen-flash可能返回 ```text\n翻译内容\n``` 格式
+        if (text.StartsWith("```"))
         {
-            // 尝试截取到提示词之前的部分
-            var promptStart = text.IndexOf("This text is from AutoCAD engineering");
-            if (promptStart > 0)
+            // 移除开头的 ```language
+            var firstNewline = text.IndexOf('\n');
+            if (firstNewline > 0)
             {
-                text = text.Substring(0, promptStart).Trim();
+                text = text.Substring(firstNewline + 1);
             }
-            else
+
+            // 移除结尾的 ```
+            if (text.EndsWith("```"))
             {
-                // 如果响应只包含提示词，返回空字符串
-                text = "";
+                text = text.Substring(0, text.Length - 3);
+            }
+
+            text = text.Trim();
+            Log.Debug("移除Markdown代码块标记");
+        }
+
+        // ========== 第2步：移除系统提示词特征短语 ==========
+        var systemPromptKeywords = new[]
+        {
+            // ✅ v1.0.7新增：检测中文system prompt关键词
+            "你是CAD/BIM工程图纸专业翻译",
+            "严格遵守：",
+            "使用标准工程术语",
+            "保留图号、规范代号",
+            "直接输出译文",
+            "不加任何解释",
+
+            // 旧版英文提示词关键词
+            "You are a professional CAD/BIM",
+            "You are a professional translator",
+            "Follow these rules strictly:",
+            "STANDARD INDUSTRY TERMINOLOGY",
+            "PRESERVE ALL technical identifiers",
+            "MAINTAIN original formatting",
+            "OUTPUT FORMAT:",
+            "Direct translation ONLY",
+            "Do NOT add:",
+            "Task: Translate",
+            "Output ONLY the translated text",
+
+            // 其他中文关键词
+            "您是专业的CAD/BIM",
+            "您是专业翻译",
+            "请严格遵循以下规则",
+            "标准行业术语",
+            "保留所有技术标识",
+            "保持原始格式",
+            "输出格式",
+            "仅输出翻译",
+            "不要添加",
+            "任务：翻译"
+        };
+
+        foreach (var keyword in systemPromptKeywords)
+        {
+            if (text.Contains(keyword))
+            {
+                var keywordIndex = text.IndexOf(keyword);
+                if (keywordIndex >= 0)
+                {
+                    // 如果关键词在开头，直接移除到关键词后
+                    if (keywordIndex == 0)
+                    {
+                        // 查找第一个换行符或冒号后的内容
+                        var separatorIndex = Math.Max(
+                            text.IndexOf('\n', keyword.Length),
+                            text.IndexOf(':', keyword.Length)
+                        );
+
+                        if (separatorIndex > 0)
+                        {
+                            text = text.Substring(separatorIndex + 1).Trim();
+                        }
+                        else
+                        {
+                            text = "";
+                        }
+                    }
+                    // 如果关键词在中间/结尾，截取到关键词之前
+                    else
+                    {
+                        text = text.Substring(0, keywordIndex).Trim();
+                    }
+
+                    Log.Debug($"移除系统提示词片段: {keyword}");
+                    break;
+                }
             }
         }
 
-        // 2. 移除DomainPrompt中的关键短语（英文版本 - 部分泄露的情况）
-        var promptKeyPhrasesEn = new[]
+        // ========== 第3步：移除常见的解释性前缀 ==========
+        var explanatoryPrefixes = new[]
         {
-            "This text is from AutoCAD",
-            "IMPORTANT TRANSLATION RULES:",
-            "PRESERVE: Drawing numbers",
-            "TRANSLATE: Descriptive text",
-            "Use official construction industry terminology",
-            "Translate into professional construction engineering domain style",
-            "architectural construction drawings",
-            "structural engineering",
-            "MEP systems"
+            "Translation:",
+            "译文：",
+            "翻译结果：",
+            "翻译：",
+            "Translated text:",
+            "The translation is:",
+            "Here is the translation:",
+            "以下是翻译：",
+            "翻译如下：",
+            "答案：",
+            "Answer:",
+            "Result:",
+            "结果："
         };
 
-        foreach (var phrase in promptKeyPhrasesEn)
+        foreach (var prefix in explanatoryPrefixes)
         {
-            if (text.Contains(phrase))
+            if (text.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {
-                var phraseStart = text.IndexOf(phrase);
-                if (phraseStart > 0)
-                {
-                    // 截取到短语之前的部分
-                    text = text.Substring(0, phraseStart).Trim();
-                }
-                else
-                {
-                    // 如果响应开头就是这些短语，清空
-                    text = "";
-                }
+                text = text.Substring(prefix.Length).Trim();
+                Log.Debug($"移除解释性前缀: {prefix}");
                 break;
             }
         }
 
-        // 3. ✅ 新增：移除DomainPrompt的中文翻译版本（用户报告：出现"文本来自AutoCAD工程与建筑施工图"）
-        var promptKeyPhrasesZh = new[]
+        // ========== 第4步：移除引号包裹（如果整个文本被引号包裹） ==========
+        text = text.Trim();
+        if ((text.StartsWith("\"") && text.EndsWith("\"")) ||
+            (text.StartsWith("'") && text.EndsWith("'")) ||
+            (text.StartsWith(""") && text.EndsWith(""")))
         {
-            "文本来自AutoCAD",      // ✅ 用户确认的准确短语
-            "本文来自AutoCAD",
-            "这段文本来自",
-            "此文本来自",
-            "工程与建筑施工图",
-            "工程和建筑施工图",
-            "建筑施工图纸",
-            "结构工程",
-            "机电系统",
-            "重要翻译规则",
-            "保留：图纸编号",
-            "翻译：描述性文本",
-            "使用官方建筑行业术语",
-            "翻译成专业建筑工程领域风格"
-        };
-
-        foreach (var phrase in promptKeyPhrasesZh)
-        {
-            if (text.Contains(phrase))
-            {
-                var phraseStart = text.IndexOf(phrase);
-                if (phraseStart > 0)
-                {
-                    // 截取到短语之前的部分
-                    text = text.Substring(0, phraseStart).Trim();
-                }
-                else
-                {
-                    // 如果响应开头就是这些短语，清空
-                    text = "";
-                }
-                break;
-            }
+            text = text.Substring(1, text.Length - 2).Trim();
+            Log.Debug("移除引号包裹");
         }
 
-        // 3. 移除常见的特殊标识符
+        // ========== 第5步：移除特殊标识符 ==========
         text = text
             .Replace("<|endofcontent|>", "")
             .Replace("<|im_end|>", "")
             .Replace("<|im_start|>", "")
             .Replace("<|end|>", "")
             .Replace("<|start|>", "")
+            .Replace("<eot_id>", "")
+            .Replace("<start_of_turn>", "")
+            .Replace("<end_of_turn>", "")
             .Trim();
 
-        // 4. 如果清理后为空或只剩下提示词片段，记录警告
+        // ========== 第6步：移除注释和说明性文本 ==========
+        // 模式：(注: xxx) 或 [注释: xxx] 或 <!-- xxx -->
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"\(注[:：].*?\)", "");
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"\[注释[:：].*?\]", "");
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"<!--.*?-->", "");
+        text = text.Trim();
+
+        // ========== 第7步：检测并警告异常情况 ==========
         if (string.IsNullOrWhiteSpace(text) || text.Length < 2)
         {
-            Log.Warning("翻译结果清理后为空，可能是提示词泄露或API响应异常");
+            Log.Warning($"翻译结果清洗后为空！原始响应前100字符: {original.Substring(0, Math.Min(100, original.Length))}");
+            // 如果清洗后为空，返回原始文本（最后的兜底）
+            return original;
+        }
+
+        // 检测是否清洗掉了大量内容（可能过度清洗）
+        if (original.Length > 100 && text.Length < original.Length * 0.3)
+        {
+            Log.Warning($"清洗可能过度：原始{original.Length}字符 → 清洗后{text.Length}字符（保留{text.Length * 100.0 / original.Length:F1}%）");
         }
 
         return text;
@@ -739,18 +805,38 @@ public class BailianApiClient
         // 从配置读取模型，如果未指定则使用最优翻译模型
         if (string.IsNullOrEmpty(model))
         {
+            // ✅ 2025-11-16更新：默认使用qwen-flash（1M上下文，更强推理和专业术语理解）
+            // 替代qwen-mt-flash的原因：
+            // 1. qwen-flash有1M上下文（vs qwen-mt-flash的8K），可一次性翻译整个图纸
+            // 2. qwen-flash推理能力更强，更好理解复杂工程规范和专业术语
+            // 3. qwen-flash支持思考模式，翻译质量更高
             model = _configManager.GetString(
                 "Bailian:TextTranslationModel",
-                BailianModelSelector.Models.QwenMTFlash // qwen-mt-flash：术语定制+格式还原
+                BailianModelSelector.Models.QwenFlash // qwen-flash：1M上下文+混合思考模式
             );
         }
 
         Log.Debug($"翻译使用模型: {model}");
 
-        // ✅ 检查文本长度，如果超过限制则分段翻译
-        if (text.Length > EngineeringTranslationConfig.MaxCharsPerBatch)
+        // ✅ 根据模型类型选择合适的批次大小
+        int maxCharsPerBatch;
+        if (model.Contains("flash") && !model.Contains("mt-flash"))
         {
-            Log.Information($"文本过长({text.Length}字符)，启用分段翻译（每段{EngineeringTranslationConfig.MaxCharsPerBatch}字符）");
+            // qwen-flash/qwen-plus：1M上下文，可处理超长文本
+            maxCharsPerBatch = 450000; // 900K tokens（留100K余量）
+            Log.Debug($"使用大上下文模型 {model}，批次大小: {maxCharsPerBatch}字符");
+        }
+        else
+        {
+            // qwen-mt-flash等：8K上下文
+            maxCharsPerBatch = EngineeringTranslationConfig.MaxCharsPerBatch; // 3500字符
+            Log.Debug($"使用标准模型 {model}，批次大小: {maxCharsPerBatch}字符");
+        }
+
+        // ✅ 检查文本长度，如果超过限制则分段翻译
+        if (text.Length > maxCharsPerBatch)
+        {
+            Log.Information($"文本过长({text.Length}字符)，启用分段翻译（每段{maxCharsPerBatch}字符）");
             return await TranslateWithSegmentationAsync(text, targetLanguage, model, sourceLanguage, cancellationToken);
         }
 
@@ -1514,8 +1600,34 @@ public class ChatMessage
     public string Role { get; set; } = ""; // "user", "assistant", "system", "tool"
     public string Content { get; set; } = "";
     public string? Name { get; set; } // 工具名称（用于role="tool"的消息）
-    public string? ToolCallId { get; set; } // ✅ 商业级最佳实践：支持工具调用ID（Function Calling必需）
-                                               // 参考：阿里云百炼官方文档 - Function Calling要求tool消息必须包含tool_call_id
+    public string? ToolCallId { get; set; } // ✅ tool消息必须包含tool_call_id关联到assistant的tool_calls
+
+    // ✅ CRITICAL FIX: assistant消息必须保存工具调用信息
+    // 参考：阿里云百炼官方文档 - Function Calling要求assistant消息包含完整的tool_calls数组
+    // 错误："messages with role 'tool' must be a response to a preceeding message with 'tool_calls'"
+    // 原因：当会话恢复或BuildMessages时，assistant消息缺少tool_calls字段导致API拒绝后续的tool消息
+    public List<ToolCallInfo>? ToolCalls { get; set; }
+}
+
+/// <summary>
+/// 工具调用信息（用于ChatMessage序列化到API）
+/// 与ToolCall类分离，专门用于消息历史持久化
+/// </summary>
+public class ToolCallInfo
+{
+    public string Id { get; set; } = "";
+    public string Type { get; set; } = "function";
+    public FunctionCallInfo Function { get; set; } = new();
+    public int Index { get; set; }
+}
+
+/// <summary>
+/// 函数调用信息
+/// </summary>
+public class FunctionCallInfo
+{
+    public string Name { get; set; } = "";
+    public string Arguments { get; set; } = ""; // JSON字符串格式
 }
 
 /// <summary>

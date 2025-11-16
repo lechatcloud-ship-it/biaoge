@@ -58,8 +58,9 @@ namespace BiaogPlugin.UI
         {
             try
             {
-                // 禁用按钮防止重复点击
+                // ✅ 交互反馈：禁用按钮并修改文本
                 TranslateButton.IsEnabled = false;
+                TranslateButton.Content = "翻译中...";
                 ProgressCard.Visibility = Visibility.Visible;
 
                 // 获取选择的语言
@@ -117,7 +118,9 @@ namespace BiaogPlugin.UI
             }
             finally
             {
+                // ✅ 恢复按钮状态和文本
                 TranslateButton.IsEnabled = true;
+                TranslateButton.Content = "开始翻译";
                 ProgressCard.Visibility = Visibility.Collapsed;
             }
         }
