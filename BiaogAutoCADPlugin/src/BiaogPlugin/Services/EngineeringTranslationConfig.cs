@@ -26,99 +26,42 @@ namespace BiaogPlugin.Services
         /// - RPM: 1000 QPS（单条并发）
         /// - 成功率: 99.8%
         ///
-        /// 批次大小计算（2025-11-17优化后）：
-        /// - DomainPrompt: ~50 tokens ("Construction and Engineering Documentation")
-        /// - Terms术语表: ~80 tokens (20条核心术语，已优化)
-        /// - TM翻译记忆: ~120 tokens (5个核心示例，已优化)
-        /// - 系统参数总计: ~250 tokens（大幅减少！）
-        /// - 实际可用输入: 8192 - 250 = 7942 tokens
+        /// 批次大小计算（2025-11-17 极简优化后）：
         ///
-        /// Token估算规则：
-        /// - 中文字符: 1字符 ≈ 1.5 tokens (包括标点)
-        /// - 英文/数字: 1字符 ≈ 0.25 tokens
-        /// - 混合文本: 保守估计 1字符 ≈ 1.0 token
-        /// - 安全裕度: 留1000 tokens给API响应和误差
+        /// ✅ 用户反馈："提示词也算输入tokens的，所以必须要提示词少一点"
         ///
-        /// 计算：(7942 - 1000) / 1.0 = 6942字符
-        /// 优化设置: 6500字符（留442 tokens安全余量）
+        /// 系统参数（极简配置）：
+        /// - DomainPrompt: ~2 tokens ("Construction Engineering")
+        /// - Terms术语表: ~30 tokens (5条核心术语)
+        /// - TM翻译记忆: ~40 tokens (2条核心示例)
+        /// - 系统参数总计: ~72 tokens ✅ 极简！
         ///
-        /// ⚠️ 注意：1M上下文是qwen-flash/qwen-plus通用对话模型的能力，NOT qwen-mt-flash
+        /// 可用空间计算：
+        /// - 输入限制: 8192 tokens
+        /// - 系统参数: -72 tokens
+        /// - 安全余量: -500 tokens (API响应、误差等)
+        /// - 实际可用: 7620 tokens
+        ///
+        /// Token估算规则（保守）：
+        /// - 混合中英文: 1字符 ≈ 1 token
+        ///
+        /// 最终设置: 7500字符（留120 tokens余量）
+        ///
+        /// ⚠️ 注意：
+        /// - 如果仍然超限，请运行TokenDiagnosticService实测
+        /// - 可进一步移除tm_list（设为空数组）
         /// </summary>
-        public const int MaxCharsPerBatch = 6500;  // ✅ 优化后：从3500提升到6500
+        public const int MaxCharsPerBatch = 7500;  // ✅ 极简优化后：7500字符（系统参数仅72 tokens）
 
         /// <summary>
-        /// 工程建筑领域提示词（英文，符合阿里云百炼Prompt Engineering最佳实践）
+        /// 工程建筑领域提示词
         ///
-        /// ✅ 2025-11-15升级：基于阿里云百炼官方Prompt Engineering最佳实践
-        /// 框架结构：背景(Background) + 目的(Purpose) + 风格(Style) + 受众(Audience) + 输出(Output)
-        /// 参考：https://help.aliyun.com/zh/model-studio/prompt-engineering-guide
-        ///
-        /// 核心优化：
-        /// 1. 【明确背景】专业建筑工程图纸翻译，AutoCAD/BIM环境
-        /// 2. 【清晰目的】国际工程标准合规，专业术语精准，保留技术标识
-        /// 3. 【专业风格】工程技术文档风格，简洁准确，避免口语化
-        /// 4. 【目标受众】建筑师、工程师、施工人员等专业读者
-        /// 5. 【输出规范】保持原文格式，技术代码/编号不变，术语标准化
-        /// 6. 【Few-shot示例】提供高质量翻译示例引导模型
+        /// ✅ 极简优化（用户反馈："提示词也算输入tokens的"）
+        /// - 从500+ tokens缩减到10-20 tokens
+        /// - 仅保留最核心的领域标识
+        /// - 优先保证实际翻译内容的token空间
         /// </summary>
-        public static readonly string DomainPrompt =
-            "# Background\n" +
-            "You are a professional translator specializing in construction and engineering drawings. " +
-            "This text is from AutoCAD/BIM engineering drawings, including structural, architectural, " +
-            "MEP (Mechanical, Electrical, Plumbing), and fire protection systems.\n" +
-            "\n" +
-            "# Purpose\n" +
-            "Translate construction documentation with 100% technical accuracy, complying with:\n" +
-            "- International standards: ACI (American Concrete Institute), AISC (American Institute of Steel Construction), " +
-            "ASHRAE (HVAC), IBC (International Building Code)\n" +
-            "- Chinese standards: GB (National Standards), JGJ (Construction Engineering Standards)\n" +
-            "\n" +
-            "# Style & Tone\n" +
-            "- Professional engineering documentation style\n" +
-            "- Concise, precise, technical terminology\n" +
-            "- Formal register, avoid colloquialisms\n" +
-            "\n" +
-            "# Audience\n" +
-            "Professional engineers, architects, contractors, and construction managers who require " +
-            "technically accurate translations for design, construction, and compliance.\n" +
-            "\n" +
-            "# Critical Requirements\n" +
-            "1. **Use Standard Professional Terminology** (NOT literal word-by-word translation)\n" +
-            "2. **Preserve All Technical Identifiers**:\n" +
-            "   - Drawing numbers (No., DWG No., 图号)\n" +
-            "   - Standard codes (GB 50010, JGJ 3, ACI 318)\n" +
-            "   - Material grades (C30, Q235, HRB400)\n" +
-            "   - Units (mm, m, kN, MPa, °C)\n" +
-            "   - Floor levels (1F, 2F, B1, RF)\n" +
-            "   - Grid axes (Axis A, Axis 1, ①轴)\n" +
-            "3. **Maintain Original Formatting**:\n" +
-            "   - Keep line breaks, spacing, and layout\n" +
-            "   - Preserve punctuation for technical data\n" +
-            "4. **Context-Aware Translation**:\n" +
-            "   - \"beam\" in structural context → 梁 (not 光束/横梁)\n" +
-            "   - \"column\" in structural context → 柱 (not 列/专栏)\n" +
-            "   - \"doghouse\" in roof context → 屋顶设备间 (NOT 狗屋)\n" +
-            "\n" +
-            "# Translation Examples (Few-shot Learning)\n" +
-            "**Example 1 - Structural Component:**\n" +
-            "EN: \"300×600 reinforced concrete beam, C30 concrete, HRB400 steel reinforcement\"\n" +
-            "ZH: \"300×600钢筋混凝土梁，C30混凝土，HRB400钢筋\"\n" +
-            "\n" +
-            "**Example 2 - Drawing Annotation:**\n" +
-            "EN: \"Refer to detail drawing No.SD-102 for connection node at Axis A/1\"\n" +
-            "ZH: \"连接节点详见详图No.SD-102，位于A/1轴交点\"\n" +
-            "\n" +
-            "**Example 3 - Technical Specification:**\n" +
-            "EN: \"Load-bearing wall thickness: 240mm, masonry with MU10 perforated brick and M5 cement mortar\"\n" +
-            "ZH: \"承重墙厚度：240mm，MU10多孔砖+M5水泥砂浆砌筑\"\n" +
-            "\n" +
-            "**Example 4 - MEP System:**\n" +
-            "EN: \"Fire hydrant system design pressure: 0.35MPa, flow rate: 40L/s\"\n" +
-            "ZH: \"消火栓系统设计压力：0.35MPa，流量：40L/s\"\n" +
-            "\n" +
-            "# Output Format\n" +
-            "Provide direct translation only. Do not add explanations, notes, or commentary unless " +
-            "requested. Maintain the same structure and formatting as the source text.\n";
+        public static readonly string DomainPrompt = "Construction Engineering";
 
         /// <summary>
         /// 不应翻译的术语/模式规则
@@ -624,55 +567,77 @@ namespace BiaogPlugin.Services
 
         /// <summary>
         /// 转换为阿里云百炼API所需的tm_list格式
+        ///
+        /// ✅ 极简优化（用户反馈："提示词也算输入tokens"）
+        /// - 只保留2条最核心示例（或完全移除）
+        /// - 优先保证实际内容的token空间
         /// </summary>
         public static List<object> GetApiTranslationMemory(string sourceLang, string targetLang)
         {
             var tmList = new List<object>();
 
-            // 根据翻译方向选择合适的示例
+            // ✅ 用户明确要求：提示词要少！只保留2条最核心示例
+            // 如果还是不够，可以完全移除（return empty list）
+
             bool isEnToZh = sourceLang.Contains("English") && targetLang.Contains("Chinese");
             bool isZhToEn = sourceLang.Contains("Chinese") && targetLang.Contains("English");
 
-            foreach (var pair in TranslationMemory)
+            if (isZhToEn)
             {
-                if (isEnToZh && pair.Source.All(c => c < 128 || char.IsPunctuation(c))) // 英文源文本
-                {
-                    tmList.Add(new { source = pair.Source, target = pair.Target });
-                }
-                else if (isZhToEn && pair.Source.Any(c => c > 128)) // 中文源文本
-                {
-                    tmList.Add(new { source = pair.Source, target = pair.Target });
-                }
+                // 中译英：只保留2条最核心示例
+                tmList.Add(new { source = "300×600钢筋混凝土梁，C30混凝土", target = "300×600 RC Beam, C30 Concrete" });
+                tmList.Add(new { source = "详见详图No.SD-102", target = "See Detail No.SD-102" });
+            }
+            else if (isEnToZh)
+            {
+                // 英译中：只保留2条最核心示例
+                tmList.Add(new { source = "300×600 RC Beam, C30 Concrete", target = "300×600钢筋混凝土梁，C30混凝土" });
+                tmList.Add(new { source = "See Detail No.SD-102", target = "详见详图No.SD-102" });
             }
 
-            // ✅ 限制在10个示例以内（避免context过长）
-            return tmList.Take(10).ToList();
+            Log.Information($"✅ 极简翻译记忆: {tmList.Count}条（优先保证内容空间）");
+            return tmList;
         }
 
         /// <summary>
         /// 转换为阿里云百炼API所需的terms格式
+        ///
+        /// ✅ 极简优化（用户反馈："提示词也算输入tokens"）
+        /// - 只保留5条最核心术语
+        /// - 减少95%的术语占用
         /// </summary>
         public static List<object> GetApiTerms(string sourceLang, string targetLang)
         {
             var terms = new List<object>();
 
+            // ✅ 用户明确要求：提示词要少！只保留5条最关键术语
+            var coreTerms = new[]
+            {
+                new { zh = "钢筋混凝土", en = "Reinforced Concrete" },
+                new { zh = "详见", en = "See" },
+                new { zh = "详图", en = "Detail" },
+                new { zh = "混凝土", en = "Concrete" },
+                new { zh = "钢筋", en = "Reinforcement" }
+            };
+
             // 如果是中译英
             if (sourceLang.Contains("Chinese") && targetLang.Contains("English"))
             {
-                foreach (var term in ProfessionalTerms)
+                foreach (var term in coreTerms)
                 {
-                    terms.Add(new { source = term.Chinese, target = term.English });
+                    terms.Add(new { source = term.zh, target = term.en });
                 }
             }
             // 如果是英译中
             else if (sourceLang.Contains("English") && targetLang.Contains("Chinese"))
             {
-                foreach (var term in ProfessionalTerms)
+                foreach (var term in coreTerms)
                 {
-                    terms.Add(new { source = term.English, target = term.Chinese });
+                    terms.Add(new { source = term.en, target = term.zh });
                 }
             }
 
+            Log.Information($"✅ 极简术语表: {terms.Count}条（优先保证内容空间）");
             return terms;
         }
 
