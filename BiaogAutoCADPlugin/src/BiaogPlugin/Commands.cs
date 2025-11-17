@@ -666,6 +666,98 @@ namespace BiaogPlugin
             }
         }
 
+        /// <summary>
+        /// ✅ 一键算量并导出Excel - 完整的专业算量功能
+        ///
+        /// 用户反馈："导出来的表格简单至极，这根本就不是一个合格的算量工具"
+        ///
+        /// 功能：
+        /// 1. 自动识别图纸中的所有构件（柱梁板墙、钢筋、门窗等）
+        /// 2. 提取几何实体并匹配面积/体积
+        /// 3. 计算钢筋重量、模板面积
+        /// 4. 导出详细的Excel报表（3个工作表）
+        ///    - 工作表1：分部分项工程量清单（GB 50854-2013格式）
+        ///    - 工作表2：钢筋明细表（直径、长度、根数、重量）
+        ///    - 工作表3：材料汇总表（混凝土、钢筋、模板汇总）
+        /// </summary>
+        [CommandMethod("BIAOGE_CALCULATE_EXPORT", CommandFlags.Modal)]
+        public async void CalculateAndExport()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                ed.WriteMessage("\n╔═════════════════════════════════════════════════════╗");
+                ed.WriteMessage("\n║     标哥智能算量 - 一键算量并导出Excel           ║");
+                ed.WriteMessage("\n╚═════════════════════════════════════════════════════╝");
+                ed.WriteMessage("\n");
+
+                Log.Information("开始执行一键算量并导出");
+
+                // ===== 步骤1：提取文本实体 =====
+                ed.WriteMessage("\n【步骤1/4】正在提取图纸文本...");
+                var textExtractor = new DwgTextExtractor();
+                var textEntities = textExtractor.ExtractAllText();
+                ed.WriteMessage($" 完成！提取到{textEntities.Count}个文本实体");
+
+                // ===== 步骤2：识别构件 =====
+                ed.WriteMessage("\n【步骤2/4】正在识别构件（柱梁板墙、钢筋等）...");
+                var bailianClient = ServiceLocator.Get<BailianApiClient>();
+                var componentRecognizer = new ComponentRecognizer(bailianClient);
+                var components = await componentRecognizer.RecognizeFromTextEntitiesAsync(textEntities, useAiVerification: false);
+                ed.WriteMessage($" 完成！识别到{components.Count}个构件");
+
+                if (components.Count == 0)
+                {
+                    ed.WriteMessage("\n⚠️  未识别到任何构件，无法继续算量");
+                    ed.WriteMessage("\n\n💡 提示：");
+                    ed.WriteMessage("\n  1. 确保图纸文字使用标准术语（如：C30混凝土柱、HRB400钢筋）");
+                    ed.WriteMessage("\n  2. 运行 BIAOGE_DIAGNOSE_QUANTITY 命令进行详细诊断");
+                    return;
+                }
+
+                // ===== 步骤3：统计工程量 =====
+                ed.WriteMessage("\n【步骤3/4】正在统计工程量...");
+                double totalArea = components.Sum(c => c.Area);
+                double totalVolume = components.Sum(c => c.Volume);
+                double totalSteelWeight = components.Sum(c => c.SteelWeight);
+                double totalFormwork = components.Sum(c => c.FormworkArea);
+
+                ed.WriteMessage("\n  ✓ 总面积: " + $"{totalArea:F2}m²");
+                ed.WriteMessage("\n  ✓ 总体积: " + $"{totalVolume:F3}m³");
+                ed.WriteMessage("\n  ✓ 钢筋重量: " + $"{totalSteelWeight:F2}kg ({totalSteelWeight/1000:F3}t)");
+                ed.WriteMessage("\n  ✓ 模板面积: " + $"{totalFormwork:F2}m²");
+
+                // ===== 步骤4：导出Excel =====
+                ed.WriteMessage("\n【步骤4/4】正在导出Excel报表...");
+
+                var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                var fileName = $"工程量清单_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+                var filePath = System.IO.Path.Combine(desktopPath, fileName);
+
+                var excelExporter = new QuantityExcelExporter();
+                excelExporter.ExportToExcel(components, filePath);
+
+                ed.WriteMessage($" 完成！");
+                ed.WriteMessage($"\n\n✅ Excel报表已保存到桌面：");
+                ed.WriteMessage($"\n   {fileName}");
+                ed.WriteMessage("\n\n报表内容：");
+                ed.WriteMessage("\n  - 工作表1：分部分项工程量清单（按构件类型汇总）");
+                ed.WriteMessage("\n  - 工作表2：钢筋明细表（直径、长度、根数、重量）");
+                ed.WriteMessage("\n  - 工作表3：材料汇总表（混凝土、钢筋、模板等）");
+                ed.WriteMessage("\n");
+
+                Log.Information($"✅ 一键算量并导出完成: {filePath}");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "一键算量并导出失败");
+                ed.WriteMessage($"\n❌ 错误：{ex.Message}");
+                ed.WriteMessage($"\n详细信息：{ex.StackTrace}");
+            }
+        }
+
         #endregion
 
         #region 设置命令
