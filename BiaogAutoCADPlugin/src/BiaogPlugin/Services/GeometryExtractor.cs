@@ -915,6 +915,144 @@ namespace BiaogPlugin.Services
             return allGeometries.Where(g => g.Layer == layerName).ToList();
         }
 
+        /// <summary>
+        /// ✅ 性能优化：大图纸分批处理（适用于10万+实体的大型图纸）
+        /// </summary>
+        /// <param name="batchSize">每批处理的实体数量（默认5000）</param>
+        /// <param name="progressCallback">进度回调（current, total）</param>
+        public List<GeometryEntity> ExtractAllGeometryBatched(
+            int batchSize = 5000,
+            Action<int, int>? progressCallback = null)
+        {
+            var geometries = new List<GeometryEntity>();
+            var doc = Application.DocumentManager.MdiActiveDocument;
+
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return geometries;
+            }
+
+            var db = doc.Database;
+
+            using (var tr = db.TransactionManager.StartTransaction())
+            {
+                try
+                {
+                    Log.Information("═══════════════════════════════════════════════════");
+                    Log.Information("开始分批提取几何实体（大图纸性能优化模式）");
+                    Log.Information($"批处理大小: {batchSize}");
+                    Log.Information("═══════════════════════════════════════════════════");
+
+                    // 统计总实体数
+                    int totalEntities = 0;
+                    var bt = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+                    var modelSpace = (BlockTableRecord)tr.GetObject(bt[BlockTableRecord.ModelSpace], OpenMode.ForRead);
+
+                    foreach (ObjectId objId in modelSpace)
+                    {
+                        totalEntities++;
+                    }
+
+                    Log.Information($"图纸包含 {totalEntities} 个实体，将分 {(totalEntities + batchSize - 1) / batchSize} 批处理");
+
+                    int processed = 0;
+                    int batchNumber = 1;
+
+                    // 分批处理
+                    foreach (ObjectId objId in modelSpace)
+                    {
+                        var ent = tr.GetObject(objId, OpenMode.ForRead) as Entity;
+                        if (ent == null) continue;
+
+                        GeometryEntity? geometryData = null;
+
+                        // 提取几何数据（使用现有逻辑）
+                        if (ent is Polyline polyline)
+                        {
+                            geometryData = ExtractPolylineData(polyline, objId, "Model");
+                        }
+                        else if (ent is Polyline2d polyline2d)
+                        {
+                            geometryData = ExtractPolyline2dData(polyline2d, objId, "Model");
+                        }
+                        else if (ent is Polyline3d polyline3d)
+                        {
+                            geometryData = ExtractPolyline3dData(polyline3d, objId, "Model");
+                        }
+                        else if (ent is Solid3d solid3d)
+                        {
+                            geometryData = ExtractSolid3dData(solid3d, objId, "Model");
+                        }
+                        else if (ent is Region region)
+                        {
+                            geometryData = ExtractRegionData(region, objId, "Model");
+                        }
+                        else if (ent is Hatch hatch)
+                        {
+                            geometryData = ExtractHatchData(hatch, objId, "Model");
+                        }
+                        else if (ent is Circle circle)
+                        {
+                            geometryData = ExtractCircleData(circle, objId, "Model");
+                        }
+                        else if (ent is Arc arc)
+                        {
+                            geometryData = ExtractArcData(arc, objId, "Model");
+                        }
+                        else if (ent is Ellipse ellipse)
+                        {
+                            geometryData = ExtractEllipseData(ellipse, objId, "Model");
+                        }
+                        else if (ent is Spline spline)
+                        {
+                            geometryData = ExtractSplineData(spline, objId, "Model");
+                        }
+                        else if (ent is Face face)
+                        {
+                            geometryData = ExtractFaceData(face, objId, "Model");
+                        }
+                        else if (ent is Surface surface)
+                        {
+                            geometryData = ExtractSurfaceData(surface, objId, "Model");
+                        }
+
+                        if (geometryData != null)
+                        {
+                            geometries.Add(geometryData);
+                        }
+
+                        processed++;
+
+                        // 每处理完一批，报告进度
+                        if (processed % batchSize == 0)
+                        {
+                            progressCallback?.Invoke(processed, totalEntities);
+                            Log.Debug($"批处理进度: {batchNumber}批完成 ({processed}/{totalEntities}, {100.0 * processed / totalEntities:F1}%)");
+                            batchNumber++;
+
+                            // 允许GC回收（大图纸内存优化）
+                            GC.Collect(0, GCCollectionMode.Optimized);
+                        }
+                    }
+
+                    // 最终进度报告
+                    progressCallback?.Invoke(totalEntities, totalEntities);
+
+                    tr.Commit();
+
+                    Log.Information($"✅ 分批提取完成: 共{geometries.Count}个几何实体（{processed}/{totalEntities}个实体已处理）");
+                    return geometries;
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, "分批提取几何实体失败");
+                    tr.Abort();
+                    throw;
+                }
+            }
+        }
+
         #endregion
     }
 }
