@@ -91,8 +91,15 @@ namespace BiaogPlugin.Services
         {
             try
             {
-                var center = GetPoint3d(args, "center_point");
+                var center = GetPoint3d(args, "center");  // ✅ 修复：与工具定义保持一致
                 var radius = GetDoubleSafe(args, "radius", 100.0);
+
+                // ✅ 添加参数验证
+                if (radius <= 0)
+                {
+                    return "✗ 半径必须大于0";
+                }
+
                 var layer = GetStringSafe(args, "layer", "0");
                 var colorStr = GetStringSafe(args, "color", "ByLayer");
 
@@ -263,6 +270,17 @@ namespace BiaogPlugin.Services
                 var position = GetPoint2d(args, "position");
                 var text = GetStringSafe(args, "text", "");
                 var height = GetDoubleSafe(args, "height", 3.5);
+
+                // ✅ 添加参数验证
+                if (string.IsNullOrWhiteSpace(text))
+                {
+                    return "✗ 文本内容不能为空";
+                }
+                if (height <= 0)
+                {
+                    return "✗ 文字高度必须大于0";
+                }
+
                 var rotation = GetDoubleSafe(args, "rotation", 0.0);
                 var layer = GetStringSafe(args, "layer", "0");
                 var textType = GetStringSafe(args, "text_type", "single");
@@ -1521,6 +1539,13 @@ namespace BiaogPlugin.Services
                     }
                     else
                     {
+                        // ✅ 添加文件路径验证
+                        var directory = System.IO.Path.GetDirectoryName(filePath);
+                        if (!string.IsNullOrEmpty(directory) && !System.IO.Directory.Exists(directory))
+                        {
+                            return $"✗ 目录不存在: {directory}";
+                        }
+
                         // 另存为
                         db.SaveAs(filePath, DwgVersion.Current);
                         Log.Information($"✅ 另存为完成: {filePath}");
@@ -1546,6 +1571,20 @@ namespace BiaogPlugin.Services
                 if (string.IsNullOrEmpty(outputPath))
                 {
                     return "✗ 输出路径不能为空";
+                }
+
+                // ✅ 添加文件路径验证
+                var directory = System.IO.Path.GetDirectoryName(outputPath);
+                if (!string.IsNullOrEmpty(directory) && !System.IO.Directory.Exists(directory))
+                {
+                    return $"✗ 目录不存在: {directory}";
+                }
+
+                // ✅ 检查文件扩展名
+                var extension = System.IO.Path.GetExtension(outputPath);
+                if (!extension.Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+                {
+                    outputPath += ".pdf";
                 }
 
                 var doc = Application.DocumentManager.MdiActiveDocument;
@@ -1790,9 +1829,22 @@ namespace BiaogPlugin.Services
         {
             try
             {
-                var entityId1 = GetObjectIdList(args, "entity_ids")[0];
-                var entityId2 = GetObjectIdList(args, "entity_ids")[1];
+                var entityIds = GetObjectIdList(args, "entity_ids");
+
+                // ✅ 添加参数验证
+                if (entityIds.Count < 2)
+                {
+                    return "✗ 需要至少2个实体ID";
+                }
+
+                var entityId1 = entityIds[0];
+                var entityId2 = entityIds[1];
                 var radius = GetDoubleSafe(args, "radius", 0.0);
+
+                if (radius < 0)
+                {
+                    return "✗ 圆角半径不能为负数";
+                }
 
                 var doc = Application.DocumentManager.MdiActiveDocument;
                 var db = doc.Database;
@@ -1833,10 +1885,23 @@ namespace BiaogPlugin.Services
         {
             try
             {
-                var entityId1 = GetObjectIdList(args, "entity_ids")[0];
-                var entityId2 = GetObjectIdList(args, "entity_ids")[1];
+                var entityIds = GetObjectIdList(args, "entity_ids");
+
+                // ✅ 添加参数验证
+                if (entityIds.Count < 2)
+                {
+                    return "✗ 需要至少2个实体ID";
+                }
+
+                var entityId1 = entityIds[0];
+                var entityId2 = entityIds[1];
                 var distance1 = GetDoubleSafe(args, "distance1", 0.0);
                 var distance2 = GetDoubleSafe(args, "distance2", 0.0);
+
+                if (distance1 < 0 || distance2 < 0)
+                {
+                    return "✗ 倒角距离不能为负数";
+                }
 
                 var doc = Application.DocumentManager.MdiActiveDocument;
                 var db = doc.Database;
