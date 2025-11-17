@@ -344,7 +344,7 @@ namespace BiaogPlugin
                                 historyRecords.Add(new TranslationHistory.HistoryRecord
                                 {
                                     Timestamp = DateTime.Now,
-                                    ObjectIdHandle = textEntities[i].ObjectId.Handle.ToString(),
+                                    ObjectIdHandle = textEntities[i].Id.Handle.ToString(),  // ✅ P0修复: 使用Id而非ObjectId
                                     OriginalText = textEntities[i].Content,
                                     TranslatedText = translations[i],
                                     SourceLanguage = "auto",
