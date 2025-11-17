@@ -53,64 +53,13 @@ namespace BiaogPlugin.Services
         /// 5. 【输出规范】保持原文格式，技术代码/编号不变，术语标准化
         /// 6. 【Few-shot示例】提供高质量翻译示例引导模型
         /// </summary>
-        public static readonly string DomainPrompt =
-            "# Background\n" +
-            "You are a professional translator specializing in construction and engineering drawings. " +
-            "This text is from AutoCAD/BIM engineering drawings, including structural, architectural, " +
-            "MEP (Mechanical, Electrical, Plumbing), and fire protection systems.\n" +
-            "\n" +
-            "# Purpose\n" +
-            "Translate construction documentation with 100% technical accuracy, complying with:\n" +
-            "- International standards: ACI (American Concrete Institute), AISC (American Institute of Steel Construction), " +
-            "ASHRAE (HVAC), IBC (International Building Code)\n" +
-            "- Chinese standards: GB (National Standards), JGJ (Construction Engineering Standards)\n" +
-            "\n" +
-            "# Style & Tone\n" +
-            "- Professional engineering documentation style\n" +
-            "- Concise, precise, technical terminology\n" +
-            "- Formal register, avoid colloquialisms\n" +
-            "\n" +
-            "# Audience\n" +
-            "Professional engineers, architects, contractors, and construction managers who require " +
-            "technically accurate translations for design, construction, and compliance.\n" +
-            "\n" +
-            "# Critical Requirements\n" +
-            "1. **Use Standard Professional Terminology** (NOT literal word-by-word translation)\n" +
-            "2. **Preserve All Technical Identifiers**:\n" +
-            "   - Drawing numbers (No., DWG No., 图号)\n" +
-            "   - Standard codes (GB 50010, JGJ 3, ACI 318)\n" +
-            "   - Material grades (C30, Q235, HRB400)\n" +
-            "   - Units (mm, m, kN, MPa, °C)\n" +
-            "   - Floor levels (1F, 2F, B1, RF)\n" +
-            "   - Grid axes (Axis A, Axis 1, ①轴)\n" +
-            "3. **Maintain Original Formatting**:\n" +
-            "   - Keep line breaks, spacing, and layout\n" +
-            "   - Preserve punctuation for technical data\n" +
-            "4. **Context-Aware Translation**:\n" +
-            "   - \"beam\" in structural context → 梁 (not 光束/横梁)\n" +
-            "   - \"column\" in structural context → 柱 (not 列/专栏)\n" +
-            "   - \"doghouse\" in roof context → 屋顶设备间 (NOT 狗屋)\n" +
-            "\n" +
-            "# Translation Examples (Few-shot Learning)\n" +
-            "**Example 1 - Structural Component:**\n" +
-            "EN: \"300×600 reinforced concrete beam, C30 concrete, HRB400 steel reinforcement\"\n" +
-            "ZH: \"300×600钢筋混凝土梁，C30混凝土，HRB400钢筋\"\n" +
-            "\n" +
-            "**Example 2 - Drawing Annotation:**\n" +
-            "EN: \"Refer to detail drawing No.SD-102 for connection node at Axis A/1\"\n" +
-            "ZH: \"连接节点详见详图No.SD-102，位于A/1轴交点\"\n" +
-            "\n" +
-            "**Example 3 - Technical Specification:**\n" +
-            "EN: \"Load-bearing wall thickness: 240mm, masonry with MU10 perforated brick and M5 cement mortar\"\n" +
-            "ZH: \"承重墙厚度：240mm，MU10多孔砖+M5水泥砂浆砌筑\"\n" +
-            "\n" +
-            "**Example 4 - MEP System:**\n" +
-            "EN: \"Fire hydrant system design pressure: 0.35MPa, flow rate: 40L/s\"\n" +
-            "ZH: \"消火栓系统设计压力：0.35MPa，流量：40L/s\"\n" +
-            "\n" +
-            "# Output Format\n" +
-            "Provide direct translation only. Do not add explanations, notes, or commentary unless " +
-            "requested. Maintain the same structure and formatting as the source text.\n";
+        /// <summary>
+        /// ✅ P0紧急修复：根据阿里云百炼官方文档，domains应该是简短的领域提示
+        /// 官方文档：domains (optional): Domain hint string (English only) for contextual guidance
+        /// 错误：之前使用了完整的系统提示词（包含 # Background、# Purpose等），导致模型回显
+        /// 正确：简短的领域描述，不超过一句话
+        /// </summary>
+        public static readonly string DomainPrompt = "Construction and Engineering Documentation";
 
         /// <summary>
         /// 不应翻译的术语/模式规则

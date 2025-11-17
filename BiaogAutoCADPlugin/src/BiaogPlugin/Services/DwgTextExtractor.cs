@@ -564,20 +564,18 @@ namespace BiaogPlugin.Services
                     return; // 跳过此块
                 }
 
-                // ✅ 检测外部引用和覆盖引用（但继续提取）
-                // 🐛 修复：用户反馈"很多文本根本翻译不了，比如外键文本等"
-                // 🔧 原因：之前直接跳过外部引用块，导致XRef中的文本无法提取
-                // ✅ 新策略：允许提取XRef文本，但记录日志方便追踪
-                // ⚠️ 限制：XRef块是只读的，翻译后无法更新（DwgTextUpdater会自动跳过）
+                // ✅ P0关键修复：跳过外部引用块（XRef是只读的，无法翻译更新）
+                // 📌 设计决策（v1.0.9）：
+                //    - XRef外部引用块是只读的，即使提取并翻译也无法更新
+                //    - 提取XRef文本会浪费API调用，增加用户困惑
+                //    - 如果用户需要翻译XRef内容，应该打开XRef源文件直接翻译
+                // 🔧 修复逻辑：检测到XRef直接返回，不提取任何文本
                 bool isXRef = blockDef.IsFromExternalReference || blockDef.IsFromOverlayReference;
                 if (isXRef)
                 {
                     int entityCount = blockDef.Cast<ObjectId>().Count();
-                    Log.Debug($"检测到外部引用块: {blockDef.Name} (XRef)，包含 {entityCount} 个实体，继续提取文本（注意：XRef只读）");
-                    if (entityCount > 10000)
-                    {
-                        Log.Warning($"XRef块 {blockDef.Name} 实体数量过多({entityCount})，可能影响提取性能");
-                    }
+                    Log.Information($"跳过外部引用块: {blockDef.Name} (XRef)，包含 {entityCount} 个实体（XRef是只读的，无法翻译更新）");
+                    return; // ✅ 直接返回，不提取XRef中的文本
                 }
 
                 // 遍历块定义中的所有实体
@@ -693,6 +691,13 @@ namespace BiaogPlugin.Services
                 // 只跳过模型空间和图纸空间（已在ExtractFromBlockTableRecord中处理）
                 if (blockDef.IsLayout)
                     continue;
+
+                // ✅ P0关键修复：跳过外部引用块定义（XRef是只读的，无法翻译更新）
+                if (blockDef.IsFromExternalReference || blockDef.IsFromOverlayReference)
+                {
+                    Log.Debug($"跳过外部引用块定义: {blockDef.Name} (XRef)");
+                    continue;
+                }
 
                 // ✅ 关键修复：不再跳过匿名块！
                 // 动态块、标注块等会创建匿名块变体，必须提取这些块中的文本
