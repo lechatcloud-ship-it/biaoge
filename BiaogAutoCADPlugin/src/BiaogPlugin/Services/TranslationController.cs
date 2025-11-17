@@ -27,10 +27,13 @@ namespace BiaogPlugin.Services
             _extractor = new DwgTextExtractor();
             _updater = new DwgTextUpdater();
 
-            // 从ServiceLocator获取服务
-            _translationEngine = ServiceLocator.GetService<TranslationEngine>()!;
-            _cacheService = ServiceLocator.GetService<CacheService>()!;
-            _configManager = ServiceLocator.GetService<ConfigManager>()!;
+            // ✅ P1修复：从ServiceLocator获取服务,添加null检查避免NullReferenceException
+            _translationEngine = ServiceLocator.GetService<TranslationEngine>()
+                ?? throw new InvalidOperationException("TranslationEngine未在ServiceLocator中注册");
+            _cacheService = ServiceLocator.GetService<CacheService>()
+                ?? throw new InvalidOperationException("CacheService未在ServiceLocator中注册");
+            _configManager = ServiceLocator.GetService<ConfigManager>()
+                ?? throw new InvalidOperationException("ConfigManager未在ServiceLocator中注册");
         }
 
         /// <summary>
