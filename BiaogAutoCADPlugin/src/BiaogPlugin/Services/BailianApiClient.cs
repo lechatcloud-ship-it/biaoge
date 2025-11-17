@@ -1254,7 +1254,10 @@ public class BailianApiClient
         var requestBody = new
         {
             model = model,
-            messages = messages.Select(m => new { role = m.Role, content = m.Content }).ToList(),
+            messages = messages.Select(m => new {
+                role = m.Role,
+                content = m.MultiModalContent ?? (object)m.Content  // ✅ 优先使用MultiModalContent（支持视觉模型）
+            }).ToList(),
             tools = tools,
             stream = true,
             // ✅ 阿里云官方推荐：incremental_output 必须是顶级参数，不能嵌套在 stream_options 中
@@ -1468,7 +1471,10 @@ public class BailianApiClient
         var requestBody = new
         {
             model = model,
-            messages = messages.Select(m => new { role = m.Role, content = m.Content }).ToList(),
+            messages = messages.Select(m => new {
+                role = m.Role,
+                content = m.MultiModalContent ?? (object)m.Content  // ✅ 优先使用MultiModalContent（支持视觉模型）
+            }).ToList(),
             tools = tools,
             stream = false,
             temperature = temperature,
@@ -1699,12 +1705,20 @@ public class ChatMessage
 {
     public string Role { get; set; } = ""; // "user", "assistant", "system", "tool"
     public string Content { get; set; } = "";
+
+    /// <summary>
+    /// ✅ 多模态内容（用于视觉模型，如qwen-vl-max）
+    /// 当设置此字段时，优先使用MultiModalContent而非Content
+    /// 支持文字+图片混合内容：[{type:"text", text:"..."}, {type:"image_url", image_url:{url:"data:image/png;base64,..."}}]
+    /// </summary>
+    public object? MultiModalContent { get; set; }
+
     public string? Name { get; set; } // 工具名称（用于role="tool"的消息）
     public string? ToolCallId { get; set; } // ✅ tool消息必须包含tool_call_id关联到assistant的tool_calls
 
     // ✅ CRITICAL FIX: assistant消息必须保存工具调用信息
     // 参考：阿里云百炼官方文档 - Function Calling要求assistant消息包含完整的tool_calls数组
-    // 错误："messages with role 'tool' must be a response to a preceeding message with 'tool_calls'"
+    // 错误:"messages with role 'tool' must be a response to a preceeding message with 'tool_calls'"
     // 原因：当会话恢复或BuildMessages时，assistant消息缺少tool_calls字段导致API拒绝后续的tool消息
     public List<ToolCallInfo>? ToolCalls { get; set; }
 }

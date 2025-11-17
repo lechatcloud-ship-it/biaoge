@@ -310,7 +310,7 @@ namespace BiaogPlugin.Services
                     new ChatMessage
                     {
                         Role = "user",
-                        Content = new object[]
+                        MultiModalContent = new object[]
                         {
                             new { type = "text", text = prompt },
                             new { type = "image_url", image_url = new { url = $"data:image/png;base64,{base64Image}" } }
@@ -323,7 +323,7 @@ namespace BiaogPlugin.Services
                     messages,
                     model: "qwen-vl-max",  // ✅ 视觉模型
                     temperature: 0.2,      // 低温度确保准确性
-                    maxTokens: 4000        // 足够的token用于详细输出
+                    enableThinking: false  // 视觉模型不需要思考模式
                 );
 
                 Log.Debug($"AI返回: {response.Content.Length}字符");

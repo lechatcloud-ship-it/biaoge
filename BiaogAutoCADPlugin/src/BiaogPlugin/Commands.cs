@@ -542,6 +542,86 @@ namespace BiaogPlugin
         #region 算量命令
 
         /// <summary>
+        /// ✅ AI视觉分析图纸并识别构件（革命性算量方案）
+        /// </summary>
+        [CommandMethod("BIAOGE_VISION_ANALYZE", CommandFlags.Modal)]
+        public async void VisionAnalyzeDrawing()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                Log.Information("执行AI视觉分析命令: BIAOGE_VISION_ANALYZE");
+                ed.WriteMessage("\n\n╔══════════════════════════════════════════════════════════╗");
+                ed.WriteMessage("\n║  AI视觉图纸分析 - 基于qwen-vl-max                       ║");
+                ed.WriteMessage("\n╚══════════════════════════════════════════════════════════╝\n");
+
+                // 询问分析精度级别
+                ed.WriteMessage("\n选择分析精度级别:");
+                ed.WriteMessage("\n  [Q] 快速分析（主要构件：柱、梁、板、墙）");
+                ed.WriteMessage("\n  [S] 标准分析（含细部构件、门窗、钢筋）");
+                ed.WriteMessage("\n  [D] 详尽分析（所有可见构件、标注、符号）");
+                ed.WriteMessage("\n");
+
+                var levelInput = ed.GetKeywords(
+                    "\n请选择分析级别",
+                    new string[] { "Quick", "Standard", "Detailed" }
+                );
+
+                if (levelInput.Status != Autodesk.AutoCAD.EditorInput.PromptStatus.OK)
+                {
+                    ed.WriteMessage("\n分析已取消。");
+                    return;
+                }
+
+                var analysisLevel = levelInput.StringResult switch
+                {
+                    "Quick" => VisionAnalysisLevel.Quick,
+                    "Detailed" => VisionAnalysisLevel.Detailed,
+                    _ => VisionAnalysisLevel.Standard
+                };
+
+                ed.WriteMessage($"\n\n开始AI视觉分析（{analysisLevel}模式）...");
+                ed.WriteMessage("\n1️⃣  导出当前视图为图片...");
+
+                var analyzer = new DrawingVisionAnalyzer();
+                var results = await analyzer.AnalyzeDrawingAsync(analysisLevel: analysisLevel);
+
+                ed.WriteMessage($"\n\n✅ 分析完成！识别了 {results.Count} 个构件：");
+                ed.WriteMessage("\n");
+
+                // 显示前10个结果
+                int displayCount = Math.Min(10, results.Count);
+                for (int i = 0; i < displayCount; i++)
+                {
+                    var component = results[i];
+                    ed.WriteMessage($"\n  {i + 1}. {component.Type}");
+                    ed.WriteMessage($"\n     位置: ({component.Position.X:F2}, {component.Position.Y:F2})");
+                    ed.WriteMessage($"\n     尺寸: {component.Dimensions.Length:F2}×{component.Dimensions.Width:F2}×{component.Dimensions.Height:F2} {component.Dimensions.Unit}");
+                    ed.WriteMessage($"\n     数量: {component.Quantity}, 置信度: {component.Confidence:P0}");
+                    ed.WriteMessage($"\n     验证: {component.ValidationStatus}");
+                    ed.WriteMessage("\n");
+                }
+
+                if (results.Count > 10)
+                {
+                    ed.WriteMessage($"\n  ... 还有 {results.Count - 10} 个构件");
+                }
+
+                ed.WriteMessage("\n\n💡 提示：运行 BIAOGE_CALCULATE 打开算量面板查看完整结果。\n");
+
+                Log.Information($"AI视觉分析完成: {results.Count}个构件");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "AI视觉分析失败");
+                ed.WriteMessage($"\n\n❌ 分析失败: {ex.Message}");
+                ed.WriteMessage("\n");
+            }
+        }
+
+        /// <summary>
         /// 构件识别和工程量计算命令
         /// </summary>
         [CommandMethod("BIAOGE_CALCULATE", CommandFlags.Modal)]
