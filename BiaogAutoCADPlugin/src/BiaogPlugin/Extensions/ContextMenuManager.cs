@@ -232,8 +232,9 @@ namespace BiaogPlugin.Extensions
                 ed.WriteMessage($"\n开始翻译为{languageName}...");
                 ed.WriteMessage($"\n已选择 {selectedIds.Length} 个文本实体");
 
+                // ✅ P1修复: 使用TextEntity替代DwgTextEntity,统一数据模型
                 // 提取文本内容
-                var textEntities = new List<DwgTextEntity>();
+                var textEntities = new List<TextEntity>();
 
                 using (var tr = db.TransactionManager.StartTransaction())
                 {
@@ -244,51 +245,50 @@ namespace BiaogPlugin.Extensions
                             continue;
 
                         var obj = tr.GetObject(objId, OpenMode.ForRead);
-                        DwgTextEntity? textEntity = null;
+                        TextEntity? textEntity = null;
 
                         if (obj is DBText dbText)
                         {
-                            textEntity = new DwgTextEntity
+                            textEntity = new TextEntity
                             {
-                                ObjectId = objId,
+                                Id = objId,
+                                Type = TextEntityType.DBText,
                                 Content = dbText.TextString,
-                                Type = "DBText",
+                                Position = dbText.Position,
                                 Layer = dbText.Layer,
-                                Position = new System.Numerics.Vector3(
-                                    (float)dbText.Position.X,
-                                    (float)dbText.Position.Y,
-                                    (float)dbText.Position.Z
-                                )
+                                Height = dbText.Height,
+                                Rotation = dbText.Rotation,
+                                ColorIndex = (short)dbText.ColorIndex
                             };
                         }
                         else if (obj is MText mText)
                         {
-                            textEntity = new DwgTextEntity
+                            textEntity = new TextEntity
                             {
-                                ObjectId = objId,
+                                Id = objId,
+                                Type = TextEntityType.MText,
                                 Content = mText.Text,
-                                Type = "MText",
+                                Position = mText.Location,
                                 Layer = mText.Layer,
-                                Position = new System.Numerics.Vector3(
-                                    (float)mText.Location.X,
-                                    (float)mText.Location.Y,
-                                    (float)mText.Location.Z
-                                )
+                                Height = mText.TextHeight,
+                                Rotation = mText.Rotation,
+                                ColorIndex = (short)mText.ColorIndex,
+                                Width = mText.Width
                             };
                         }
                         else if (obj is AttributeReference attRef)
                         {
-                            textEntity = new DwgTextEntity
+                            textEntity = new TextEntity
                             {
-                                ObjectId = objId,
+                                Id = objId,
+                                Type = TextEntityType.AttributeReference,
                                 Content = attRef.TextString,
-                                Type = "AttributeReference",
+                                Position = attRef.Position,
                                 Layer = attRef.Layer,
-                                Position = new System.Numerics.Vector3(
-                                    (float)attRef.Position.X,
-                                    (float)attRef.Position.Y,
-                                    (float)attRef.Position.Z
-                                )
+                                Height = attRef.Height,
+                                Rotation = attRef.Rotation,
+                                ColorIndex = (short)attRef.ColorIndex,
+                                Tag = attRef.Tag
                             };
                         }
 
@@ -335,9 +335,11 @@ namespace BiaogPlugin.Extensions
                     {
                         updateRequests.Add(new TextUpdateRequest
                         {
-                            ObjectId = textEntities[i].ObjectId,
+                            ObjectId = textEntities[i].Id,  // ✅ P1修复: 使用Id而非ObjectId
                             OriginalContent = textEntities[i].Content,
-                            NewContent = translations[i]
+                            NewContent = translations[i],
+                            Layer = textEntities[i].Layer,
+                            EntityType = textEntities[i].Type
                         });
                         translatedCount++;
                     }

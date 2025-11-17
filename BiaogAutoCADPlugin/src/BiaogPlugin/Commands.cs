@@ -193,8 +193,9 @@ namespace BiaogPlugin
 
                 ed.WriteMessage($"\n开始翻译为{languageName}...");
 
+                // ✅ P1修复: 使用TextEntity替代DwgTextEntity,统一数据模型
                 // 提取选中文本实体的内容
-                var textEntities = new List<DwgTextEntity>();
+                var textEntities = new List<TextEntity>();
                 using (var tr = db.TransactionManager.StartTransaction())
                 {
                     foreach (var objId in selectedIds)
@@ -208,51 +209,51 @@ namespace BiaogPlugin
 
                         var obj = tr.GetObject(objId, Autodesk.AutoCAD.DatabaseServices.OpenMode.ForRead);
 
-                        DwgTextEntity? textEntity = null;
+                        TextEntity? textEntity = null;
 
+                        // ✅ P1修复: 使用TextEntity完整属性和强类型枚举
                         if (obj is Autodesk.AutoCAD.DatabaseServices.DBText dbText)
                         {
-                            textEntity = new DwgTextEntity
+                            textEntity = new TextEntity
                             {
-                                ObjectId = objId,
+                                Id = objId,  // ✅ 使用Id而非ObjectId,与TextEntity定义一致
+                                Type = TextEntityType.DBText,  // ✅ 强类型枚举,而非字符串
                                 Content = dbText.TextString,
-                                Type = "DBText",
+                                Position = dbText.Position,  // ✅ 直接使用Point3d,无需转换
                                 Layer = dbText.Layer,
-                                Position = new System.Numerics.Vector3(
-                                    (float)dbText.Position.X,
-                                    (float)dbText.Position.Y,
-                                    (float)dbText.Position.Z
-                                )
+                                Height = dbText.Height,  // ✅ 保留完整属性
+                                Rotation = dbText.Rotation,
+                                ColorIndex = (short)dbText.ColorIndex
                             };
                         }
                         else if (obj is Autodesk.AutoCAD.DatabaseServices.MText mText)
                         {
-                            textEntity = new DwgTextEntity
+                            textEntity = new TextEntity
                             {
-                                ObjectId = objId,
+                                Id = objId,
+                                Type = TextEntityType.MText,
                                 Content = mText.Text,
-                                Type = "MText",
+                                Position = mText.Location,
                                 Layer = mText.Layer,
-                                Position = new System.Numerics.Vector3(
-                                    (float)mText.Location.X,
-                                    (float)mText.Location.Y,
-                                    (float)mText.Location.Z
-                                )
+                                Height = mText.TextHeight,
+                                Rotation = mText.Rotation,
+                                ColorIndex = (short)mText.ColorIndex,
+                                Width = mText.Width
                             };
                         }
                         else if (obj is Autodesk.AutoCAD.DatabaseServices.AttributeReference attRef)
                         {
-                            textEntity = new DwgTextEntity
+                            textEntity = new TextEntity
                             {
-                                ObjectId = objId,
+                                Id = objId,
+                                Type = TextEntityType.AttributeReference,
                                 Content = attRef.TextString,
-                                Type = "AttributeReference",
+                                Position = attRef.Position,
                                 Layer = attRef.Layer,
-                                Position = new System.Numerics.Vector3(
-                                    (float)attRef.Position.X,
-                                    (float)attRef.Position.Y,
-                                    (float)attRef.Position.Z
-                                )
+                                Height = attRef.Height,
+                                Rotation = attRef.Rotation,
+                                ColorIndex = (short)attRef.ColorIndex,
+                                Tag = attRef.Tag
                             };
                         }
 
@@ -312,9 +313,11 @@ namespace BiaogPlugin
                     {
                         updateRequests.Add(new TextUpdateRequest
                         {
-                            ObjectId = textEntities[i].ObjectId,
+                            ObjectId = textEntities[i].Id,  // ✅ P1修复: 使用Id而非ObjectId
                             OriginalContent = textEntities[i].Content,
-                            NewContent = translations[i]
+                            NewContent = translations[i],
+                            Layer = textEntities[i].Layer,  // ✅ 添加Layer信息
+                            EntityType = textEntities[i].Type  // ✅ 添加EntityType信息
                         });
                         translatedCount++;
                     }

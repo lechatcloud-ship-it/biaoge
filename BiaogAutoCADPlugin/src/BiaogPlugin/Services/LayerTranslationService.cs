@@ -131,13 +131,13 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
-        /// 从指定图层提取文本实体
+        /// ✅ P1修复: 从指定图层提取文本实体,使用统一的TextEntity模型
         /// </summary>
-        public static List<DwgTextEntity> ExtractTextFromLayers(List<string> layerNames)
+        public static List<TextEntity> ExtractTextFromLayers(List<string> layerNames)
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
             var db = doc.Database;
-            var textEntities = new List<DwgTextEntity>();
+            var textEntities = new List<TextEntity>();
 
             try
             {
@@ -161,51 +161,50 @@ namespace BiaogPlugin.Services
                                 continue;
 
                             var obj = tr.GetObject(objId, OpenMode.ForRead);
-                            DwgTextEntity? textEntity = null;
+                            TextEntity? textEntity = null;
 
                             if (obj is DBText dbText && layerNames.Contains(dbText.Layer))
                             {
-                                textEntity = new DwgTextEntity
+                                textEntity = new TextEntity
                                 {
-                                    ObjectId = objId,
+                                    Id = objId,
+                                    Type = TextEntityType.DBText,
                                     Content = dbText.TextString,
-                                    Type = "DBText",
+                                    Position = dbText.Position,
                                     Layer = dbText.Layer,
-                                    Position = new System.Numerics.Vector3(
-                                        (float)dbText.Position.X,
-                                        (float)dbText.Position.Y,
-                                        (float)dbText.Position.Z
-                                    )
+                                    Height = dbText.Height,
+                                    Rotation = dbText.Rotation,
+                                    ColorIndex = (short)dbText.ColorIndex
                                 };
                             }
                             else if (obj is MText mText && layerNames.Contains(mText.Layer))
                             {
-                                textEntity = new DwgTextEntity
+                                textEntity = new TextEntity
                                 {
-                                    ObjectId = objId,
+                                    Id = objId,
+                                    Type = TextEntityType.MText,
                                     Content = mText.Text,
-                                    Type = "MText",
+                                    Position = mText.Location,
                                     Layer = mText.Layer,
-                                    Position = new System.Numerics.Vector3(
-                                        (float)mText.Location.X,
-                                        (float)mText.Location.Y,
-                                        (float)mText.Location.Z
-                                    )
+                                    Height = mText.TextHeight,
+                                    Rotation = mText.Rotation,
+                                    ColorIndex = (short)mText.ColorIndex,
+                                    Width = mText.Width
                                 };
                             }
                             else if (obj is AttributeReference attRef && layerNames.Contains(attRef.Layer))
                             {
-                                textEntity = new DwgTextEntity
+                                textEntity = new TextEntity
                                 {
-                                    ObjectId = objId,
+                                    Id = objId,
+                                    Type = TextEntityType.AttributeReference,
                                     Content = attRef.TextString,
-                                    Type = "AttributeReference",
+                                    Position = attRef.Position,
                                     Layer = attRef.Layer,
-                                    Position = new System.Numerics.Vector3(
-                                        (float)attRef.Position.X,
-                                        (float)attRef.Position.Y,
-                                        (float)attRef.Position.Z
-                                    )
+                                    Height = attRef.Height,
+                                    Rotation = attRef.Rotation,
+                                    ColorIndex = (short)attRef.ColorIndex,
+                                    Tag = attRef.Tag
                                 };
                             }
 
