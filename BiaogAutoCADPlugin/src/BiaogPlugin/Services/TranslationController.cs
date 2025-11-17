@@ -60,6 +60,46 @@ namespace BiaogPlugin.Services
             {
                 Log.Information($"开始翻译图纸: {doc.Name}, 目标语言: {targetLanguage}");
 
+                // ====== 阶段0: 解锁图纸（新增！） ======
+                progress?.Report(new TranslationProgress
+                {
+                    Stage = "解锁图纸",
+                    Percentage = 0
+                });
+
+                DwgUnlockService.UnlockRecord? unlockRecord = null;
+                try
+                {
+                    // 检查锁定状态
+                    var (lockedLayers, xrefCount) = DwgUnlockService.CheckLockStatus();
+                    Log.Information($"图纸状态: {lockedLayers}个锁定图层, {xrefCount}个外部引用");
+
+                    if (lockedLayers > 0 || xrefCount > 0)
+                    {
+                        ed.WriteMessage($"\n检测到 {lockedLayers} 个锁定图层, {xrefCount} 个外部引用");
+                        ed.WriteMessage("\n正在解锁图纸...");
+
+                        // ✅ 用户需求："如果锁定就解锁整个图纸后再翻译"
+                        // bindXRefs参数：是否自动绑定外部引用（默认true，确保外部文本可翻译）
+                        unlockRecord = DwgUnlockService.UnlockDrawingForTranslation(bindXRefs: xrefCount > 0);
+
+                        if (xrefCount > 0 && unlockRecord.BoundXRefs.Count > 0)
+                        {
+                            ed.WriteMessage($"\n✅ 已绑定 {unlockRecord.BoundXRefs.Count} 个外部引用为本地块");
+                        }
+                        ed.WriteMessage($"\n✅ 图纸解锁完成: {unlockRecord.UnlockedLayers.Count}个图层已解锁");
+                    }
+                    else
+                    {
+                        Log.Information("图纸无锁定内容，跳过解锁");
+                    }
+                }
+                catch (Exception unlockEx)
+                {
+                    Log.Warning(unlockEx, "解锁图纸失败，继续翻译（可能部分文本无法更新）");
+                    ed.WriteMessage($"\n⚠️ 解锁失败: {unlockEx.Message}");
+                }
+
                 // ====== 阶段1: 提取文本 ======
                 progress?.Report(new TranslationProgress
                 {
