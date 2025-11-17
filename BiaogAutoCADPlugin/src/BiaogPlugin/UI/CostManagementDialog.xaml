@@ -46,9 +46,9 @@
                                     <Run Text="✅ 步骤1：获取本地价格数据"/><LineBreak/>
                                     <Run Text="   访问当地工程造价信息网（如：北京造价信息网、上海工程造价信息网）"/><LineBreak/><LineBreak/>
                                     <Run Text="✅ 步骤2：编辑价格数据库"/><LineBreak/>
-                                    <Run Text="   点击"打开价格数据库文件"按钮，用记事本/VS Code编辑JSON文件"/><LineBreak/><LineBreak/>
+                                    <Run Text="   点击【打开价格数据库文件】按钮，用记事本/VS Code编辑JSON文件"/><LineBreak/><LineBreak/>
                                     <Run Text="✅ 步骤3：启用成本估算"/><LineBreak/>
-                                    <Run Text="   在"基本设置"标签页中勾选"启用成本估算""/>
+                                    <Run Text="   在【基本设置】标签页中勾选【启用成本估算】"/>
                                 </TextBlock>
                             </StackPanel>
                         </Border>
@@ -175,7 +175,7 @@
                                Foreground="White" Margin="0,10,0,10"/>
                     <TextBlock TextWrapping="Wrap" Foreground="#CCCCCC" LineHeight="20">
                         <Run Text="• 使用VS Code或记事本编辑JSON文件"/><LineBreak/>
-                        <Run Text="• 保存后点击"重新加载数据库"按钮应用更改"/><LineBreak/>
+                        <Run Text="• 保存后点击【重新加载数据库】按钮应用更改"/><LineBreak/>
                         <Run Text="• 支持用户自定义配置：复制文件到 ~/.biaoge/cost-database.json"/><LineBreak/>
                         <Run Text="• JSON格式示例："/><LineBreak/>
                         <Run Text='  "C30混凝土柱": { "unit": "m³", "price": 500.00, "description": "..." }'/>

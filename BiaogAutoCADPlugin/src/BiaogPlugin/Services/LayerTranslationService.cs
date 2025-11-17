@@ -290,7 +290,7 @@ namespace BiaogPlugin.Services
                     {
                         updateRequests.Add(new TextUpdateRequest
                         {
-                            ObjectId = textEntities[i].ObjectId,
+                            ObjectId = textEntities[i].Id,
                             OriginalContent = textEntities[i].Content,
                             NewContent = translations[i]
                         });
@@ -313,12 +313,12 @@ namespace BiaogPlugin.Services
                                 historyRecords.Add(new TranslationHistory.HistoryRecord
                                 {
                                     Timestamp = DateTime.Now,
-                                    ObjectIdHandle = textEntities[i].ObjectId.Handle.ToString(),
+                                    ObjectIdHandle = textEntities[i].Id.Handle.ToString(),
                                     OriginalText = textEntities[i].Content,
                                     TranslatedText = translations[i],
                                     SourceLanguage = "auto",
                                     TargetLanguage = targetLanguage,
-                                    EntityType = textEntities[i].Type,
+                                    EntityType = textEntities[i].Type.ToString(),
                                     Layer = textEntities[i].Layer,
                                     Operation = "translate"
                                 });

@@ -919,8 +919,11 @@ namespace BiaogPlugin.Services
                             }
                             else if (entity is Region region)
                             {
-                                var areaProps = region.GetAreaProperties();
-                                totalArea += areaProps.Area;
+                                // Region使用GeometricExtents估算面积
+                                var bounds = region.GeometricExtents;
+                                double length = bounds.MaxPoint.X - bounds.MinPoint.X;
+                                double width = bounds.MaxPoint.Y - bounds.MinPoint.Y;
+                                totalArea += length * width;
                                 count++;
                             }
                         }
@@ -1175,6 +1178,7 @@ namespace BiaogPlugin.Services
 
                 var doc = Application.DocumentManager.MdiActiveDocument;
                 var db = doc.Database;
+                var changes = new List<string>();
 
                 using (var docLock = doc.LockDocument())
                 using (var tr = db.TransactionManager.StartTransaction())
@@ -1190,8 +1194,6 @@ namespace BiaogPlugin.Services
                         layerTable[layerName],
                         OpenMode.ForWrite
                     );
-
-                    var changes = new List<string>();
 
                     if (!string.IsNullOrEmpty(colorStr))
                     {

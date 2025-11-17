@@ -169,11 +169,11 @@ namespace BiaogPlugin.Services
 
                 if (ent is MText mText)
                 {
-                    // ✅ P0修复：使用Text属性而非Contents（避免格式代码注入）
-                    // 🐛 问题：Contents包含MText格式代码（如{\fSimSun|b0;文本}），直接赋值纯文本会导致格式混乱
-                    // 📖 官方文档：AutoCAD 2022 .NET API - MText.Text = 纯文本，MText.Contents = 含格式代码
+                    // ✅ P0修复：使用Contents属性设置文本内容
+                    // 🐛 注意：MText.Text是只读属性，必须使用Contents
+                    // 📖 官方文档：AutoCAD 2022 .NET API - MText.Text = 只读纯文本，MText.Contents = 可写含格式代码
                     // 参考：https://help.autodesk.com/view/OARX/2022/ENU MText Properties
-                    mText.Text = update.NewContent;  // 使用Text属性赋值纯文本
+                    mText.Contents = update.NewContent;  // 使用Contents属性赋值
 
                     // ✅ 如果包含中文，切换到支持中文的字体
                     if (containsChinese)

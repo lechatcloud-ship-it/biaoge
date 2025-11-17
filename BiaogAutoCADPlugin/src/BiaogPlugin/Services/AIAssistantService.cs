@@ -211,7 +211,7 @@ namespace BiaogPlugin.Services
                         // 降级方案
                         summary = await _bailianClient.ChatCompletionStreamAsync(
                             messages: summaryMessages,
-                            model: AgentModel,
+                            model: _agentModel,
                             onStreamChunk: chunk => onContentChunk?.Invoke(chunk)
                         );
                     }

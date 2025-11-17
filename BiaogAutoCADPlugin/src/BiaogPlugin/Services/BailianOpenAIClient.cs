@@ -188,16 +188,16 @@ public class BailianOpenAIClient
                 }
             }
 
-            // ✅ 深度思考模式支持（Qwen3-Flash/Plus）
+            // ❌ 深度思考模式暂不支持（OpenAI SDK版本问题）
             // 参考：https://help.aliyun.com/zh/model-studio/deep-thinking
             if (enableThinking)
             {
-                // OpenAI SDK通过AdditionalProperties传递非标准参数
-                options.AdditionalProperties = new Dictionary<string, object>
-                {
-                    ["enable_thinking"] = true
-                };
-                Log.Debug("深度思考模式已启用（enable_thinking=true）");
+                Log.Warning("当前SDK版本暂不支持深度思考模式，使用标准模式");
+                // TODO: 需要使用HttpClient路径实现深度思考
+                // options.AdditionalProperties = new Dictionary<string, object>
+                // {
+                //     ["enable_thinking"] = true
+                // };
             }
 
             Log.Debug($"流式调用OpenAI SDK: 模型={_model}, 消息数={messages.Count}, 深度思考={enableThinking}");

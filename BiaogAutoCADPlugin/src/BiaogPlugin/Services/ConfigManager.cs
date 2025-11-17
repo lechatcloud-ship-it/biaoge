@@ -74,7 +74,7 @@ public class ConfigManager
         }
     }
 
-    private void SaveConfig()
+    public void SaveConfig()
     {
         lock (_lock)
         {

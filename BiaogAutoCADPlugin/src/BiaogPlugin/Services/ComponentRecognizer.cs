@@ -694,7 +694,8 @@ public class ComponentRecognizer
     private decimal EstimateCost(ComponentRecognitionResult result)
     {
         // ✅ 检查成本估算是否启用（默认关闭）
-        var config = ConfigManager.Instance.Config;
+        var configManager = ServiceLocator.GetService<ConfigManager>();
+        var config = configManager?.Config ?? new PluginConfig();
         if (!config.Cost.EnableCostEstimation)
         {
             Log.Debug("成本估算功能已禁用（默认关闭，避免误导）");

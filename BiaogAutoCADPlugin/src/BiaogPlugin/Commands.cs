@@ -349,7 +349,7 @@ namespace BiaogPlugin
                                     TranslatedText = translations[i],
                                     SourceLanguage = "auto",
                                     TargetLanguage = targetLanguage,
-                                    EntityType = textEntities[i].Type,
+                                    EntityType = textEntities[i].Type.ToString(),
                                     Layer = textEntities[i].Layer,
                                     Operation = "translate"
                                 });

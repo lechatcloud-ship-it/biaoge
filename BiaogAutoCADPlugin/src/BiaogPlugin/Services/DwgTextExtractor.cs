@@ -572,10 +572,11 @@ namespace BiaogPlugin.Services
                 bool isXRef = blockDef.IsFromExternalReference || blockDef.IsFromOverlayReference;
                 if (isXRef)
                 {
-                    Log.Debug($"检测到外部引用块: {blockDef.Name} (XRef)，包含 {blockDef.Count} 个实体，继续提取文本（注意：XRef只读）");
-                    if (blockDef.Count > 10000)
+                    int entityCount = blockDef.Cast<ObjectId>().Count();
+                    Log.Debug($"检测到外部引用块: {blockDef.Name} (XRef)，包含 {entityCount} 个实体，继续提取文本（注意：XRef只读）");
+                    if (entityCount > 10000)
                     {
-                        Log.Warning($"XRef块 {blockDef.Name} 实体数量过多({blockDef.Count})，可能影响提取性能");
+                        Log.Warning($"XRef块 {blockDef.Name} 实体数量过多({entityCount})，可能影响提取性能");
                     }
                 }
 

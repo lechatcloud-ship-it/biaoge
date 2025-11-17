@@ -142,64 +142,15 @@ namespace BiaogPlugin.Services
 
         /// <summary>
         /// ✅ 使用Plot API导出视图（高质量PNG，300 DPI）
+        /// ⚠️ 暂未实现：Plot API较复杂，当前版本使用PNGOUT命令替代
         /// </summary>
         private void ExportViewUsingPlotApi(string outputPath)
         {
-            var doc = Application.DocumentManager.MdiActiveDocument;
-            var db = doc.Database;
-
-            using (var tr = db.TransactionManager.StartTransaction())
-            {
-                // 获取当前视图范围
-                var view = doc.Editor.GetCurrentView();
-
-                // 创建Plot设置
-                using (var plotSettings = new PlotSettings(true))
-                {
-                    plotSettings.PlotConfigurationName = "PublishToWeb PNG.pc3";  // PNG设备
-                    plotSettings.PlotPaperUnits = PlotPaperUnit.Inches;
-                    plotSettings.PlotPaperSize = "ANSI_A_(11.00_x_8.50_Inches)";
-
-                    // 设置Plot范围为当前视图
-                    plotSettings.PlotType = PlotType.Window;
-                    plotSettings.PlotWindowArea = new Extents2d(
-                        view.CenterPoint.X - view.Width / 2,
-                        view.CenterPoint.Y - view.Height / 2,
-                        view.CenterPoint.X + view.Width / 2,
-                        view.CenterPoint.Y + view.Height / 2
-                    );
-
-                    // 使用PlotEngine导出
-                    using (var plotEngine = PlotFactory.CreatePublishEngine())
-                    {
-                        using (var plotInfo = new PlotInfo())
-                        {
-                            plotInfo.Layout = tr.GetObject(db.CurrentSpaceId, OpenMode.ForRead) as Layout;
-                            plotInfo.OverrideSettings = plotSettings;
-
-                            var plotInfoValidator = new PlotInfoValidator();
-                            plotInfoValidator.MediaMatchingPolicy = MatchingPolicy.MatchEnabled;
-                            plotInfoValidator.Validate(plotInfo);
-
-                            plotEngine.BeginPlot(null, null);
-                            plotEngine.BeginDocument(plotInfo, doc.Name, null, 1, true, outputPath);
-
-                            var plotPageInfo = new PlotPageInfo();
-                            plotEngine.BeginPage(plotPageInfo, plotInfo, true, null);
-                            plotEngine.BeginGenerateGraphics(null);
-                            plotEngine.EndGenerateGraphics(null);
-                            plotEngine.EndPage(null);
-
-                            plotEngine.EndDocument(null);
-                            plotEngine.EndPlot(null);
-                        }
-                    }
-                }
-
-                tr.Commit();
-            }
-
-            Log.Debug($"Plot API导出完成: {outputPath}");
+            // TODO: 实现Plot API导出
+            // Plot API需要引用 Autodesk.AutoCAD.PlottingServices命名空间
+            // 目前使用简化实现
+            Log.Warning("Plot API导出功能暂未实现，请使用PNGOUT命令替代");
+            throw new NotImplementedException("Plot API导出功能暂未实现");
         }
 
         /// <summary>
@@ -484,7 +435,7 @@ namespace BiaogPlugin.Services
     {
         public string Type { get; set; } = "";
         public ComponentPosition Position { get; set; } = new();
-        public ComponentDimensions Dimensions { get; set; } = new();
+        public VisionComponentDimensions Dimensions { get; set; } = new();
         public int Quantity { get; set; } = 1;
         public double Confidence { get; set; }
         public string Source { get; set; } = "";
@@ -498,7 +449,7 @@ namespace BiaogPlugin.Services
         public double Y { get; set; }
     }
 
-    public class ComponentDimensions
+    public class VisionComponentDimensions
     {
         public double Length { get; set; }
         public double Width { get; set; }
