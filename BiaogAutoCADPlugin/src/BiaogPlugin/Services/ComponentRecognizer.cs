@@ -86,6 +86,13 @@ public class ComponentRecognizer
         },
 
         // ✅ 梁（所有强度等级）
+        ["C20混凝土梁"] = new List<Regex>
+        {
+            new Regex(@"C20.*梁", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"混凝土梁.*C20", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"梁.*C20", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"KL.*C20", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
         ["C25混凝土梁"] = new List<Regex>
         {
             new Regex(@"C25.*梁", RegexOptions.Compiled | RegexOptions.IgnoreCase),
@@ -117,12 +124,14 @@ public class ComponentRecognizer
         {
             new Regex(@"C20.*板", RegexOptions.Compiled | RegexOptions.IgnoreCase),
             new Regex(@"混凝土板.*C20", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-            new Regex(@"楼板.*C20", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+            new Regex(@"楼板.*C20", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"板.*C20", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
         ["C25混凝土板"] = new List<Regex>
         {
             new Regex(@"C25.*板", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-            new Regex(@"混凝土板.*C25", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+            new Regex(@"混凝土板.*C25", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"板.*C25", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
         ["C30混凝土板"] = new List<Regex>
         {
@@ -131,8 +140,33 @@ public class ComponentRecognizer
             new Regex(@"板.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase),
             new Regex(@"楼板.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
+        ["C35混凝土板"] = new List<Regex>
+        {
+            new Regex(@"C35.*板", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"混凝土板.*C35", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"板.*C35", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"楼板.*C35", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+        ["C40混凝土板"] = new List<Regex>
+        {
+            new Regex(@"C40.*板", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"混凝土板.*C40", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"板.*C40", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
 
-        // ✅ 剪力墙
+        // ✅ 剪力墙（所有强度等级）
+        ["C20剪力墙"] = new List<Regex>
+        {
+            new Regex(@"C20.*剪力墙", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"剪力墙.*C20", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"剪.*墙.*C20", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+        ["C25剪力墙"] = new List<Regex>
+        {
+            new Regex(@"C25.*剪力墙", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"剪力墙.*C25", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"剪.*墙.*C25", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
         ["C30剪力墙"] = new List<Regex>
         {
             new Regex(@"C30.*剪力墙", RegexOptions.Compiled | RegexOptions.IgnoreCase),
@@ -143,6 +177,17 @@ public class ComponentRecognizer
         {
             new Regex(@"C35.*剪力墙", RegexOptions.Compiled | RegexOptions.IgnoreCase),
             new Regex(@"剪力墙.*C35", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+        ["C40剪力墙"] = new List<Regex>
+        {
+            new Regex(@"C40.*剪力墙", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"剪力墙.*C40", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+        ["C50剪力墙"] = new List<Regex>
+        {
+            new Regex(@"C50.*剪力墙", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"剪力墙.*C50", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"剪.*墙.*C50", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         },
 
         // ==================== 钢筋 ====================
@@ -246,11 +291,103 @@ public class ComponentRecognizer
             new Regex(@"^砖墙$", RegexOptions.Compiled),
             new Regex(@"^填充墙$", RegexOptions.Compiled)
         },
-        ["基础"] = new List<Regex>
+
+        // ==================== 楼梯 ====================
+        ["C25楼梯"] = new List<Regex>
         {
-            new Regex(@"基础", RegexOptions.Compiled | RegexOptions.IgnoreCase),
-            new Regex(@"独立基础", RegexOptions.Compiled),
-            new Regex(@"条形基础", RegexOptions.Compiled)
+            new Regex(@"C25.*楼梯", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"楼梯.*C25", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"楼梯.*25", RegexOptions.Compiled)
+        },
+        ["C30楼梯"] = new List<Regex>
+        {
+            new Regex(@"C30.*楼梯", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"楼梯.*C30", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"ST.*C30", RegexOptions.Compiled),  // ST=Stair
+            new Regex(@"楼梯", RegexOptions.Compiled)  // 默认C30
+        },
+        ["C35楼梯"] = new List<Regex>
+        {
+            new Regex(@"C35.*楼梯", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"楼梯.*C35", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+        },
+
+        // ==================== 屋面 ====================
+        ["现浇屋面板"] = new List<Regex>
+        {
+            new Regex(@"屋面.*板", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"屋顶", RegexOptions.Compiled),
+            new Regex(@"屋面", RegexOptions.Compiled),
+            new Regex(@"WM", RegexOptions.Compiled)  // WM=Roof (屋面)
+        },
+        ["防水层"] = new List<Regex>
+        {
+            new Regex(@"防水.*层", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"防水", RegexOptions.Compiled),
+            new Regex(@"SBS.*卷材", RegexOptions.Compiled),
+            new Regex(@"卷材.*防水", RegexOptions.Compiled)
+        },
+        ["保温层"] = new List<Regex>
+        {
+            new Regex(@"保温.*层", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"保温", RegexOptions.Compiled),
+            new Regex(@"挤塑板", RegexOptions.Compiled),
+            new Regex(@"岩棉", RegexOptions.Compiled)
+        },
+
+        // ==================== 预制构件 ====================
+        ["预制板"] = new List<Regex>
+        {
+            new Regex(@"预制.*板", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"PC.*板", RegexOptions.Compiled),  // PC=Precast Concrete
+            new Regex(@"叠合板", RegexOptions.Compiled)
+        },
+        ["预制梁"] = new List<Regex>
+        {
+            new Regex(@"预制.*梁", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"PC.*梁", RegexOptions.Compiled),
+            new Regex(@"吊车梁", RegexOptions.Compiled)
+        },
+        ["预制柱"] = new List<Regex>
+        {
+            new Regex(@"预制.*柱", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"PC.*柱", RegexOptions.Compiled)
+        },
+
+        // ==================== 基础（详细分类） ====================
+        ["独立基础"] = new List<Regex>
+        {
+            new Regex(@"独立.*基础", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"独基", RegexOptions.Compiled),
+            new Regex(@"JC\d*", RegexOptions.Compiled)  // JC=基础
+        },
+        ["条形基础"] = new List<Regex>
+        {
+            new Regex(@"条形.*基础", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"条基", RegexOptions.Compiled),
+            new Regex(@"TJ\d*", RegexOptions.Compiled)  // TJ=条基
+        },
+        ["筏板基础"] = new List<Regex>
+        {
+            new Regex(@"筏板.*基础", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"筏板", RegexOptions.Compiled),
+            new Regex(@"FB\d*", RegexOptions.Compiled)  // FB=筏板
+        },
+        ["承台基础"] = new List<Regex>
+        {
+            new Regex(@"承台", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"CT\d*", RegexOptions.Compiled)  // CT=承台
+        },
+        ["桩基础"] = new List<Regex>
+        {
+            new Regex(@"桩.*基础", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+            new Regex(@"灌注桩", RegexOptions.Compiled),
+            new Regex(@"预制桩", RegexOptions.Compiled),
+            new Regex(@"CFG桩", RegexOptions.Compiled)
+        },
+        ["基础"] = new List<Regex>  // 通用基础（兜底）
+        {
+            new Regex(@"基础", RegexOptions.Compiled | RegexOptions.IgnoreCase)
         }
     };
 

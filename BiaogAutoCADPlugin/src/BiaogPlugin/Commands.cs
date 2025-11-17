@@ -674,8 +674,12 @@ namespace BiaogPlugin
         /// 功能：
         /// 1. 自动识别图纸中的所有构件（柱梁板墙、钢筋、门窗等）
         /// 2. 提取几何实体并匹配面积/体积
-        /// 3. 计算钢筋重量、模板面积
-        /// 4. 导出详细的Excel报表（3个工作表）
+        /// 3. 应用扣减关系（GB 50854-2013规范）
+        ///    - 板扣减柱、墙占用面积
+        ///    - 墙扣减门窗洞口体积
+        ///    - 梁柱交接处理（混凝土计入梁）
+        /// 4. 计算钢筋重量、模板面积
+        /// 5. 导出详细的Excel报表（3个工作表）
         ///    - 工作表1：分部分项工程量清单（GB 50854-2013格式）
         ///    - 工作表2：钢筋明细表（直径、长度、根数、重量）
         ///    - 工作表3：材料汇总表（混凝土、钢筋、模板汇总）
@@ -717,8 +721,14 @@ namespace BiaogPlugin
                     return;
                 }
 
+                // ===== 步骤2.5：应用扣减关系（GB 50854-2013规范） =====
+                ed.WriteMessage("\n【步骤2.5/5】正在应用扣减关系（板扣柱墙、墙扣门窗）...");
+                var deductionService = new DeductionService();
+                deductionService.ApplyDeductions(components);
+                ed.WriteMessage(" 完成！");
+
                 // ===== 步骤3：统计工程量 =====
-                ed.WriteMessage("\n【步骤3/4】正在统计工程量...");
+                ed.WriteMessage("\n【步骤3/5】正在统计工程量...");
                 double totalArea = components.Sum(c => c.Area);
                 double totalVolume = components.Sum(c => c.Volume);
                 double totalSteelWeight = components.Sum(c => c.SteelWeight);
@@ -730,7 +740,7 @@ namespace BiaogPlugin
                 ed.WriteMessage("\n  ✓ 模板面积: " + $"{totalFormwork:F2}m²");
 
                 // ===== 步骤4：导出Excel =====
-                ed.WriteMessage("\n【步骤4/4】正在导出Excel报表...");
+                ed.WriteMessage("\n【步骤4/5】正在导出Excel报表...");
 
                 var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
                 var fileName = $"工程量清单_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
