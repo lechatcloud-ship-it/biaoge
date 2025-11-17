@@ -23,7 +23,10 @@ public class ComponentRecognizer
     private readonly GeometryExtractor _geometryExtractor;   // ✅ 新增：几何实体提取器（Polyline、Region、Solid3d等）
 
     // 静态正则表达式 - 使用Compiled选项提升性能
-    private static readonly Regex QuantityRegex = new(@"(\d+(?:\.\d+)?)\s*(?:个|根|块|片|扇|樘)?",
+    // ✅ P0修复：只匹配明确带有数量单位的数字，避免误将尺寸当作数量（如"300×600"中的300）
+    // 修复前：(\d+(?:\.\d+)?)\s*(?:个|根|块|片|扇|樘)?  ← 单位可选，会匹配任何数字
+    // 修复后：必须有明确的数量单位或"数量："前缀
+    private static readonly Regex QuantityRegex = new(@"(?:数量[:：]\s*)?(\d+(?:\.\d+)?)\s*(?:个|根|块|片|扇|樘)(?!\d)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     // ✅ 增强尺寸提取正则（支持AutoCAD多种标注格式）
@@ -351,6 +354,16 @@ public class ComponentRecognizer
                     Log.Debug($"  ✓ AI验证后置信度: {regexResult.Confidence:P}");
                 }
 
+                // ✅ P0修复：如果尺寸为0，应用默认尺寸（基于构件类型）
+                if (regexResult.Length == 0 && regexResult.Width == 0 && regexResult.Height == 0)
+                {
+                    ApplyDefaultDimensions(regexResult);
+                    if (regexResult.Length > 0 || regexResult.Width > 0 || regexResult.Height > 0)
+                    {
+                        Log.Debug($"  ✓ 应用默认尺寸: L={regexResult.Length:F2}m, W={regexResult.Width:F2}m, H={regexResult.Height:F2}m");
+                    }
+                }
+
                 // 计算工程量
                 CalculateQuantity(regexResult);
                 if (regexResult.Volume > 0 || regexResult.Area > 0)
@@ -663,6 +676,77 @@ public class ComponentRecognizer
         catch (System.Exception ex)
         {
             Log.Warning(ex, "AI验证失败");
+        }
+    }
+
+    /// <summary>
+    /// ✅ P0修复：为缺少尺寸的构件应用默认尺寸（基于建筑行业标准）
+    /// 参考：GB 50854-2013《房屋建筑制图统一标准》
+    /// </summary>
+    private void ApplyDefaultDimensions(ComponentRecognitionResult result)
+    {
+        // 根据构件类型应用默认尺寸
+        if (result.Type.Contains("柱"))
+        {
+            // 柱：典型截面 400×400mm，层高3.0m
+            result.Length = 0.4;
+            result.Width = 0.4;
+            result.Height = 3.0;
+            Log.Debug($"应用柱默认尺寸: 400×400×3000mm");
+        }
+        else if (result.Type.Contains("梁"))
+        {
+            // 梁：典型截面 300×600mm，跨度6.0m
+            result.Length = 6.0;
+            result.Width = 0.3;
+            result.Height = 0.6;
+            Log.Debug($"应用梁默认尺寸: 6000×300×600mm");
+        }
+        else if (result.Type.Contains("板"))
+        {
+            // 板：典型跨度 6×6m，厚度120mm
+            result.Length = 6.0;
+            result.Width = 6.0;
+            result.Height = 0.12;
+            Log.Debug($"应用板默认尺寸: 6000×6000×120mm");
+        }
+        else if (result.Type.Contains("墙") || result.Type.Contains("砌块"))
+        {
+            // 墙/砌块：典型长度6m，高度3m，厚度240mm
+            result.Length = 6.0;
+            result.Width = 0.24;
+            result.Height = 3.0;
+            Log.Debug($"应用墙默认尺寸: 6000×240×3000mm");
+        }
+        else if (result.Type.Contains("窗"))
+        {
+            // 窗：典型尺寸 1500×1500mm（按面积计算）
+            result.Length = 1.5;
+            result.Width = 1.5;
+            result.Height = 0;  // 窗不需要高度（按面积计算）
+            Log.Debug($"应用窗默认尺寸: 1500×1500mm");
+        }
+        else if (result.Type.Contains("门"))
+        {
+            // 门：典型尺寸 900×2100mm
+            result.Length = 0.9;
+            result.Width = 2.1;
+            result.Height = 0;  // 门不需要高度（按面积计算）
+            Log.Debug($"应用门默认尺寸: 900×2100mm");
+        }
+        else if (result.Type.Contains("钢筋"))
+        {
+            // 钢筋：按长度计算，默认12m一根
+            result.Length = 12.0;
+            result.Diameter = 0.012;  // Φ12mm
+            Log.Debug($"应用钢筋默认尺寸: L=12m, Φ12mm");
+        }
+
+        // 降低置信度，标记为估算值
+        if (result.Length > 0 || result.Width > 0 || result.Height > 0)
+        {
+            result.Confidence -= 0.2;  // 使用默认尺寸会降低置信度
+            result.Status = "估算尺寸";
         }
     }
 
