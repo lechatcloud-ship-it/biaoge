@@ -689,9 +689,24 @@ public class ComponentRecognizer
 
     /// <summary>
     /// ✅ 估算成本（元）- 使用动态成本数据库，替代硬编码单价
+    /// ⚠️ 默认禁用，避免误导用户（地区差异巨大，无公开API）
     /// </summary>
     private decimal EstimateCost(ComponentRecognitionResult result)
     {
+        // ✅ 检查成本估算是否启用（默认关闭）
+        var config = ConfigManager.Instance.Config;
+        if (!config.Cost.EnableCostEstimation)
+        {
+            Log.Debug("成本估算功能已禁用（默认关闭，避免误导）");
+            return 0;
+        }
+
+        // ⚠️ 显示警告（首次使用时提醒用户）
+        if (config.Cost.ShowCostWarning)
+        {
+            Log.Warning("⚠️ 成本估算警告：价格数据因地区差异巨大（一线城市比西部高30-50%），仅供粗略参考，请以当地定额为准");
+        }
+
         // ✅ 从成本数据库查询单价
         var priceItem = CostDatabase.Instance.GetPrice(result.Type);
 

@@ -1,0 +1,219 @@
+<Window x:Class="BiaogPlugin.UI.CostManagementDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="成本管理 - 标哥插件" Height="650" Width="800"
+        WindowStartupLocation="CenterScreen"
+        Topmost="True"
+        Background="#1E1E1E">
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TabControl Grid.Row="0">
+            <!-- ⚠️ 重要说明 Tab -->
+            <TabItem Header="⚠️ 重要说明">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="15">
+                        <TextBlock Text="⚠️ 成本估算功能重要说明" FontSize="18"
+                                   FontWeight="Bold" Foreground="#FF6B6B" Margin="0,0,0,20"/>
+
+                        <Border Background="#2D2D30" Padding="15" CornerRadius="5" Margin="0,0,0,15">
+                            <StackPanel>
+                                <TextBlock Text="为什么成本估算默认关闭？" FontSize="14" FontWeight="Bold"
+                                           Foreground="White" Margin="0,0,0,10"/>
+                                <TextBlock TextWrapping="Wrap" Foreground="#CCCCCC" LineHeight="22">
+                                    <Run Text="1. ❌ 中国无公开工程造价API"/><LineBreak/>
+                                    <Run Text="   没有任何免费的、公开的API可以获取实时工程造价数据。"/><LineBreak/><LineBreak/>
+                                    <Run Text="2. 📊 地区差异巨大（30-50%）"/><LineBreak/>
+                                    <Run Text="   • 北京/上海：C30混凝土 550-600元/m³"/><LineBreak/>
+                                    <Run Text="   • 成都/西安：C30混凝土 450-500元/m³"/><LineBreak/>
+                                    <Run Text="   • 昆明/贵阳：C30混凝土 380-420元/m³"/><LineBreak/><LineBreak/>
+                                    <Run Text="3. 📈 价格随市场波动"/><LineBreak/>
+                                    <Run Text="   建材价格受市场影响，每月都可能变化，需定期更新。"/><LineBreak/><LineBreak/>
+                                    <Run Text="4. ⚖️ 法律责任"/><LineBreak/>
+                                    <Run Text="   正式预算必须使用当地定额和造价咨询资质单位出具的报告。"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#3E3E42" Padding="15" CornerRadius="5" Margin="0,0,0,15">
+                            <StackPanel>
+                                <TextBlock Text="如何使用成本估算功能？" FontSize="14" FontWeight="Bold"
+                                           Foreground="White" Margin="0,0,0,10"/>
+                                <TextBlock TextWrapping="Wrap" Foreground="#CCCCCC" LineHeight="22">
+                                    <Run Text="✅ 步骤1：获取本地价格数据"/><LineBreak/>
+                                    <Run Text="   访问当地工程造价信息网（如：北京造价信息网、上海工程造价信息网）"/><LineBreak/><LineBreak/>
+                                    <Run Text="✅ 步骤2：编辑价格数据库"/><LineBreak/>
+                                    <Run Text="   点击"打开价格数据库文件"按钮，用记事本/VS Code编辑JSON文件"/><LineBreak/><LineBreak/>
+                                    <Run Text="✅ 步骤3：启用成本估算"/><LineBreak/>
+                                    <Run Text="   在"基本设置"标签页中勾选"启用成本估算""/>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="#2D2D30" Padding="15" CornerRadius="5">
+                            <StackPanel>
+                                <TextBlock Text="推荐的价格数据来源" FontSize="14" FontWeight="Bold"
+                                           Foreground="White" Margin="0,0,0,10"/>
+                                <TextBlock TextWrapping="Wrap" Foreground="#CCCCCC" LineHeight="22">
+                                    <Run Text="📌 官方渠道（免费）"/><LineBreak/>
+                                    <Run Text="   • 各省市工程造价信息网"/><LineBreak/>
+                                    <Run Text="   • 各地建设工程定额站"/><LineBreak/>
+                                    <Run Text="   • 中国建设工程造价管理协会"/><LineBreak/><LineBreak/>
+                                    <Run Text="💼 商业平台（付费）"/><LineBreak/>
+                                    <Run Text="   • 造价通（www.zjtcn.com）"/><LineBreak/>
+                                    <Run Text="   • 广联达云造价"/><LineBreak/>
+                                    <Run Text="   • 鲁班造价"/><LineBreak/><LineBreak/>
+                                    <Run Text="⚠️ 免责声明"/><LineBreak/>
+                                    <Run Text="   插件提供的参考价格仅供粗略估算，用户需自行核实价格准确性。"/>
+                                    <Run Text="   插件开发者不对估算结果的准确性承担任何责任。"/>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- 基本设置 Tab -->
+            <TabItem Header="基本设置">
+                <StackPanel Margin="15">
+                    <TextBlock Text="成本估算配置" FontSize="16" FontWeight="Bold"
+                               Foreground="White" Margin="0,0,0,15"/>
+
+                    <CheckBox x:Name="EnableCostCheckBox" Content="启用成本估算（默认关闭）"
+                              Foreground="#CCCCCC" Margin="0,0,0,10" FontSize="14"
+                              Checked="EnableCostCheckBox_Changed"
+                              Unchecked="EnableCostCheckBox_Changed"/>
+                    <TextBlock Text="⚠️ 启用前请确保已理解上述重要说明，并自行维护价格数据"
+                               Foreground="#FF6B6B" FontSize="11" Margin="20,0,0,20"/>
+
+                    <TextBlock Text="当前地区:" Foreground="#CCCCCC" Margin="0,10,0,5"/>
+                    <ComboBox x:Name="RegionComboBox" Height="30" Margin="0,0,0,10">
+                        <ComboBoxItem Content="华北（北京、天津、河北、山西、内蒙古）" Tag="华北"/>
+                        <ComboBoxItem Content="华东（上海、江苏、浙江、安徽、福建、江西、山东）" Tag="华东" IsSelected="True"/>
+                        <ComboBoxItem Content="华南（广东、广西、海南）" Tag="华南"/>
+                        <ComboBoxItem Content="华中（河南、湖北、湖南）" Tag="华中"/>
+                        <ComboBoxItem Content="西南（重庆、四川、贵州、云南、西藏）" Tag="西南"/>
+                        <ComboBoxItem Content="西北（陕西、甘肃、青海、宁夏、新疆）" Tag="西北"/>
+                        <ComboBoxItem Content="东北（辽宁、吉林、黑龙江）" Tag="东北"/>
+                    </ComboBox>
+                    <TextBlock Text="💡 选择项目所在地区，以便提醒价格差异"
+                               Foreground="#888" FontSize="11" Margin="0,0,0,15"/>
+
+                    <CheckBox x:Name="ShowWarningCheckBox" Content="显示成本估算警告"
+                              IsChecked="True" Foreground="#CCCCCC" Margin="0,10,0,10"/>
+                    <TextBlock Text="每次计算时提醒用户价格仅供参考"
+                               Foreground="#888" FontSize="11" Margin="20,0,0,15"/>
+
+                    <TextBlock Text="价格数据来源（选填）:" Foreground="#CCCCCC" Margin="0,10,0,5"/>
+                    <TextBox x:Name="DataSourceTextBox" Height="30" Margin="0,0,0,5"
+                             Background="#2D2D30" Foreground="White" BorderBrush="#3E3E42"/>
+                    <TextBlock Text="例如：北京造价信息网 2025年1月价格"
+                               Foreground="#888" FontSize="11" Margin="0,0,0,15"/>
+
+                    <TextBlock Text="最后更新日期:" Foreground="#CCCCCC" Margin="0,10,0,5"/>
+                    <DatePicker x:Name="LastUpdateDatePicker" Height="30" Margin="0,0,0,5"/>
+                </StackPanel>
+            </TabItem>
+
+            <!-- 价格数据库 Tab -->
+            <TabItem Header="价格数据库">
+                <StackPanel Margin="15">
+                    <TextBlock Text="价格数据库管理" FontSize="16" FontWeight="Bold"
+                               Foreground="White" Margin="0,0,0,15"/>
+
+                    <Border Background="#2D2D30" Padding="15" CornerRadius="5" Margin="0,0,0,15">
+                        <StackPanel>
+                            <TextBlock Text="数据库信息" FontSize="14" FontWeight="Bold"
+                                       Foreground="White" Margin="0,0,0,10"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="版本:" Foreground="#CCCCCC" Margin="0,0,0,5"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" x:Name="VersionText" Foreground="White" Margin="0,0,0,5"/>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="数据来源:" Foreground="#CCCCCC" Margin="0,5,0,5"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" x:Name="DataSourceInfoText" Foreground="White"
+                                           TextWrapping="Wrap" Margin="0,5,0,5"/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="地区差异:" Foreground="#CCCCCC" Margin="0,5,0,5"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" x:Name="RegionalVariationText" Foreground="#FF6B6B"
+                                           TextWrapping="Wrap" Margin="0,5,0,5"/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="API可用性:" Foreground="#CCCCCC" Margin="0,5,0,5"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1" x:Name="ApiAvailabilityText" Foreground="#FF6B6B"
+                                           TextWrapping="Wrap" Margin="0,5,0,5"/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="价格项数量:" Foreground="#CCCCCC" Margin="0,5,0,5"/>
+                                <TextBlock Grid.Row="4" Grid.Column="1" x:Name="PriceCountText" Foreground="White" Margin="0,5,0,5"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,15">
+                        <Button x:Name="OpenDatabaseButton" Content="📂 打开价格数据库文件" Width="200" Height="40"
+                                Click="OpenDatabaseButton_Click"
+                                Background="#0078D4" Foreground="White" BorderThickness="0" Margin="0,0,10,0"/>
+                        <Button x:Name="ReloadDatabaseButton" Content="🔄 重新加载数据库" Width="180" Height="40"
+                                Click="ReloadDatabaseButton_Click"
+                                Background="#3E3E42" Foreground="White" BorderThickness="0"/>
+                    </StackPanel>
+
+                    <TextBlock Text="💡 编辑提示" FontSize="14" FontWeight="Bold"
+                               Foreground="White" Margin="0,10,0,10"/>
+                    <TextBlock TextWrapping="Wrap" Foreground="#CCCCCC" LineHeight="20">
+                        <Run Text="• 使用VS Code或记事本编辑JSON文件"/><LineBreak/>
+                        <Run Text="• 保存后点击"重新加载数据库"按钮应用更改"/><LineBreak/>
+                        <Run Text="• 支持用户自定义配置：复制文件到 ~/.biaoge/cost-database.json"/><LineBreak/>
+                        <Run Text="• JSON格式示例："/><LineBreak/>
+                        <Run Text='  "C30混凝土柱": { "unit": "m³", "price": 500.00, "description": "..." }'/>
+                    </TextBlock>
+
+                    <Border Background="#3E3E42" Padding="15" CornerRadius="5" Margin="0,15,0,0">
+                        <StackPanel>
+                            <TextBlock Text="⚠️ 地区价格参考" FontSize="12" FontWeight="Bold"
+                                       Foreground="#FF6B6B" Margin="0,0,0,10"/>
+                            <TextBlock x:Name="RegionalPriceExamplesText" TextWrapping="Wrap"
+                                       Foreground="#CCCCCC" FontSize="11" LineHeight="18"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </TabItem>
+
+            <!-- 导入导出 Tab (未来功能) -->
+            <TabItem Header="导入导出" IsEnabled="False">
+                <StackPanel Margin="15" VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <TextBlock Text="🚧 功能开发中" FontSize="18" FontWeight="Bold"
+                               Foreground="#888" HorizontalAlignment="Center" Margin="0,0,0,15"/>
+                    <TextBlock Text="即将支持：" Foreground="#CCCCCC" HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                    <TextBlock Text="• Excel格式导入价格数据" Foreground="#888" HorizontalAlignment="Center"/>
+                    <TextBlock Text="• Excel格式导出价格数据" Foreground="#888" HorizontalAlignment="Center"/>
+                    <TextBlock Text="• 多地区价格集管理" Foreground="#888" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </TabItem>
+        </TabControl>
+
+        <!-- 底部按钮 -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,15,0,0">
+            <Button x:Name="SaveButton" Content="保存" Width="100" Height="35"
+                    Margin="0,0,10,0" Click="SaveButton_Click"
+                    Background="#0078D4" Foreground="White" BorderThickness="0"/>
+            <Button x:Name="CancelButton" Content="取消" Width="100" Height="35"
+                    Click="CancelButton_Click"
+                    Background="#3E3E42" Foreground="White" BorderThickness="0"/>
+        </StackPanel>
+    </Grid>
+</Window>

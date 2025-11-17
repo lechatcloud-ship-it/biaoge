@@ -103,6 +103,17 @@ namespace BiaogPlugin.Services
 
                     Log.Information("✅ 成本数据库加载成功: 版本{Version}, {Count}个价格项",
                         _config.Version, _flatPriceCache.Count);
+
+                    // ⚠️ 显示重要警告
+                    if (_config.Metadata != null)
+                    {
+                        Log.Warning("⚠️ 成本数据库重要说明:");
+                        Log.Warning($"  - 数据来源: {_config.Metadata.DataSource}");
+                        Log.Warning($"  - API可用性: {_config.Metadata.ApiAvailability}");
+                        Log.Warning($"  - 地区差异: {_config.Metadata.RegionalVariation}");
+                        Log.Warning($"  - 更新频率: {_config.Metadata.UpdateFrequency}");
+                        Log.Warning($"  - 用户责任: {_config.Metadata.UserResponsibility}");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -331,6 +342,21 @@ namespace BiaogPlugin.Services
 
         [JsonPropertyName("note")]
         public string Note { get; set; } = "";
+
+        [JsonPropertyName("updateFrequency")]
+        public string UpdateFrequency { get; set; } = "";
+
+        [JsonPropertyName("regionalVariation")]
+        public string RegionalVariation { get; set; } = "";
+
+        [JsonPropertyName("apiAvailability")]
+        public string ApiAvailability { get; set; } = "";
+
+        [JsonPropertyName("userResponsibility")]
+        public string UserResponsibility { get; set; } = "";
+
+        [JsonPropertyName("recommendedActions")]
+        public List<string> RecommendedActions { get; set; } = new();
     }
 
     #endregion

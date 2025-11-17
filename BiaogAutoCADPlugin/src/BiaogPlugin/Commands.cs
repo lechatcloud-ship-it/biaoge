@@ -613,6 +613,39 @@ namespace BiaogPlugin
         }
 
         /// <summary>
+        /// ✅ 打开成本管理对话框
+        /// </summary>
+        [CommandMethod("BIAOGE_COST_MANAGE", CommandFlags.Modal)]
+        public void OpenCostManagement()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                Log.Information("打开成本管理对话框");
+                ed.WriteMessage("\n打开成本管理对话框...");
+
+                var costDialog = new CostManagementDialog();
+                var result = costDialog.ShowDialog();
+
+                if (result == true)
+                {
+                    ed.WriteMessage("\n✅ 成本管理设置已保存。");
+                }
+                else
+                {
+                    ed.WriteMessage("\n成本管理设置未更改。");
+                }
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "打开成本管理对话框失败");
+                ed.WriteMessage($"\n[错误] 打开成本管理对话框失败: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// 切换双击翻译功能
         /// </summary>
         [CommandMethod("BIAOGE_TOGGLE_DOUBLECLICK", CommandFlags.Modal)]
