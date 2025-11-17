@@ -251,6 +251,8 @@ namespace BiaogPlugin.Services
 
         /// <summary>
         /// 执行工具（智能调度和执行）
+        /// ✅ 路由所有AutoCAD工具到AutoCADToolExecutor
+        /// 参考：AGENT_TOOLS_DESIGN.md
         /// </summary>
         private async Task<string> ExecuteTool(ToolCall toolCall, Action<string>? onStreamChunk)
         {
@@ -258,6 +260,69 @@ namespace BiaogPlugin.Services
             {
                 switch (toolCall.Name)
                 {
+                    // ===== P0.1 绘图工具（Drawing Tools）=====
+                    case "draw_line":
+                        return await AutoCADToolExecutor.DrawLine(toolCall.Arguments);
+
+                    case "draw_circle":
+                        return await AutoCADToolExecutor.DrawCircle(toolCall.Arguments);
+
+                    case "draw_rectangle":
+                        return await AutoCADToolExecutor.DrawRectangle(toolCall.Arguments);
+
+                    case "draw_polyline":
+                        return await AutoCADToolExecutor.DrawPolyline(toolCall.Arguments);
+
+                    case "draw_text":
+                        return await AutoCADToolExecutor.DrawText(toolCall.Arguments);
+
+                    // ===== P0.2 修改工具（Modify Tools）=====
+                    case "delete_entity":
+                        return await AutoCADToolExecutor.DeleteEntity(toolCall.Arguments);
+
+                    case "modify_entity_properties":
+                        return await AutoCADToolExecutor.ModifyEntityProperties(toolCall.Arguments);
+
+                    case "move_entity":
+                        return await AutoCADToolExecutor.MoveEntity(toolCall.Arguments);
+
+                    case "copy_entity":
+                        return await AutoCADToolExecutor.CopyEntity(toolCall.Arguments);
+
+                    // ===== P1.1 查询工具（Query Tools）=====
+                    case "measure_distance":
+                        return await AutoCADToolExecutor.MeasureDistance(toolCall.Arguments);
+
+                    case "measure_area":
+                        return await AutoCADToolExecutor.MeasureArea(toolCall.Arguments);
+
+                    case "list_entities":
+                        return await AutoCADToolExecutor.ListEntities(toolCall.Arguments);
+
+                    case "count_entities":
+                        return await AutoCADToolExecutor.CountEntities(toolCall.Arguments);
+
+                    // ===== P1.2 图层工具（Layer Tools）=====
+                    case "create_layer":
+                        return await AutoCADToolExecutor.CreateLayer(toolCall.Arguments);
+
+                    case "set_current_layer":
+                        return await AutoCADToolExecutor.SetCurrentLayer(toolCall.Arguments);
+
+                    case "modify_layer_properties":
+                        return await AutoCADToolExecutor.ModifyLayerProperties(toolCall.Arguments);
+
+                    case "query_layer_info":
+                        return await AutoCADToolExecutor.QueryLayerInfo(toolCall.Arguments);
+
+                    // ===== P1.3 高级修改工具（Advanced Modify Tools）=====
+                    case "rotate_entity":
+                        return await AutoCADToolExecutor.RotateEntity(toolCall.Arguments);
+
+                    case "scale_entity":
+                        return await AutoCADToolExecutor.ScaleEntity(toolCall.Arguments);
+
+                    // ===== 原有工具（保留兼容性）=====
                     case "translate_text":
                         return await ExecuteTranslateTool(toolCall.Arguments, onStreamChunk);
 
@@ -549,11 +614,514 @@ namespace BiaogPlugin.Services
 
         /// <summary>
         /// 定义可用工具（阿里云官方格式）
+        /// ✅ 集成完整AutoCAD工具集 - 实现真正的Agent功能
+        /// 参考：AGENT_TOOLS_DESIGN.md
         /// </summary>
         private List<object> GetAvailableTools()
         {
             return new List<object>
             {
+                // ===== P0.1 绘图工具（Drawing Tools）- 5个 =====
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "draw_line",
+                        description = "在AutoCAD中绘制一条直线",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                start_point = new {
+                                    type = "array",
+                                    items = new { type = "number" },
+                                    description = "起点坐标[x, y, z]，单位mm"
+                                },
+                                end_point = new {
+                                    type = "array",
+                                    items = new { type = "number" },
+                                    description = "终点坐标[x, y, z]，单位mm"
+                                },
+                                layer = new {
+                                    type = "string",
+                                    description = "图层名（可选，默认'0'）"
+                                },
+                                color = new {
+                                    type = "string",
+                                    description = "颜色（可选，支持中文如'红色'，RGB如'255,0,0'，或'ByLayer'）"
+                                }
+                            },
+                            required = new[] { "start_point", "end_point" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "draw_circle",
+                        description = "在AutoCAD中绘制圆",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                center = new {
+                                    type = "array",
+                                    items = new { type = "number" },
+                                    description = "圆心坐标[x, y, z]，单位mm"
+                                },
+                                radius = new {
+                                    type = "number",
+                                    description = "半径，单位mm"
+                                },
+                                layer = new {
+                                    type = "string",
+                                    description = "图层名（可选，默认'0'）"
+                                },
+                                color = new {
+                                    type = "string",
+                                    description = "颜色（可选）"
+                                }
+                            },
+                            required = new[] { "center", "radius" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "draw_rectangle",
+                        description = "在AutoCAD中绘制矩形",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                corner1 = new {
+                                    type = "array",
+                                    items = new { type = "number" },
+                                    description = "第一个角点坐标[x, y]，单位mm"
+                                },
+                                corner2 = new {
+                                    type = "array",
+                                    items = new { type = "number" },
+                                    description = "对角点坐标[x, y]，单位mm"
+                                },
+                                layer = new {
+                                    type = "string",
+                                    description = "图层名（可选，默认'0'）"
+                                },
+                                color = new {
+                                    type = "string",
+                                    description = "颜色（可选）"
+                                }
+                            },
+                            required = new[] { "corner1", "corner2" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "draw_polyline",
+                        description = "在AutoCAD中绘制多段线（连续的线段）",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                points = new {
+                                    type = "array",
+                                    items = new {
+                                        type = "array",
+                                        items = new { type = "number" }
+                                    },
+                                    description = "顶点坐标数组[[x1,y1], [x2,y2], ...]，单位mm"
+                                },
+                                closed = new {
+                                    type = "boolean",
+                                    description = "是否闭合（可选，默认false）"
+                                },
+                                layer = new {
+                                    type = "string",
+                                    description = "图层名（可选，默认'0'）"
+                                },
+                                color = new {
+                                    type = "string",
+                                    description = "颜色（可选）"
+                                }
+                            },
+                            required = new[] { "points" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "draw_text",
+                        description = "在AutoCAD中添加文本标注",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                position = new {
+                                    type = "array",
+                                    items = new { type = "number" },
+                                    description = "文本插入点[x, y, z]，单位mm"
+                                },
+                                text = new {
+                                    type = "string",
+                                    description = "文本内容"
+                                },
+                                height = new {
+                                    type = "number",
+                                    description = "文字高度，单位mm（可选，默认2.5mm）"
+                                },
+                                layer = new {
+                                    type = "string",
+                                    description = "图层名（可选，默认'0'）"
+                                },
+                                color = new {
+                                    type = "string",
+                                    description = "颜色（可选）"
+                                }
+                            },
+                            required = new[] { "position", "text" }
+                        }
+                    }
+                },
+
+                // ===== P0.2 修改工具（Modify Tools）- 4个 =====
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "delete_entity",
+                        description = "删除AutoCAD中的图形实体",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                entity_ids = new {
+                                    type = "array",
+                                    items = new { type = "string" },
+                                    description = "实体ID列表（Handle，十六进制字符串）"
+                                }
+                            },
+                            required = new[] { "entity_ids" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "modify_entity_properties",
+                        description = "修改AutoCAD实体的属性（颜色、图层等）",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                entity_ids = new {
+                                    type = "array",
+                                    items = new { type = "string" },
+                                    description = "实体ID列表（Handle）"
+                                },
+                                layer = new {
+                                    type = "string",
+                                    description = "新图层名（可选）"
+                                },
+                                color = new {
+                                    type = "string",
+                                    description = "新颜色（可选）"
+                                }
+                            },
+                            required = new[] { "entity_ids" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "move_entity",
+                        description = "移动AutoCAD实体到新位置",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                entity_ids = new {
+                                    type = "array",
+                                    items = new { type = "string" },
+                                    description = "实体ID列表（Handle）"
+                                },
+                                displacement = new {
+                                    type = "array",
+                                    items = new { type = "number" },
+                                    description = "位移向量[dx, dy, dz]，单位mm"
+                                }
+                            },
+                            required = new[] { "entity_ids", "displacement" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "copy_entity",
+                        description = "复制AutoCAD实体到新位置",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                entity_ids = new {
+                                    type = "array",
+                                    items = new { type = "string" },
+                                    description = "实体ID列表（Handle）"
+                                },
+                                displacement = new {
+                                    type = "array",
+                                    items = new { type = "number" },
+                                    description = "位移向量[dx, dy, dz]，单位mm"
+                                }
+                            },
+                            required = new[] { "entity_ids", "displacement" }
+                        }
+                    }
+                },
+
+                // ===== P1.1 查询工具（Query Tools）- 4个 =====
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "measure_distance",
+                        description = "测量两点之间的距离",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                point1 = new {
+                                    type = "array",
+                                    items = new { type = "number" },
+                                    description = "第一个点坐标[x, y, z]，单位mm"
+                                },
+                                point2 = new {
+                                    type = "array",
+                                    items = new { type = "number" },
+                                    description = "第二个点坐标[x, y, z]，单位mm"
+                                }
+                            },
+                            required = new[] { "point1", "point2" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "measure_area",
+                        description = "测量多边形区域的面积",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                points = new {
+                                    type = "array",
+                                    items = new {
+                                        type = "array",
+                                        items = new { type = "number" }
+                                    },
+                                    description = "多边形顶点[[x1,y1], [x2,y2], ...]，单位mm"
+                                }
+                            },
+                            required = new[] { "points" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "list_entities",
+                        description = "列出图纸中的所有实体",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                entity_type = new {
+                                    type = "string",
+                                    description = "实体类型过滤（可选，如'Line', 'Circle', 'Text'等）"
+                                },
+                                layer = new {
+                                    type = "string",
+                                    description = "图层名过滤（可选）"
+                                }
+                            }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "count_entities",
+                        description = "统计图纸中的实体数量",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                entity_type = new {
+                                    type = "string",
+                                    description = "实体类型过滤（可选）"
+                                },
+                                layer = new {
+                                    type = "string",
+                                    description = "图层名过滤（可选）"
+                                }
+                            }
+                        }
+                    }
+                },
+
+                // ===== P1.2 图层工具（Layer Tools）- 4个 =====
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "create_layer",
+                        description = "创建新图层",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                layer_name = new {
+                                    type = "string",
+                                    description = "图层名称"
+                                },
+                                color = new {
+                                    type = "string",
+                                    description = "图层颜色（可选，默认白色）"
+                                }
+                            },
+                            required = new[] { "layer_name" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "set_current_layer",
+                        description = "设置当前工作图层",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                layer_name = new {
+                                    type = "string",
+                                    description = "图层名称"
+                                }
+                            },
+                            required = new[] { "layer_name" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "modify_layer_properties",
+                        description = "修改图层属性",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                layer_name = new {
+                                    type = "string",
+                                    description = "图层名称"
+                                },
+                                color = new {
+                                    type = "string",
+                                    description = "新颜色（可选）"
+                                },
+                                is_frozen = new {
+                                    type = "boolean",
+                                    description = "是否冻结（可选）"
+                                },
+                                is_locked = new {
+                                    type = "boolean",
+                                    description = "是否锁定（可选）"
+                                }
+                            },
+                            required = new[] { "layer_name" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "query_layer_info",
+                        description = "查询图层详细信息",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                layer_name = new {
+                                    type = "string",
+                                    description = "图层名称（可选，不指定则返回所有图层）"
+                                }
+                            }
+                        }
+                    }
+                },
+
+                // ===== P1.3 高级修改工具（Advanced Modify Tools）- 2个 =====
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "rotate_entity",
+                        description = "旋转AutoCAD实体",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                entity_ids = new {
+                                    type = "array",
+                                    items = new { type = "string" },
+                                    description = "实体ID列表（Handle）"
+                                },
+                                base_point = new {
+                                    type = "array",
+                                    items = new { type = "number" },
+                                    description = "旋转基点[x, y, z]，单位mm"
+                                },
+                                angle = new {
+                                    type = "number",
+                                    description = "旋转角度（度，逆时针为正）"
+                                }
+                            },
+                            required = new[] { "entity_ids", "base_point", "angle" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "scale_entity",
+                        description = "缩放AutoCAD实体",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                entity_ids = new {
+                                    type = "array",
+                                    items = new { type = "string" },
+                                    description = "实体ID列表（Handle）"
+                                },
+                                base_point = new {
+                                    type = "array",
+                                    items = new { type = "number" },
+                                    description = "缩放基点[x, y, z]，单位mm"
+                                },
+                                scale_factor = new {
+                                    type = "number",
+                                    description = "缩放比例（>1放大，<1缩小）"
+                                }
+                            },
+                            required = new[] { "entity_ids", "base_point", "scale_factor" }
+                        }
+                    }
+                },
+
+                // ===== 原有工具（保留兼容性）=====
+
                 // 翻译工具
                 new {
                     type = "function",
