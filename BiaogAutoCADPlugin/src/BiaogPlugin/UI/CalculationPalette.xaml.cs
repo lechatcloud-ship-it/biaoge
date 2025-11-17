@@ -148,24 +148,29 @@ namespace BiaogPlugin.UI
                 }
 
                 // ===== AutoCAD API调用（需要文档锁定） =====
-                // ✅ 最佳实践：PaletteSet事件中调用AutoCAD API应显式锁定文档
+                // ✅ P0修复：将同步的文档锁定操作移到Task.Run中，避免阻塞UI线程
                 // 参考：AutoCAD官方文档 - "When to Lock the Document"
-                List<TextEntity> textEntities;
-                List<string> layerNames;
 
+                // 更新进度（UI线程）
                 ProgressText.Text = "提取文本...";
                 ProgressBar.Value = 10;
 
-                using (var docLock = doc.LockDocument())
+                // ✅ 在后台线程执行文档锁定和数据提取（避免UI卡死）
+                var (textEntities, layerNames) = await Task.Run(() =>
                 {
-                    // 在文档锁定下提取DWG数据
-                    var extractor = new DwgTextExtractor();
-                    textEntities = extractor.ExtractAllText();
+                    using (var docLock = doc.LockDocument())
+                    {
+                        // 在文档锁定下提取DWG数据
+                        var extractor = new DwgTextExtractor();
+                        var entities = extractor.ExtractAllText();
 
-                    // 提取图层名称
-                    layerNames = textEntities.Select(t => t.Layer).Distinct().ToList();
-                }
-                // ✅ 文档锁定在await之前释放（避免死锁）
+                        // 提取图层名称
+                        var layers = entities.Select(t => t.Layer).Distinct().ToList();
+
+                        return (entities, layers);
+                    }
+                });
+                // ✅ Task.Run完成后返回主线程，文档锁定已释放
 
                 AddLog($"提取到 {textEntities.Count} 个文本实体");
                 AddLog($"图层数: {layerNames.Count}");
