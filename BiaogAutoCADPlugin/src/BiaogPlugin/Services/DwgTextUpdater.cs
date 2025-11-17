@@ -210,7 +210,112 @@ namespace BiaogPlugin.Services
                     return true;
                 }
 
-                Log.Warning($"不支持的实体类型: {ent.GetType().Name}");
+                // ✅ P0关键修复：添加Dimension（标注）更新支持
+                // 🐛 根本问题：DwgTextExtractor提取了标注文本，但UpdateSingleText不支持更新
+                // 📖 参考：AutoCAD 2025 .NET API - Dimension.DimensionText属性
+                if (ent is Dimension dimension)
+                {
+                    try
+                    {
+                        // 使用DimensionText属性更新标注文本（覆盖测量值）
+                        dimension.DimensionText = update.NewContent;
+                        Log.Debug($"已更新Dimension文本: {update.NewContent}");
+                        return true;
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Log.Warning(ex, $"更新Dimension失败: {update.ObjectId}");
+                        return false;
+                    }
+                }
+
+                // ✅ P0关键修复：添加MLeader（多重引线）更新支持
+                // 📖 参考：AutoCAD 2025 .NET API - MLeader.MText属性
+                if (ent is MLeader mLeader)
+                {
+                    try
+                    {
+                        // MLeader的文本通过MText属性访问
+                        if (mLeader.MText != null)
+                        {
+                            mLeader.MText.Contents = update.NewContent;
+                            Log.Debug($"已更新MLeader文本: {update.NewContent}");
+                            return true;
+                        }
+                        else
+                        {
+                            Log.Warning($"MLeader {update.ObjectId} 没有MText内容");
+                            return false;
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Log.Warning(ex, $"更新MLeader失败: {update.ObjectId}");
+                        return false;
+                    }
+                }
+
+                // ✅ P0关键修复：添加Table（表格）更新支持
+                // 📖 参考：AutoCAD 2025 .NET API - Table.Cells[row,col].TextString
+                // ⚠️ 注意：update.Tag包含单元格位置信息（格式：Row{row}_Col{col}）
+                if (ent is Table table)
+                {
+                    try
+                    {
+                        // 从Tag中解析行列位置（Tag格式：Row0_Col1）
+                        if (update.EntityType == TextEntityType.Table && !string.IsNullOrEmpty(update.Tag))
+                        {
+                            var parts = update.Tag.Split('_');
+                            if (parts.Length == 2 &&
+                                parts[0].StartsWith("Row") &&
+                                parts[1].StartsWith("Col"))
+                            {
+                                int row = int.Parse(parts[0].Substring(3));
+                                int col = int.Parse(parts[1].Substring(3));
+
+                                if (row < table.Rows.Count && col < table.Columns.Count)
+                                {
+                                    table.Cells[row, col].TextString = update.NewContent;
+                                    Log.Debug($"已更新Table单元格[{row},{col}]: {update.NewContent}");
+                                    return true;
+                                }
+                                else
+                                {
+                                    Log.Warning($"Table单元格索引越界: [{row},{col}]，表格大小: [{table.Rows.Count},{table.Columns.Count}]");
+                                    return false;
+                                }
+                            }
+                        }
+
+                        Log.Warning($"Table更新失败: Tag格式错误或为空 (Tag={update.Tag})");
+                        return false;
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Log.Warning(ex, $"更新Table失败: {update.ObjectId}");
+                        return false;
+                    }
+                }
+
+                // ✅ P0关键修复：添加FeatureControlFrame（几何公差）更新支持
+                // 📖 参考：AutoCAD 2025 .NET API - FeatureControlFrame.Text属性
+                if (ent is FeatureControlFrame fcf)
+                {
+                    try
+                    {
+                        fcf.Text = update.NewContent;
+                        Log.Debug($"已更新FeatureControlFrame文本: {update.NewContent}");
+                        return true;
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Log.Warning(ex, $"更新FeatureControlFrame失败: {update.ObjectId}");
+                        return false;
+                    }
+                }
+
+                // ⚠️ 不支持的类型
+                Log.Warning($"不支持的实体类型: {ent.GetType().Name} (ObjectId: {update.ObjectId})");
                 return false;
             }
             catch (System.Exception ex)
