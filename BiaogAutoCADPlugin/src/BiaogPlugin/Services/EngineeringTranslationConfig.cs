@@ -28,33 +28,36 @@ namespace BiaogPlugin.Services
         ///
         /// 批次大小计算（2025-11-17 精简优化后）：
         ///
-        /// 用户反馈："注释等占用tokens，提示词直接告诉要什么不要什么"
+        /// 用户反馈："要写有些不翻译，有些翻译啊，比如各种不需要翻译的"
         ///
-        /// 系统参数（精简配置）：
-        /// - DomainPrompt: ~15 tokens (去掉废话，直接指令)
+        /// 系统参数（明确配置）：
+        /// - DomainPrompt: ~25 tokens (明确指令：翻译什么 + 不翻译什么)
         /// - Terms术语表: ~60 tokens (12条核心工程术语)
         /// - TM翻译记忆: ~80 tokens (4条核心翻译示例)
-        /// - 系统参数总计: ~155 tokens (比最初700少78%)
+        /// - 系统参数总计: ~165 tokens (比最初700少76%)
         ///
         /// 可用空间计算：
         /// - 输入限制: 8192 tokens
-        /// - 系统参数: -155 tokens
+        /// - 系统参数: -165 tokens
         /// - 安全余量: -500 tokens
-        /// - 实际可用: 7537 tokens
+        /// - 实际可用: 7527 tokens
         ///
         /// Token估算：1字符 约等于 1 token
-        /// 最终设置: 7500字符（留37 tokens余量）
+        /// 最终设置: 7500字符（留27 tokens余量）
         /// </summary>
-        public const int MaxCharsPerBatch = 7500;  // 精简优化：系统参数155 tokens，实际可用7537 tokens
+        public const int MaxCharsPerBatch = 7500;  // 精简优化：系统参数165 tokens，实际可用7527 tokens
 
         /// <summary>
         /// 工程建筑领域提示词
         ///
-        /// 用户反馈："注释等占用tokens，提示词直接告诉要什么不要什么"
-        /// 极简指令：仅保留最核心的要求，去掉所有解释性废话
-        /// 估算：约15 tokens（比之前80减少81%）
+        /// 用户反馈："要写有些不翻译，有些翻译啊，比如各种不需要翻译的"
+        /// 明确指令：清楚告知什么要翻译、什么不翻译
+        /// 估算：约25 tokens
         /// </summary>
-        public static readonly string DomainPrompt = "Engineering drawings. Preserve: GB, ACI, C30, HRB400, No., units.";
+        public static readonly string DomainPrompt =
+            "Engineering drawings. " +
+            "Translate: text, labels, notes, titles. " +
+            "Preserve: GB/JGJ/ACI codes, C30/HRB400 grades, No./DWG numbers, units, axes.";
 
         /// <summary>
         /// 不应翻译的术语/模式规则
