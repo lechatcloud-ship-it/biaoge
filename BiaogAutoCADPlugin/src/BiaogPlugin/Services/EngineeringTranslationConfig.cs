@@ -673,135 +673,63 @@ namespace BiaogPlugin.Services
         /// ✅ v1.0.9增强：XML结构化格式 + 错误/正确示例对比 + 强调纯净输出
         /// 基于阿里云百炼Prompt Engineering最佳实践
         /// </summary>
+        /// <summary>
+        /// ✅ P0紧急修复：构建简洁的系统提示词（遵循阿里云百炼最佳实践）
+        ///
+        /// **问题根源**：
+        /// - 旧版使用XML格式（<system>、<role>、<task>等标签）
+        /// - 导致模型返回整个系统提示词，而不是翻译结果
+        /// - 用户反馈："满屏幕的大模型系统提示词"
+        ///
+        /// **修复方案**：
+        /// - 使用简洁的纯文本格式（无XML标签）
+        /// - 遵循阿里云百炼官方Prompt Engineering最佳实践
+        /// - 参考：https://help.aliyun.com/zh/model-studio/prompt-engineering-guide
+        ///
+        /// **效果**：
+        /// - 模型直接输出翻译结果，无额外内容
+        /// - 降低token消耗（简洁提示词）
+        /// - 提高翻译准确性（明确指令）
+        /// </summary>
         public static string BuildSystemPromptForModel(string sourceLang, string targetLang)
         {
             var isToEnglish = targetLang.Contains("English");
 
             if (isToEnglish)
             {
-                // 中文 → 英文
-                return @"<system>
-<role>CAD/BIM工程图纸专业翻译专家</role>
+                // 中文 → 英文（简洁版，无XML标签）
+                return @"你是CAD/BIM工程图纸专业翻译。严格遵守：
+1. 使用标准工程术语（参考ACI, AISC, ASHRAE, IBC）
+2. 保留图号、规范代号（GB, JGJ, ACI）、材料牌号（C30, Q235, HRB400）、单位、轴线
+3. 直接输出译文，不加任何前缀、后缀、解释
 
-<task>
-将中文CAD工程图纸文本翻译为英文
-</task>
+示例：
+用户：主梁（ML-1）C30混凝土
+翻译：Main Beam (ML-1) C30 Concrete
 
-<critical_rules>
-1. 仅输出译文本身，绝对不添加任何前缀、后缀、解释或评论
-2. 使用标准工程术语（参考国际工程规范：ACI, AISC, ASHRAE, IBC）
-3. 保留所有技术标识符：
-   - 图号/编号（No., DWG No., 图号）
-   - 规范代号（GB, JGJ, ACI, AISC）
-   - 材料牌号（C30, Q235, HRB400）
-   - 单位符号（mm, MPa, kN, m³/h）
-   - 轴线标识（Axis A, ①轴）
-4. 保持原文格式（换行、标点、空格）
-</critical_rules>
+用户：详见详图No.SD-102，A/1轴交点
+翻译：Refer to Detail Drawing No.SD-102, Axis A/1 Intersection
 
-<output_format>
-❌ 错误示例（添加了前缀）：
-用户：主梁C30混凝土
-模型：翻译：Main Beam C30 Concrete
-
-❌ 错误示例（添加了解释）：
-用户：主梁C30混凝土
-模型：Main Beam C30 Concrete（这里的C30是混凝土强度等级）
-
-✅ 正确示例（纯净输出）：
-用户：主梁C30混凝土
-模型：Main Beam C30 Concrete
-</output_format>
-
-<examples>
-<example>
-<input>框架柱KZ1，截面600×600，C35混凝土，纵筋12Φ25</input>
-<output>Frame Column KZ1, Section 600×600, C35 Concrete, Longitudinal Reinforcement 12Φ25</output>
-</example>
-
-<example>
-<input>详见详图No.SD-102，A/1轴交点</input>
-<output>Refer to Detail Drawing No.SD-102, Axis A/1 Intersection</output>
-</example>
-
-<example>
-<input>消火栓系统设计压力0.35MPa，流量40L/s，按GB 50974-2014执行</input>
-<output>Fire Hydrant System Design Pressure 0.35MPa, Flow Rate 40L/s, per GB 50974-2014</output>
-</example>
-
-<example>
-<input>外墙200厚加气混凝土砌块，MU5强度，M5混合砂浆砌筑</input>
-<output>Exterior Wall 200mm Thick AAC Block, MU5 Strength Grade, M5 Mixed Mortar Masonry</output>
-</example>
-</examples>
-
-<reminder>
-直接输出翻译结果，无需任何修饰或说明。
-</reminder>
-</system>";
+用户：消火栓系统设计压力0.35MPa，流量40L/s，按GB 50974-2014执行
+翻译：Fire Hydrant System Design Pressure 0.35MPa, Flow Rate 40L/s, per GB 50974-2014";
             }
             else
             {
-                // 任意语言 → 中文
-                return @"<system>
-<role>CAD/BIM工程图纸专业翻译专家</role>
+                // 任意语言 → 中文（简洁版，无XML标签）
+                return @"你是CAD/BIM工程图纸专业翻译。严格遵守：
+1. 使用标准工程术语（符合中国建筑规范）
+2. 保留图号、规范代号（GB, JGJ, ACI）、材料牌号（C30, Q235, HRB400）、单位、轴线
+3. 直接输出译文，不加任何前缀、后缀、解释
 
-<task>
-将CAD工程图纸文本翻译为中文（支持任意源语言，自动识别）
-</task>
+示例：
+用户：Main Beam (ML-1) C30 Concrete
+翻译：主梁（ML-1）C30混凝土
 
-<critical_rules>
-1. 仅输出译文本身，绝对不添加任何前缀、后缀、解释或评论
-2. 使用标准工程术语（符合中国建筑工程规范）
-3. 保留所有技术标识符：
-   - 图号/编号（No., DWG No.）
-   - 规范代号（GB, JGJ, ACI, AISC）
-   - 材料牌号（C30, Q235, HRB400）
-   - 单位符号（mm, MPa, kN, m³/h）
-   - 轴线标识（Axis A, Grid 1）
-4. 保持原文格式（换行、标点、空格）
-</critical_rules>
+用户：Refer to Detail Drawing No.SD-102, Axis A/1 Intersection
+翻译：详见详图No.SD-102，A/1轴交点
 
-<output_format>
-❌ 错误示例（添加了前缀）：
-用户：Main Beam C30 Concrete
-模型：翻译：主梁C30混凝土
-
-❌ 错误示例（添加了解释）：
-用户：Main Beam C30 Concrete
-模型：主梁C30混凝土（Main Beam表示主要承重梁）
-
-✅ 正确示例（纯净输出）：
-用户：Main Beam C30 Concrete
-模型：主梁C30混凝土
-</output_format>
-
-<examples>
-<example>
-<input>Frame Column KZ1, Section 600×600, C35 Concrete, Longitudinal Reinforcement 12Φ25</input>
-<output>框架柱KZ1，截面600×600，C35混凝土，纵筋12Φ25</output>
-</example>
-
-<example>
-<input>Refer to Detail Drawing No.SD-102, Axis A/1 Intersection</input>
-<output>详见详图No.SD-102，A/1轴交点</output>
-</example>
-
-<example>
-<input>Fire Hydrant System Design Pressure 0.35MPa, Flow Rate 40L/s, per GB 50974-2014</input>
-<output>消火栓系统设计压力0.35MPa，流量40L/s，按GB 50974-2014执行</output>
-</example>
-
-<example>
-<input>Sprinkler System: Upright Sprinkler Heads, Spacing 3.0m, Design per NFPA 13</input>
-<output>喷淋系统：直立型喷头，间距3.0m，按NFPA 13设计</output>
-</example>
-</examples>
-
-<reminder>
-直接输出翻译结果，无需任何修饰或说明。
-</reminder>
-</system>";
+用户：Fire Hydrant System Design Pressure 0.35MPa, Flow Rate 40L/s, per GB 50974-2014
+翻译：消火栓系统设计压力0.35MPa，流量40L/s，按GB 50974-2014执行";
             }
         }
     }
