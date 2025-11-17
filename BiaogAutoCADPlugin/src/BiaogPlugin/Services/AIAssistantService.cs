@@ -30,10 +30,10 @@ namespace BiaogPlugin.Services
         private readonly ContextLengthManager _contextLengthManager;
         private readonly bool _useOpenAISDK;  // ✅ 控制是否使用OpenAI SDK
 
-        // Agent核心模型配置（2025-11-16升级到qwen3-coder-flash）
-        // qwen3-coder-flash: 代码专用，工具调用专家，1M上下文，性价比最优
+        // ✅ P0修复: Agent核心模型从配置读取,而非硬编码
+        // 默认: qwen3-coder-flash (代码专用,工具调用专家,1M上下文,性价比最优)
         // 参考: MODEL_SELECTION_GUIDE.md
-        private const string AgentModel = "qwen3-coder-flash";
+        private readonly string _agentModel;
 
         // 对话历史
         private readonly List<BiaogPlugin.Services.ChatMessage> _chatHistory = new();
@@ -48,10 +48,14 @@ namespace BiaogPlugin.Services
             _contextManager = contextManager;
             _contextLengthManager = new ContextLengthManager();
 
+            // ✅ P0修复: 从配置读取Agent模型,支持灵活配置和升级
+            _agentModel = configManager.GetString("Bailian:AgentCoreModel", "qwen3-coder-flash");
+            Log.Information("AI Agent模型配置: {Model}", _agentModel);
+
             // ✅ 全面迁移到OpenAI SDK
             try
             {
-                _openAIClient = new BailianOpenAIClient(AgentModel, configManager);
+                _openAIClient = new BailianOpenAIClient(_agentModel, configManager);
                 _useOpenAISDK = true;
                 Log.Information("标哥AI助手初始化完成 - 使用OpenAI SDK（流式优化）");
             }
