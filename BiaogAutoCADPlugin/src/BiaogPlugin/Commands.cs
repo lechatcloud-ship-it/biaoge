@@ -2750,6 +2750,60 @@ namespace BiaogPlugin
             }
         }
 
+        /// <summary>
+        /// ✅ 诊断算量功能 - 专门解决"面积始终为0"问题
+        ///
+        /// 用户反馈："改了上百次，面积始终显示是0，就很过分"
+        ///
+        /// 功能说明：
+        /// - 检查图纸中的文本实体（用于构件识别）
+        /// - 检查图纸中的几何实体（Polyline/Hatch/Region/Solid3d）
+        /// - 运行构件识别并分析为什么面积为0
+        /// - 给出具体的解决方案
+        ///
+        /// 使用场景：
+        /// - 算量功能面积为0时，运行此命令找出根本原因
+        /// - 了解图纸的几何实体分布情况
+        /// - 验证算量功能是否正常工作
+        /// </summary>
+        [CommandMethod("BIAOGE_DIAGNOSE_QUANTITY", CommandFlags.Modal)]
+        public void DiagnoseQuantityCalculation()
+        {
+            var doc = Application.DocumentManager.MdiActiveDocument;
+            var ed = doc.Editor;
+
+            try
+            {
+                ed.WriteMessage("\n╔═════════════════════════════════════════════════════╗");
+                ed.WriteMessage("\n║    标哥算量功能诊断 - 面积为0问题专项排查       ║");
+                ed.WriteMessage("\n╚═════════════════════════════════════════════════════╝");
+                ed.WriteMessage("\n正在诊断，请稍候...\n");
+
+                Log.Information("开始运行算量诊断");
+
+                // 运行诊断
+                var diagnosticService = new QuantityDiagnosticService();
+                var report = diagnosticService.RunFullDiagnostic();
+
+                // 显示报告
+                ed.WriteMessage("\n" + report);
+
+                // 保存到桌面
+                var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                var reportPath = System.IO.Path.Combine(desktopPath, $"BiaogPlugin_Quantity_Diagnostic_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
+                System.IO.File.WriteAllText(reportPath, report);
+
+                ed.WriteMessage($"\n\n诊断报告已保存到: {reportPath}");
+                Log.Information($"算量诊断报告已保存: {reportPath}");
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error(ex, "运行算量诊断失败");
+                ed.WriteMessage($"\n[错误] 诊断失败: {ex.Message}");
+                ed.WriteMessage($"\n详细错误: {ex.StackTrace}");
+            }
+        }
+
         #endregion
     }
 }
