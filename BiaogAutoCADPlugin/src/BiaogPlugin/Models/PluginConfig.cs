@@ -30,6 +30,12 @@ namespace BiaogPlugin.Models
         /// </summary>
         [JsonPropertyName("inputMethod")]
         public InputMethodConfig InputMethod { get; set; } = new InputMethodConfig();
+
+        /// <summary>
+        /// ✅ 成本管理配置
+        /// </summary>
+        [JsonPropertyName("cost")]
+        public CostConfig Cost { get; set; } = new CostConfig();
     }
 
     /// <summary>
@@ -200,5 +206,52 @@ namespace BiaogPlugin.Models
         /// </summary>
         [JsonPropertyName("textModeIME")]
         public string TextModeIME { get; set; } = "中文";
+    }
+
+    /// <summary>
+    /// ✅ 成本管理配置
+    /// ⚠️ 重要说明：
+    /// 1. 中国无公开工程造价API，所有价格数据需用户自行维护
+    /// 2. 地区差异巨大（一线城市比西部地区高30-50%）
+    /// 3. 价格随材料市场波动，需定期更新
+    /// 4. 默认禁用自动成本估算，避免误导
+    /// </summary>
+    public class CostConfig
+    {
+        /// <summary>
+        /// ✅ 启用成本估算（默认关闭，避免误导用户）
+        /// </summary>
+        [JsonPropertyName("enableCostEstimation")]
+        public bool EnableCostEstimation { get; set; } = false;
+
+        /// <summary>
+        /// 当前地区（华北/华东/华南/西南/西北/东北/华中）
+        /// </summary>
+        [JsonPropertyName("currentRegion")]
+        public string CurrentRegion { get; set; } = "华东";
+
+        /// <summary>
+        /// 自定义价格数据库路径（可覆盖默认配置）
+        /// </summary>
+        [JsonPropertyName("customPriceDatabasePath")]
+        public string CustomPriceDatabasePath { get; set; } = "";
+
+        /// <summary>
+        /// 价格数据来源说明（用户自填）
+        /// </summary>
+        [JsonPropertyName("priceDataSource")]
+        public string PriceDataSource { get; set; } = "用户自定义";
+
+        /// <summary>
+        /// 价格数据最后更新日期
+        /// </summary>
+        [JsonPropertyName("lastPriceUpdate")]
+        public string LastPriceUpdate { get; set; } = "";
+
+        /// <summary>
+        /// 显示成本估算警告（提醒用户价格仅供参考）
+        /// </summary>
+        [JsonPropertyName("showCostWarning")]
+        public bool ShowCostWarning { get; set; } = true;
     }
 }
