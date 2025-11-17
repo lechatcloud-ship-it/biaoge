@@ -129,27 +129,11 @@ namespace BiaogPlugin.Services
                 var ent = tr.GetObject(update.ObjectId, OpenMode.ForWrite) as Entity;
                 if (ent == null) return false;
 
-                // ✅ 修复：检测XRef外部引用块（只读，无法修改）
-                // 🐛 问题：DwgTextExtractor现在会提取XRef文本，但XRef块是只读的
-                // 🔧 解决：检测到XRef文本时跳过更新，避免错误
-                // ✅ P1修复：使用IsNull属性而非比较运算符（符合AutoCAD 2022官方推荐）
-                if (!ent.OwnerId.IsNull && !ent.OwnerId.IsErased && ent.OwnerId.IsValid)
-                {
-                    try
-                    {
-                        var owner = tr.GetObject(ent.OwnerId, OpenMode.ForRead) as BlockTableRecord;
-                        if (owner != null && (owner.IsFromExternalReference || owner.IsFromOverlayReference))
-                        {
-                            Log.Debug($"文本 {update.ObjectId.Handle} 属于外部引用块 {owner.Name}，无法修改（XRef只读）");
-                            return false; // XRef文本跳过更新
-                        }
-                    }
-                    catch (System.Exception ex)
-                    {
-                        Log.Warning(ex, $"检测XRef块失败: {update.ObjectId.Handle}");
-                        // 继续尝试更新，如果真是XRef会在后续OpenMode.ForWrite时失败
-                    }
-                }
+                // ✅ P0修复：移除XRef预检查，直接尝试更新
+                // 用户反馈："如果是只读但是为什么我双击又能编辑呢"
+                // 真相：用户通过REFEDIT可以编辑XRef，API也应该尝试更新
+                // 策略：直接尝试更新，如果失败会被外层try-catch捕获
+                // 如果AutoCAD不允许写入，OpenMode.ForWrite本身会抛出异常
 
                 // ✅ 关键修复：检测中文并自动切换字体
                 bool containsChinese = ContainsChinese(update.NewContent);
