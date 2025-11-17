@@ -8,14 +8,15 @@ using BiaogPlugin.Models;
 namespace BiaogPlugin.Services
 {
     /// <summary>
-    /// ✅ AutoCAD Dimension实体提取器 - 直接从几何数据获取精确尺寸
+    /// ✅ P2修复：AutoCAD Dimension实体提取器 - 直接从几何数据获取精确尺寸
     ///
     /// 核心优势：
     /// 1. 从Dimension.Measurement属性获取AutoCAD计算的精确测量值
     /// 2. 不依赖文本解析，避免格式化文本带来的误差
-    /// 3. 支持所有8种Dimension派生类（Aligned, Rotated, Diametric, Radial, etc.）
+    /// 3. ✅ 支持所有9种Dimension派生类（Aligned, Rotated, Diametric, Radial, Ordinate, etc.）
     /// 4. 提取完整的几何信息（延伸线点、圆心、半径等）
     ///
+    /// 修复：补全OrdinateDimension（坐标标注）支持，完善机械制图兼容性
     /// 基于AutoCAD .NET API 2025最佳实践
     /// </summary>
     public class DimensionExtractor
@@ -131,7 +132,10 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
-        /// ✅ 从Dimension实体提取详细几何数据（支持所有8种派生类）
+        /// ✅ P2修复：从Dimension实体提取详细几何数据（支持所有9种派生类）
+        ///
+        /// 修复前：只处理8种类型，遗漏OrdinateDimension
+        /// 修复后：补全9种类型
         ///
         /// 参考：AutoCAD .NET API官方文档
         /// - AlignedDimension: XLine1Point, XLine2Point, DimLinePoint
@@ -142,6 +146,7 @@ namespace BiaogPlugin.Services
         /// - LineAngularDimension2: XLine1Start, XLine1End, XLine2Start, XLine2End
         /// - Point3AngularDimension: CenterPoint, XLine1Point, XLine2Point
         /// - ArcDimension: XLine1Point, XLine2Point, ArcPoint
+        /// - OrdinateDimension: DefiningPoint, LeaderEndPoint, UsingXAxis
         /// </summary>
         private DimensionData? ExtractDimensionData(Dimension dimension, ObjectId objId, string spaceName)
         {
@@ -250,6 +255,18 @@ namespace BiaogPlugin.Services
                     dimData.Center = arc.CenterPoint;
 
                     Log.Debug($"提取ArcDimension: {dimData.Measurement:F3} (弧长)");
+                }
+                // 9. ✅ P2修复：坐标标注（OrdinateDimension）
+                // 参考：https://adndevblog.typepad.com/autocad/2024/10/working-with-ucs-and-ordinate-dimensions-in-autocad-using-net-api.html
+                else if (dimension is OrdinateDimension ordinate)
+                {
+                    dimData.DimensionType = DimensionType.Ordinate;
+                    dimData.DefiningPoint = ordinate.DefiningPoint;
+                    dimData.LeaderEndPoint = ordinate.LeaderEndPoint;
+                    dimData.UsingXAxis = ordinate.UsingXAxis;
+
+                    var axisLabel = ordinate.UsingXAxis ? "X" : "Y";
+                    Log.Debug($"提取OrdinateDimension: {axisLabel}={dimData.Measurement:F3}");
                 }
                 // 基类Dimension（理论上不应该直接实例化，但保留处理）
                 else

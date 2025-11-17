@@ -102,6 +102,24 @@ namespace BiaogPlugin.Models
         public Point3d? ArcPoint { get; set; }
 
         /// <summary>
+        /// ✅ P2修复：定义点（适用于OrdinateDimension）
+        /// 坐标标注的原点位置
+        /// </summary>
+        public Point3d? DefiningPoint { get; set; }
+
+        /// <summary>
+        /// ✅ P2修复：引线终点（适用于OrdinateDimension）
+        /// 坐标标注引线的终点位置
+        /// </summary>
+        public Point3d? LeaderEndPoint { get; set; }
+
+        /// <summary>
+        /// ✅ P2修复：是否使用X轴（适用于OrdinateDimension）
+        /// true: 标注X坐标值; false: 标注Y坐标值
+        /// </summary>
+        public bool? UsingXAxis { get; set; }
+
+        /// <summary>
         /// 所属空间名称（ModelSpace, Layout:xxx）
         /// </summary>
         public string? SpaceName { get; set; }
@@ -164,7 +182,9 @@ namespace BiaogPlugin.Models
     }
 
     /// <summary>
-    /// 标注类型枚举（对应AutoCAD的8种Dimension派生类）
+    /// ✅ P2修复：标注类型枚举（对应AutoCAD的9种Dimension派生类）
+    /// 修复前：只有8种类型，遗漏OrdinateDimension
+    /// 修复后：补全9种类型
     /// </summary>
     public enum DimensionType
     {
@@ -206,6 +226,12 @@ namespace BiaogPlugin.Models
         /// <summary>
         /// 弧长标注（ArcDimension）- 标注弧的长度
         /// </summary>
-        Arc
+        Arc,
+
+        /// <summary>
+        /// ✅ P2修复：坐标标注（OrdinateDimension）- 标注X或Y坐标值（DIMORDINATE命令）
+        /// 常用于机械制图，显示点到原点的X或Y方向距离
+        /// </summary>
+        Ordinate
     }
 }
