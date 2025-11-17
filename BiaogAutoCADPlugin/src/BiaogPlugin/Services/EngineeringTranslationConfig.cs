@@ -28,34 +28,34 @@ namespace BiaogPlugin.Services
         ///
         /// 批次大小计算（2025-11-17 精简优化后）：
         ///
-        /// 用户反馈："只要告诉大模型不翻译编号就好了，大模型本身就很聪明的"
+        /// 用户反馈："所有翻译全部按照建筑工程行业的专业术语来翻译图纸"
         ///
         /// 系统参数（极简配置）：
-        /// - DomainPrompt: ~12 tokens (依赖大模型理解力)
+        /// - DomainPrompt: ~16 tokens (建筑工程专业术语)
         /// - Terms术语表: ~60 tokens (12条核心工程术语)
         /// - TM翻译记忆: ~80 tokens (4条核心翻译示例)
-        /// - 系统参数总计: ~152 tokens (比最初700少78%)
+        /// - 系统参数总计: ~156 tokens (比最初700少78%)
         ///
         /// 可用空间计算：
         /// - 输入限制: 8192 tokens
-        /// - 系统参数: -152 tokens
+        /// - 系统参数: -156 tokens
         /// - 安全余量: -500 tokens
-        /// - 实际可用: 7540 tokens
+        /// - 实际可用: 7536 tokens
         ///
         /// Token估算：1字符 约等于 1 token
-        /// 最终设置: 7500字符（留40 tokens余量）
+        /// 最终设置: 7500字符（留36 tokens余量）
         /// </summary>
-        public const int MaxCharsPerBatch = 7500;  // 极简优化：系统参数152 tokens，实际可用7540 tokens
+        public const int MaxCharsPerBatch = 7500;  // 极简优化：系统参数156 tokens，实际可用7536 tokens
 
         /// <summary>
         /// 工程建筑领域提示词
         ///
-        /// 用户反馈："只要告诉大模型不翻译编号就好了，大模型本身就很聪明的"
+        /// 用户反馈："所有翻译全部按照建筑工程行业的专业术语来翻译图纸"
         /// 简洁指令：依赖大模型理解能力，不枚举具体示例
-        /// 估算：约12 tokens
+        /// 估算：约16 tokens
         /// </summary>
         public static readonly string DomainPrompt =
-            "Engineering drawings. Translate: descriptions. Preserve: codes, numbers, units.";
+            "Engineering drawings. Use construction terminology. Translate: descriptions. Preserve: codes, numbers, units.";
 
         /// <summary>
         /// 不应翻译的术语/模式规则
