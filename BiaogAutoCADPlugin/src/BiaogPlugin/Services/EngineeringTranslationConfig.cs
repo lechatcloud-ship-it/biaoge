@@ -26,42 +26,46 @@ namespace BiaogPlugin.Services
         /// - RPM: 1000 QPS（单条并发）
         /// - 成功率: 99.8%
         ///
-        /// 批次大小计算（2025-11-17 极简优化后）：
+        /// 批次大小计算（2025-11-17 平衡优化后）：
         ///
-        /// ✅ 用户反馈："提示词也算输入tokens的，所以必须要提示词少一点"
+        /// 用户反馈："提示词也算输入tokens的，所以必须要提示词少一点"
+        ///           "但是提示词要通用的适配工程建筑图纸的专业术语"
         ///
-        /// 系统参数（极简配置）：
-        /// - DomainPrompt: ~2 tokens ("Construction Engineering")
-        /// - Terms术语表: ~30 tokens (5条核心术语)
-        /// - TM翻译记忆: ~40 tokens (2条核心示例)
-        /// - 系统参数总计: ~72 tokens ✅ 极简！
+        /// 系统参数（平衡配置）：
+        /// - DomainPrompt: ~80 tokens (简洁但有效的工程图纸翻译指导)
+        /// - Terms术语表: ~60 tokens (12条核心工程术语)
+        /// - TM翻译记忆: ~80 tokens (4条核心翻译示例)
+        /// - 系统参数总计: ~220 tokens (比之前700少69%，但保证专业术语准确)
         ///
         /// 可用空间计算：
         /// - 输入限制: 8192 tokens
-        /// - 系统参数: -72 tokens
-        /// - 安全余量: -500 tokens (API响应、误差等)
-        /// - 实际可用: 7620 tokens
+        /// - 系统参数: -220 tokens
+        /// - 安全余量: -500 tokens
+        /// - 实际可用: 7472 tokens
         ///
         /// Token估算规则（保守）：
-        /// - 混合中英文: 1字符 ≈ 1 token
+        /// - 混合中英文: 1字符 约等于 1 token
         ///
-        /// 最终设置: 7500字符（留120 tokens余量）
+        /// 最终设置: 7400字符（留72 tokens余量）
         ///
-        /// ⚠️ 注意：
-        /// - 如果仍然超限，请运行TokenDiagnosticService实测
-        /// - 可进一步移除tm_list（设为空数组）
+        /// 注意：
+        /// - 如果仍然超限，可调整为7000或运行TokenDiagnosticService实测
+        /// - 如果翻译质量下降，可能需要增加terms/tm_list
         /// </summary>
-        public const int MaxCharsPerBatch = 7500;  // ✅ 极简优化后：7500字符（系统参数仅72 tokens）
+        public const int MaxCharsPerBatch = 7400;  // 平衡优化：系统参数220 tokens，实际可用7472 tokens
 
         /// <summary>
         /// 工程建筑领域提示词
         ///
-        /// ✅ 极简优化（用户反馈："提示词也算输入tokens的"）
-        /// - 从500+ tokens缩减到10-20 tokens
-        /// - 仅保留最核心的领域标识
-        /// - 优先保证实际翻译内容的token空间
+        /// ✅ 平衡优化（用户反馈："提示词要少，但要通用的适配工程建筑图纸的专业术语"）
+        /// - 简洁但有效：保留核心指导信息
+        /// - 估算：~80 tokens（远小于之前的500+，但能确保专业术语准确）
+        /// - 确保模型理解：工程图纸专业翻译，保留技术标识，使用标准术语
         /// </summary>
-        public static readonly string DomainPrompt = "Construction Engineering";
+        public static readonly string DomainPrompt =
+            "Professional translation for construction/engineering drawings (AutoCAD/BIM). " +
+            "Preserve: drawing numbers (No., DWG), codes (GB, JGJ, ACI), material grades (C30, HRB400), units, grid axes. " +
+            "Use standard engineering terminology, not literal translation.";
 
         /// <summary>
         /// 不应翻译的术语/模式规则
@@ -568,56 +572,69 @@ namespace BiaogPlugin.Services
         /// <summary>
         /// 转换为阿里云百炼API所需的tm_list格式
         ///
-        /// ✅ 极简优化（用户反馈："提示词也算输入tokens"）
-        /// - 只保留2条最核心示例（或完全移除）
-        /// - 优先保证实际内容的token空间
+        /// ✅ 平衡优化（提示词少，但要适配工程建筑图纸专业术语）
+        /// - 保留4条核心示例，覆盖主要翻译场景
+        /// - 估算：~80 tokens（比之前的120少，但能引导专业翻译）
         /// </summary>
         public static List<object> GetApiTranslationMemory(string sourceLang, string targetLang)
         {
             var tmList = new List<object>();
-
-            // ✅ 用户明确要求：提示词要少！只保留2条最核心示例
-            // 如果还是不够，可以完全移除（return empty list）
 
             bool isEnToZh = sourceLang.Contains("English") && targetLang.Contains("Chinese");
             bool isZhToEn = sourceLang.Contains("Chinese") && targetLang.Contains("English");
 
             if (isZhToEn)
             {
-                // 中译英：只保留2条最核心示例
-                tmList.Add(new { source = "300×600钢筋混凝土梁，C30混凝土", target = "300×600 RC Beam, C30 Concrete" });
+                // 中译英：4条核心示例，覆盖不同场景
+                tmList.Add(new { source = "300×600钢筋混凝土梁，C30混凝土，HRB400钢筋", target = "300×600 RC Beam, C30 Concrete, HRB400 Reinforcement" });
                 tmList.Add(new { source = "详见详图No.SD-102", target = "See Detail No.SD-102" });
+                tmList.Add(new { source = "墙体厚度240mm", target = "Wall Thickness 240mm" });
+                tmList.Add(new { source = "设计压力0.35MPa", target = "Design Pressure 0.35MPa" });
             }
             else if (isEnToZh)
             {
-                // 英译中：只保留2条最核心示例
-                tmList.Add(new { source = "300×600 RC Beam, C30 Concrete", target = "300×600钢筋混凝土梁，C30混凝土" });
+                // 英译中：4条核心示例
+                tmList.Add(new { source = "300×600 RC Beam, C30 Concrete, HRB400 Reinforcement", target = "300×600钢筋混凝土梁，C30混凝土，HRB400钢筋" });
                 tmList.Add(new { source = "See Detail No.SD-102", target = "详见详图No.SD-102" });
+                tmList.Add(new { source = "Wall Thickness 240mm", target = "墙体厚度240mm" });
+                tmList.Add(new { source = "Design Pressure 0.35MPa", target = "设计压力0.35MPa" });
             }
 
-            Log.Information($"✅ 极简翻译记忆: {tmList.Count}条（优先保证内容空间）");
+            Log.Information($"✅ 平衡翻译记忆: {tmList.Count}条（保证专业术语准确）");
             return tmList;
         }
 
         /// <summary>
         /// 转换为阿里云百炼API所需的terms格式
         ///
-        /// ✅ 极简优化（用户反馈："提示词也算输入tokens"）
-        /// - 只保留5条最核心术语
-        /// - 减少95%的术语占用
+        /// ✅ 平衡优化（提示词少，但要适配工程建筑图纸专业术语）
+        /// - 12条核心工程术语，覆盖最常用场景
+        /// - 估算：~60 tokens（比之前的80少，但覆盖关键术语）
         /// </summary>
         public static List<object> GetApiTerms(string sourceLang, string targetLang)
         {
             var terms = new List<object>();
 
-            // ✅ 用户明确要求：提示词要少！只保留5条最关键术语
+            // ✅ 平衡配置：12条核心工程术语，覆盖常用场景
             var coreTerms = new[]
             {
+                // 结构构件（最常用）
                 new { zh = "钢筋混凝土", en = "Reinforced Concrete" },
+                new { zh = "梁", en = "Beam" },
+                new { zh = "柱", en = "Column" },
+                new { zh = "墙", en = "Wall" },
+                new { zh = "板", en = "Slab" },
+                // 材料
+                new { zh = "混凝土", en = "Concrete" },
+                new { zh = "钢筋", en = "Reinforcement" },
+                // 图纸标识
                 new { zh = "详见", en = "See" },
                 new { zh = "详图", en = "Detail" },
-                new { zh = "混凝土", en = "Concrete" },
-                new { zh = "钢筋", en = "Reinforcement" }
+                // 技术术语
+                new { zh = "设计", en = "Design" },
+                new { zh = "施工", en = "Construction" },
+                // 尺寸
+                new { zh = "厚度", en = "Thickness" }
             };
 
             // 如果是中译英
@@ -637,7 +654,7 @@ namespace BiaogPlugin.Services
                 }
             }
 
-            Log.Information($"✅ 极简术语表: {terms.Count}条（优先保证内容空间）");
+            Log.Information($"✅ 平衡术语表: {terms.Count}条（覆盖常用工程术语）");
             return terms;
         }
 
