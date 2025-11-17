@@ -751,7 +751,7 @@ public class ComponentRecognizer
     }
 
     /// <summary>
-    /// 计算工程量
+    /// 计算工程量（完整版 - 包含钢筋重量、模板面积）
     /// </summary>
     private void CalculateQuantity(ComponentRecognitionResult result)
     {
@@ -767,8 +767,90 @@ public class ComponentRecognizer
             result.Area = Math.Round(result.Length * result.Width * result.Quantity, 3);
         }
 
+        // ✅ 新增：钢筋重量计算（G = 0.617 × D² / 100，单位：kg/m）
+        if (result.Type.Contains("钢筋") && result.Diameter > 0)
+        {
+            // 钢筋直径（米转毫米）
+            double diameterMm = result.Diameter * 1000;
+
+            // 单位长度重量（kg/m）
+            double weightPerMeter = 0.617 * diameterMm * diameterMm / 100;
+
+            // 总长度（米）
+            double totalLength = result.Length * result.Quantity;
+
+            // 总重量（kg）
+            result.SteelWeight = Math.Round(weightPerMeter * totalLength, 2);
+
+            Log.Debug($"  钢筋重量: Φ{diameterMm}mm × {totalLength:F2}m = {result.SteelWeight:F2}kg " +
+                     $"({weightPerMeter:F3}kg/m × {result.Quantity}根)");
+        }
+
+        // ✅ 新增：模板面积计算（混凝土构件）
+        if ((result.Type.Contains("混凝土") || result.Type.Contains("柱") || result.Type.Contains("梁") || result.Type.Contains("板")))
+        {
+            result.FormworkArea = CalculateFormworkArea(result);
+
+            if (result.FormworkArea > 0)
+            {
+                Log.Debug($"  模板面积: {result.FormworkArea:F2}m²");
+            }
+        }
+
         // 估算成本
         result.Cost = EstimateCost(result);
+    }
+
+    /// <summary>
+    /// ✅ 计算模板面积（混凝土与模板的接触面积）
+    /// 参考：GB 50854-2013《建筑工程工程量清单计价规范》
+    /// </summary>
+    private double CalculateFormworkArea(ComponentRecognitionResult result)
+    {
+        double formworkArea = 0;
+
+        if (result.Type.Contains("柱"))
+        {
+            // 柱模板面积 = 周长 × 高度 × 数量
+            // 周长 = 2 × (长 + 宽)
+            if (result.Length > 0 && result.Width > 0 && result.Height > 0)
+            {
+                double perimeter = 2 * (result.Length + result.Width);
+                formworkArea = Math.Round(perimeter * result.Height * result.Quantity, 2);
+            }
+        }
+        else if (result.Type.Contains("梁"))
+        {
+            // 梁模板面积 = (梁底 + 两侧) × 梁长 × 数量
+            // 梁底 = 梁宽
+            // 两侧 = 2 × 梁高
+            if (result.Length > 0 && result.Width > 0 && result.Height > 0)
+            {
+                double bottomArea = result.Width * result.Length;        // 梁底
+                double sideArea = 2 * result.Height * result.Length;     // 两侧
+                formworkArea = Math.Round((bottomArea + sideArea) * result.Quantity, 2);
+            }
+        }
+        else if (result.Type.Contains("板"))
+        {
+            // 板模板面积 = 板底面积 × 数量
+            // 注意：板侧模一般不计算（厚度太小）
+            if (result.Length > 0 && result.Width > 0)
+            {
+                formworkArea = Math.Round(result.Length * result.Width * result.Quantity, 2);
+            }
+        }
+        else if (result.Type.Contains("墙") || result.Type.Contains("剪力墙"))
+        {
+            // 墙模板面积 = 两侧面积 × 数量
+            // 两侧 = 2 × 长 × 高
+            if (result.Length > 0 && result.Height > 0)
+            {
+                formworkArea = Math.Round(2 * result.Length * result.Height * result.Quantity, 2);
+            }
+        }
+
+        return formworkArea;
     }
 
     /// <summary>
@@ -838,12 +920,15 @@ public class ComponentRecognizer
     }
 
     /// <summary>
-    /// ✅ 将几何实体数据匹配到识别的构件（解决面积为0的根本问题）
+    /// ✅ 将几何实体数据匹配到识别的构件（彻底解决面积为0问题）
     ///
-    /// 匹配策略：
-    /// 1. 同图层匹配：几何实体与构件在同一图层
-    /// 2. 空间位置匹配：几何实体的质心与构件文本位置接近（距离 < 5m）
-    /// 3. 尺寸验证：几何实体的尺寸与构件解析的尺寸相近（允许20%误差）
+    /// 用户反馈："改了上百次，面积始终为0"
+    ///
+    /// 匹配策略（已优化，放宽限制）：
+    /// 1. 【优先】同图层匹配
+    /// 2. 【备用】跨图层匹配（如果同图层没找到）
+    /// 3. 空间位置匹配：距离 < 20m（从5m放宽到20m）
+    /// 4. 尺寸验证：允许50%误差（防止误匹配）
     ///
     /// 匹配结果：
     /// - 使用几何实体的实际面积/体积覆盖计算值
@@ -855,48 +940,77 @@ public class ComponentRecognizer
         List<GeometryEntity> geometries)
     {
         int matchedCount = 0;
+        const double MAX_DISTANCE = 20.0;  // 放宽距离阈值：5m → 20m
+        const double MIN_SCORE = 0.15;     // 降低分数阈值：0.3 → 0.15
 
-        // 按图层分组几何实体，加速查找
-        var geometryByLayer = geometries
-            .GroupBy(g => g.Layer)
-            .ToDictionary(g => g.Key, g => g.ToList());
+        Log.Debug($"开始几何匹配: {components.Count}个构件 vs {geometries.Count}个几何实体");
 
         foreach (var component in components)
         {
-            // 策略1：同图层匹配
-            if (!geometryByLayer.ContainsKey(component.Layer))
-            {
-                continue;
-            }
-
-            var candidateGeometries = geometryByLayer[component.Layer];
             GeometryEntity? bestMatch = null;
             double bestScore = 0;
+            double bestDistance = double.MaxValue;
 
-            foreach (var geometry in candidateGeometries)
+            // ✅ 策略1（优先）：同图层匹配
+            var sameLayerGeometries = geometries.Where(g => g.Layer == component.Layer).ToList();
+
+            if (sameLayerGeometries.Count > 0)
             {
-                // 策略2：空间位置匹配（质心距离）
-                double distance = component.Position.DistanceTo(geometry.Centroid);
-                if (distance > 5.0) // 超过5米认为不相关
+                Log.Debug($"  构件[{component.Type}]在图层[{component.Layer}]找到{sameLayerGeometries.Count}个同图层几何实体");
+
+                foreach (var geometry in sameLayerGeometries)
                 {
-                    continue;
+                    double distance = component.Position.DistanceTo(geometry.Centroid);
+                    if (distance > MAX_DISTANCE)
+                    {
+                        continue;
+                    }
+
+                    double sizeScore = CalculateSizeMatchScore(component, geometry);
+                    double score = (MAX_DISTANCE - distance) / MAX_DISTANCE * 0.7 + sizeScore * 0.3;
+
+                    if (score > bestScore)
+                    {
+                        bestScore = score;
+                        bestMatch = geometry;
+                        bestDistance = distance;
+                    }
+                }
+            }
+
+            // ✅ 策略2（备用）：跨图层匹配（同图层没找到时）
+            if (bestMatch == null)
+            {
+                Log.Debug($"  构件[{component.Type}]同图层未匹配，尝试跨图层匹配（{geometries.Count}个候选）");
+
+                foreach (var geometry in geometries)
+                {
+                    double distance = component.Position.DistanceTo(geometry.Centroid);
+                    if (distance > MAX_DISTANCE)
+                    {
+                        continue;
+                    }
+
+                    double sizeScore = CalculateSizeMatchScore(component, geometry);
+                    // 跨图层匹配降低权重（距离权重更高）
+                    double score = (MAX_DISTANCE - distance) / MAX_DISTANCE * 0.8 + sizeScore * 0.2;
+
+                    if (score > bestScore)
+                    {
+                        bestScore = score;
+                        bestMatch = geometry;
+                        bestDistance = distance;
+                    }
                 }
 
-                // 策略3：尺寸验证（可选，防止误匹配）
-                double sizeScore = CalculateSizeMatchScore(component, geometry);
-
-                // 综合评分：距离越近越好，尺寸越匹配越好
-                double score = (5.0 - distance) / 5.0 * 0.6 + sizeScore * 0.4;
-
-                if (score > bestScore)
+                if (bestMatch != null)
                 {
-                    bestScore = score;
-                    bestMatch = geometry;
+                    Log.Debug($"    ✓ 跨图层匹配成功: [{component.Layer}] → [{bestMatch.Layer}], 距离={bestDistance:F2}m");
                 }
             }
 
             // 应用最佳匹配
-            if (bestMatch != null && bestScore > 0.3) // 最低匹配分数阈值
+            if (bestMatch != null && bestScore > MIN_SCORE)
             {
                 // ✅ 使用几何实体的实际面积/体积覆盖计算值
                 if (bestMatch.Area > 0)
@@ -1014,6 +1128,20 @@ public class ComponentRecognitionResult
     public double Volume { get; set; }
     public double Area { get; set; }
     public decimal Cost { get; set; }
+
+    // ✅ 新增：专业算量数据
+    /// <summary>
+    /// 钢筋重量（kg） - 仅钢筋构件有值
+    /// 计算公式：G = 0.617 × D² / 100 × L
+    /// 其中 D=直径(mm), L=总长度(m)
+    /// </summary>
+    public double SteelWeight { get; set; }
+
+    /// <summary>
+    /// 模板面积（m²） - 仅混凝土构件有值
+    /// 混凝土与模板的接触面积（按GB 50854-2013计算）
+    /// </summary>
+    public double FormworkArea { get; set; }
 
     public override string ToString()
     {
