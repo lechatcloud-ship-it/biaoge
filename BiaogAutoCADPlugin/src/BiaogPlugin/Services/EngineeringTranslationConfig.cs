@@ -26,46 +26,35 @@ namespace BiaogPlugin.Services
         /// - RPM: 1000 QPS（单条并发）
         /// - 成功率: 99.8%
         ///
-        /// 批次大小计算（2025-11-17 平衡优化后）：
+        /// 批次大小计算（2025-11-17 精简优化后）：
         ///
-        /// 用户反馈："提示词也算输入tokens的，所以必须要提示词少一点"
-        ///           "但是提示词要通用的适配工程建筑图纸的专业术语"
+        /// 用户反馈："注释等占用tokens，提示词直接告诉要什么不要什么"
         ///
-        /// 系统参数（平衡配置）：
-        /// - DomainPrompt: ~80 tokens (简洁但有效的工程图纸翻译指导)
+        /// 系统参数（精简配置）：
+        /// - DomainPrompt: ~15 tokens (去掉废话，直接指令)
         /// - Terms术语表: ~60 tokens (12条核心工程术语)
         /// - TM翻译记忆: ~80 tokens (4条核心翻译示例)
-        /// - 系统参数总计: ~220 tokens (比之前700少69%，但保证专业术语准确)
+        /// - 系统参数总计: ~155 tokens (比最初700少78%)
         ///
         /// 可用空间计算：
         /// - 输入限制: 8192 tokens
-        /// - 系统参数: -220 tokens
+        /// - 系统参数: -155 tokens
         /// - 安全余量: -500 tokens
-        /// - 实际可用: 7472 tokens
+        /// - 实际可用: 7537 tokens
         ///
-        /// Token估算规则（保守）：
-        /// - 混合中英文: 1字符 约等于 1 token
-        ///
-        /// 最终设置: 7400字符（留72 tokens余量）
-        ///
-        /// 注意：
-        /// - 如果仍然超限，可调整为7000或运行TokenDiagnosticService实测
-        /// - 如果翻译质量下降，可能需要增加terms/tm_list
+        /// Token估算：1字符 约等于 1 token
+        /// 最终设置: 7500字符（留37 tokens余量）
         /// </summary>
-        public const int MaxCharsPerBatch = 7400;  // 平衡优化：系统参数220 tokens，实际可用7472 tokens
+        public const int MaxCharsPerBatch = 7500;  // 精简优化：系统参数155 tokens，实际可用7537 tokens
 
         /// <summary>
         /// 工程建筑领域提示词
         ///
-        /// ✅ 平衡优化（用户反馈："提示词要少，但要通用的适配工程建筑图纸的专业术语"）
-        /// - 简洁但有效：保留核心指导信息
-        /// - 估算：~80 tokens（远小于之前的500+，但能确保专业术语准确）
-        /// - 确保模型理解：工程图纸专业翻译，保留技术标识，使用标准术语
+        /// 用户反馈："注释等占用tokens，提示词直接告诉要什么不要什么"
+        /// 极简指令：仅保留最核心的要求，去掉所有解释性废话
+        /// 估算：约15 tokens（比之前80减少81%）
         /// </summary>
-        public static readonly string DomainPrompt =
-            "Professional translation for construction/engineering drawings (AutoCAD/BIM). " +
-            "Preserve: drawing numbers (No., DWG), codes (GB, JGJ, ACI), material grades (C30, HRB400), units, grid axes. " +
-            "Use standard engineering terminology, not literal translation.";
+        public static readonly string DomainPrompt = "Engineering drawings. Preserve: GB, ACI, C30, HRB400, No., units.";
 
         /// <summary>
         /// 不应翻译的术语/模式规则
