@@ -314,6 +314,51 @@ namespace BiaogPlugin.Services
                     }
                 }
 
+                // ✅ P1关键修复：添加Leader（旧式引线）更新支持
+                // 📖 参考：AutoCAD 2025 .NET API - Leader.Annotation属性
+                // Leader的文本通过Annotation属性关联到其他实体（MText/DBText）
+                if (ent is Leader leader)
+                {
+                    try
+                    {
+                        // 检查是否有关联的注释实体
+                        if (!leader.Annotation.IsNull && leader.Annotation.IsValid)
+                        {
+                            // 获取关联的注释实体
+                            var annotationEnt = tr.GetObject(leader.Annotation, OpenMode.ForWrite);
+
+                            // 更新关联的文本实体
+                            if (annotationEnt is MText annoMText)
+                            {
+                                annoMText.Contents = update.NewContent;
+                                Log.Debug($"已更新Leader关联的MText: {update.NewContent}");
+                                return true;
+                            }
+                            else if (annotationEnt is DBText annoDBText)
+                            {
+                                annoDBText.TextString = update.NewContent;
+                                Log.Debug($"已更新Leader关联的DBText: {update.NewContent}");
+                                return true;
+                            }
+                            else
+                            {
+                                Log.Warning($"Leader {update.ObjectId} 关联的注释类型不支持: {annotationEnt.GetType().Name}");
+                                return false;
+                            }
+                        }
+                        else
+                        {
+                            Log.Warning($"Leader {update.ObjectId} 没有关联的注释实体");
+                            return false;
+                        }
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Log.Warning(ex, $"更新Leader失败: {update.ObjectId}");
+                        return false;
+                    }
+                }
+
                 // ⚠️ 不支持的类型
                 Log.Warning($"不支持的实体类型: {ent.GetType().Name} (ObjectId: {update.ObjectId})");
                 return false;

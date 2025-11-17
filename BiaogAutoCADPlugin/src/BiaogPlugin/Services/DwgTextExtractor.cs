@@ -887,7 +887,13 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
-        /// 去除空文本和纯数字文本（通常不需要翻译）
+        /// ✅ P1修复：去除空文本和纯数字文本，但保留单字符汉字和字母
+        ///
+        /// 修复前问题：Length < 2 会过滤掉单个汉字（如"门"、"窗"、"墙"）
+        /// 修复后逻辑：
+        /// - 保留单个汉字（0x4E00-0x9FFF）
+        /// - 保留单个字母（A-Z, a-z）
+        /// - 过滤纯数字、纯符号
         /// </summary>
         public List<TextEntity> FilterTranslatableText(List<TextEntity> texts)
         {
@@ -896,14 +902,27 @@ namespace BiaogPlugin.Services
                 if (string.IsNullOrWhiteSpace(t.Content))
                     return false;
 
+                var trimmed = t.Content.Trim();
+
                 // 如果全是数字和符号，不需要翻译
-                if (t.Content.All(c => char.IsDigit(c) || char.IsPunctuation(c) || char.IsWhiteSpace(c)))
+                if (trimmed.All(c => char.IsDigit(c) || char.IsPunctuation(c) || char.IsWhiteSpace(c)))
                     return false;
 
-                // 如果太短（少于2个字符），可能不是有意义的文本
-                if (t.Content.Trim().Length < 2)
+                // ✅ P1修复：特殊处理单字符文本
+                if (trimmed.Length == 1)
+                {
+                    char c = trimmed[0];
+                    // 允许单个汉字（0x4E00-0x9FFF）或字母
+                    if ((c >= 0x4E00 && c <= 0x9FFF) || char.IsLetter(c))
+                    {
+                        Log.Debug($"保留单字符文本用于翻译: '{trimmed}'");
+                        return true;
+                    }
+                    // 过滤单个数字、符号
                     return false;
+                }
 
+                // 多字符文本，如果包含至少一个字母或汉字，就保留
                 return true;
             }).ToList();
         }
