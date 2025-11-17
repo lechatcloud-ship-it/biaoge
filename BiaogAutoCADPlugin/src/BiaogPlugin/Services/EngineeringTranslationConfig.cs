@@ -26,17 +26,25 @@ namespace BiaogPlugin.Services
         /// - RPM: 1000 QPS（单条并发）
         /// - 成功率: 99.8%
         ///
-        /// 批次大小计算：
-        /// - DomainPrompt系统提示词: ~500 tokens
-        /// - Terms术语表: ~200 tokens (约100条术语)
-        /// - TM翻译记忆: ~300 tokens (10个示例)
-        /// - 实际可用输入: 8192 - 500 - 200 - 300 = 7192 tokens
-        /// - 安全估算: 每字符2个token → 7192 / 2 = 3596字符
-        /// - 优化设置: 3500字符（留96 tokens余量）
+        /// 批次大小计算（2025-11-17优化后）：
+        /// - DomainPrompt: ~50 tokens ("Construction and Engineering Documentation")
+        /// - Terms术语表: ~80 tokens (20条核心术语，已优化)
+        /// - TM翻译记忆: ~120 tokens (5个核心示例，已优化)
+        /// - 系统参数总计: ~250 tokens（大幅减少！）
+        /// - 实际可用输入: 8192 - 250 = 7942 tokens
+        ///
+        /// Token估算规则：
+        /// - 中文字符: 1字符 ≈ 1.5 tokens (包括标点)
+        /// - 英文/数字: 1字符 ≈ 0.25 tokens
+        /// - 混合文本: 保守估计 1字符 ≈ 1.0 token
+        /// - 安全裕度: 留1000 tokens给API响应和误差
+        ///
+        /// 计算：(7942 - 1000) / 1.0 = 6942字符
+        /// 优化设置: 6500字符（留442 tokens安全余量）
         ///
         /// ⚠️ 注意：1M上下文是qwen-flash/qwen-plus通用对话模型的能力，NOT qwen-mt-flash
         /// </summary>
-        public const int MaxCharsPerBatch = 3500;
+        public const int MaxCharsPerBatch = 6500;  // ✅ 优化后：从3500提升到6500
 
         /// <summary>
         /// 工程建筑领域提示词（英文，符合阿里云百炼Prompt Engineering最佳实践）
