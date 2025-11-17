@@ -446,6 +446,14 @@ namespace BiaogPlugin.Services
             var original = GetArgSafe(args, "original_text");
             var newValue = GetArgSafe(args, "new_text");
 
+            // ✅ P1修复：添加原始文本空值检查,防止意外的批量替换
+            // 如果original为null或空字符串,Contains("")会匹配所有文本,Replace("", x)会在每个字符间插入x
+            if (string.IsNullOrEmpty(original))
+            {
+                Log.Warning("原始文本为空,无法执行替换操作");
+                return "✗ 替换失败：原始文本不能为空";
+            }
+
             // 理解修改意图并执行
             var doc = Application.DocumentManager.MdiActiveDocument;
             var db = doc.Database;
@@ -463,14 +471,15 @@ namespace BiaogPlugin.Services
                 {
                     var obj = tr.GetObject(textEntity.Id, OpenMode.ForWrite);
 
-                    if (obj is DBText dbText && dbText.TextString.Contains(original ?? ""))
+                    // ✅ P1修复：移除null-coalescing,因为已经在上面检查过original不为空
+                    if (obj is DBText dbText && dbText.TextString.Contains(original))
                     {
-                        dbText.TextString = dbText.TextString.Replace(original ?? "", newValue ?? "");
+                        dbText.TextString = dbText.TextString.Replace(original, newValue ?? "");
                         modifiedCount++;
                     }
-                    else if (obj is MText mText && mText.Contents.Contains(original ?? ""))
+                    else if (obj is MText mText && mText.Contents.Contains(original))
                     {
-                        mText.Contents = mText.Contents.Replace(original ?? "", newValue ?? "");
+                        mText.Contents = mText.Contents.Replace(original, newValue ?? "");
                         modifiedCount++;
                     }
                 }
