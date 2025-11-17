@@ -322,6 +322,42 @@ namespace BiaogPlugin.Services
                     case "scale_entity":
                         return await AutoCADToolExecutor.ScaleEntity(toolCall.Arguments);
 
+                    // ===== P2.1 视图工具（View Tools）=====
+                    case "zoom_extents":
+                        return await AutoCADToolExecutor.ZoomExtents(toolCall.Arguments);
+
+                    case "zoom_window":
+                        return await AutoCADToolExecutor.ZoomWindow(toolCall.Arguments);
+
+                    case "pan_view":
+                        return await AutoCADToolExecutor.PanView(toolCall.Arguments);
+
+                    // ===== P2.2 文件工具（File Tools）=====
+                    case "save_drawing":
+                        return await AutoCADToolExecutor.SaveDrawing(toolCall.Arguments);
+
+                    case "export_to_pdf":
+                        return await AutoCADToolExecutor.ExportToPdf(toolCall.Arguments);
+
+                    // ===== P2.3 高级修改工具（Advanced Modify Tools）=====
+                    case "mirror_entity":
+                        return await AutoCADToolExecutor.MirrorEntity(toolCall.Arguments);
+
+                    case "offset_entity":
+                        return await AutoCADToolExecutor.OffsetEntity(toolCall.Arguments);
+
+                    case "trim_entity":
+                        return await AutoCADToolExecutor.TrimEntity(toolCall.Arguments);
+
+                    case "extend_entity":
+                        return await AutoCADToolExecutor.ExtendEntity(toolCall.Arguments);
+
+                    case "fillet_entity":
+                        return await AutoCADToolExecutor.FilletEntity(toolCall.Arguments);
+
+                    case "chamfer_entity":
+                        return await AutoCADToolExecutor.ChamferEntity(toolCall.Arguments);
+
                     // ===== 原有工具（保留兼容性）=====
                     case "translate_text":
                         return await ExecuteTranslateTool(toolCall.Arguments, onStreamChunk);
@@ -1116,6 +1152,256 @@ namespace BiaogPlugin.Services
                                 }
                             },
                             required = new[] { "entity_ids", "base_point", "scale_factor" }
+                        }
+                    }
+                },
+
+                // ===== P2.1 视图工具（View Tools）- 3个 =====
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "zoom_extents",
+                        description = "全图显示（缩放到所有实体的范围）",
+                        parameters = new {
+                            type = "object",
+                            properties = new { }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "zoom_window",
+                        description = "窗口缩放（缩放到指定矩形区域）",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                corner1 = new {
+                                    type = "array",
+                                    items = new { type = "number" },
+                                    description = "窗口第一个角点[x, y, z]，单位mm"
+                                },
+                                corner2 = new {
+                                    type = "array",
+                                    items = new { type = "number" },
+                                    description = "窗口对角点[x, y, z]，单位mm"
+                                }
+                            },
+                            required = new[] { "corner1", "corner2" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "pan_view",
+                        description = "平移视图",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                displacement = new {
+                                    type = "array",
+                                    items = new { type = "number" },
+                                    description = "平移向量[dx, dy, dz]，单位mm"
+                                }
+                            },
+                            required = new[] { "displacement" }
+                        }
+                    }
+                },
+
+                // ===== P2.2 文件工具（File Tools）- 2个 =====
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "save_drawing",
+                        description = "保存图纸（保存或另存为）",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                file_path = new {
+                                    type = "string",
+                                    description = "文件路径（可选，不指定则保存当前文件）"
+                                }
+                            }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "export_to_pdf",
+                        description = "导出图纸为PDF文件",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                output_path = new {
+                                    type = "string",
+                                    description = "PDF输出路径（含文件名）"
+                                }
+                            },
+                            required = new[] { "output_path" }
+                        }
+                    }
+                },
+
+                // ===== P2.3 高级修改工具（Advanced Modify Tools）- 6个 =====
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "mirror_entity",
+                        description = "镜像AutoCAD实体",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                entity_ids = new {
+                                    type = "array",
+                                    items = new { type = "string" },
+                                    description = "实体ID列表（Handle）"
+                                },
+                                mirror_line_point1 = new {
+                                    type = "array",
+                                    items = new { type = "number" },
+                                    description = "镜像线起点[x, y, z]，单位mm"
+                                },
+                                mirror_line_point2 = new {
+                                    type = "array",
+                                    items = new { type = "number" },
+                                    description = "镜像线终点[x, y, z]，单位mm"
+                                },
+                                erase_source = new {
+                                    type = "boolean",
+                                    description = "是否删除原实体（可选，默认false）"
+                                }
+                            },
+                            required = new[] { "entity_ids", "mirror_line_point1", "mirror_line_point2" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "offset_entity",
+                        description = "偏移曲线实体（Line, Circle, Arc, Polyline等）",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                entity_ids = new {
+                                    type = "array",
+                                    items = new { type = "string" },
+                                    description = "实体ID列表（Handle）"
+                                },
+                                distance = new {
+                                    type = "number",
+                                    description = "偏移距离，单位mm（正值向外，负值向内）"
+                                }
+                            },
+                            required = new[] { "entity_ids", "distance" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "trim_entity",
+                        description = "修剪实体（交互式操作）",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                cutting_edge_ids = new {
+                                    type = "array",
+                                    items = new { type = "string" },
+                                    description = "切割边实体ID列表"
+                                },
+                                entity_to_trim_ids = new {
+                                    type = "array",
+                                    items = new { type = "string" },
+                                    description = "待修剪实体ID列表"
+                                }
+                            },
+                            required = new[] { "cutting_edge_ids", "entity_to_trim_ids" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "extend_entity",
+                        description = "延伸实体到边界（交互式操作）",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                boundary_edge_ids = new {
+                                    type = "array",
+                                    items = new { type = "string" },
+                                    description = "边界实体ID列表"
+                                },
+                                entity_to_extend_ids = new {
+                                    type = "array",
+                                    items = new { type = "string" },
+                                    description = "待延伸实体ID列表"
+                                }
+                            },
+                            required = new[] { "boundary_edge_ids", "entity_to_extend_ids" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "fillet_entity",
+                        description = "在两个曲线之间创建圆角",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                entity_ids = new {
+                                    type = "array",
+                                    items = new { type = "string" },
+                                    description = "两个实体ID（Handle）"
+                                },
+                                radius = new {
+                                    type = "number",
+                                    description = "圆角半径，单位mm"
+                                }
+                            },
+                            required = new[] { "entity_ids", "radius" }
+                        }
+                    }
+                },
+
+                new {
+                    type = "function",
+                    function = new {
+                        name = "chamfer_entity",
+                        description = "在两个曲线之间创建倒角",
+                        parameters = new {
+                            type = "object",
+                            properties = new {
+                                entity_ids = new {
+                                    type = "array",
+                                    items = new { type = "string" },
+                                    description = "两个实体ID（Handle）"
+                                },
+                                distance1 = new {
+                                    type = "number",
+                                    description = "第一条线上的倒角距离，单位mm"
+                                },
+                                distance2 = new {
+                                    type = "number",
+                                    description = "第二条线上的倒角距离，单位mm"
+                                }
+                            },
+                            required = new[] { "entity_ids", "distance1", "distance2" }
                         }
                     }
                 },
