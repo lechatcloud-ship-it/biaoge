@@ -190,6 +190,11 @@ namespace BiaogPlugin.Models
         public TextEntityType? EntityType { get; set; }
 
         /// <summary>
+        /// 标签（用于Table单元格位置等额外信息）
+        /// </summary>
+        public string? Tag { get; set; }
+
+        /// <summary>
         /// 是否需要更新（内容发生变化）
         /// </summary>
         public bool NeedsUpdate => OriginalContent != NewContent;

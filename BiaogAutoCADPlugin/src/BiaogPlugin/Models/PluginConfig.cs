@@ -57,11 +57,11 @@ namespace BiaogPlugin.Models
 
         /// <summary>
         /// 文本翻译模型
-        /// 推荐: qwen3-max-preview (256K上下文，更好的专业术语翻译)
-        /// 备选: qwen-mt-flash (专用翻译模型，低成本)
+        /// 推荐: qwen-mt-flash (专用翻译模型，无提示词泄露，低成本)
+        /// 备选: qwen3-max-preview (256K上下文，但可能泄露提示词)
         /// </summary>
         [JsonPropertyName("textTranslationModel")]
-        public string TextTranslationModel { get; set; } = "qwen3-max-preview";
+        public string TextTranslationModel { get; set; } = "qwen-mt-flash";
 
         /// <summary>
         /// 图像翻译模型

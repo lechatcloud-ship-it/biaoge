@@ -50,7 +50,10 @@ namespace BiaogPlugin.Services
         /// <summary>
         /// 工程建筑领域提示词
         ///
-        /// 用户反馈："所有翻译全部按照建筑工程行业的专业术语来翻译图纸"
+        /// ✅ P0紧急修复：根据阿里云百炼官方文档，domains应该是简短的领域提示
+        /// 官方文档：domains (optional): Domain hint string (English only) for contextual guidance
+        ///
+        /// 用户最新反馈："所有翻译全部按照建筑工程行业的专业术语来翻译图纸"
         /// 简洁指令：依赖大模型理解能力，不枚举具体示例
         /// 估算：约16 tokens
         /// </summary>

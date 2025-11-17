@@ -453,6 +453,20 @@ public class BailianApiClient
     }
 
     /// <summary>
+    /// ❌ 已移除：ExtractPureTranslation 方法引入了严重的误判问题
+    ///
+    /// 原问题：启发式算法经常选择错误的行，导致翻译结果不正确
+    /// 用户反馈：
+    /// - "增强属性" 被误翻译成 "# 读者对象"
+    /// - 很多文本被误翻译成 "#背景"
+    ///
+    /// 解决方案：
+    /// 1. 依赖qwen-mt-flash专业翻译模型的原生输出
+    /// 2. 仅使用CleanTranslationText进行基础清理
+    /// 3. 添加详细日志记录异常情况，由用户反馈而不是自动猜测
+    /// </summary>
+
+    /// <summary>
     /// 转换语言代码为英文全称
     /// 例如: "zh" -> "Chinese", "en" -> "English"
     /// </summary>
@@ -661,13 +675,19 @@ public class BailianApiClient
         IProgress<double>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        // 从配置读取模型，如果未指定则使用最优翻译模型
+        // ✅ P0紧急修复：强制使用qwen-mt-flash，避免提示词泄露
+        // 原因：通用对话模型（qwen3-max-preview/qwen-flash）会回显系统提示词
+        // 解决：始终使用专用翻译模型，使用translation_options API，完全无提示词泄露
         if (string.IsNullOrEmpty(model))
         {
-            model = _configManager.GetString(
-                "Bailian:TextTranslationModel",
-                BailianModelSelector.Models.QwenMTFlash // qwen-mt-flash：术语定制+格式还原
-            );
+            model = BailianModelSelector.Models.QwenMTFlash; // 强制使用qwen-mt-flash
+            Log.Information("批量翻译强制使用专用翻译模型: qwen-mt-flash（避免提示词泄露）");
+        }
+        else if (!model.Contains("mt-flash") && !model.Contains("mt-turbo") && !model.Contains("mt-plus"))
+        {
+            // 如果配置的是通用对话模型，覆盖为qwen-mt-flash
+            Log.Warning($"检测到通用对话模型配置: {model}，自动切换为 qwen-mt-flash（避免提示词泄露）");
+            model = BailianModelSelector.Models.QwenMTFlash;
         }
 
         Log.Information($"批量翻译: {texts.Count}条文本，使用模型: {model}");
@@ -744,9 +764,10 @@ public class BailianApiClient
                     // qwen-flash/qwen-plus: 通用对话模型，使用系统提示词（1M上下文，强大的专业术语理解）
                     object requestBody;
 
-                    if (model.Contains("mt-flash") || model.Contains("mt-plus"))
+                    if (model.Contains("mt-flash") || model.Contains("mt-plus") || model.Contains("mt-turbo"))
                     {
-                        // qwen-mt-flash专用翻译API格式
+                        // ✅ qwen-mt-flash专用翻译API格式（完全符合阿里云百炼官方文档）
+                        // 官方文档：https://help.aliyun.com/zh/model-studio/qwen-mt-api
                         requestBody = new
                         {
                             model = model,
@@ -758,14 +779,20 @@ public class BailianApiClient
                                     content = text
                                 }
                             },
-                            translation_options = new  // ✅ 根级别，不是extra_body
+                            // ✅ 根据官方文档，HTTP调用时 translation_options 放在顶层（不是 extra_body）
+                            translation_options = new
                             {
-                                source_lang = sourceLang,
-                                target_lang = targetLang,
-                                domains = EngineeringTranslationConfig.DomainPrompt,
-                                terms = EngineeringTranslationConfig.GetApiTerms(sourceLang, targetLang),
-                                tm_list = EngineeringTranslationConfig.GetApiTranslationMemory(sourceLang, targetLang)  // ✅ 翻译记忆
-                            }
+                                source_lang = sourceLang,        // 必选：源语言英文全称或"auto"
+                                target_lang = targetLang,         // 必选：目标语言英文全称
+                                domains = EngineeringTranslationConfig.DomainPrompt,  // 可选：领域提示（仅英文）
+                                terms = EngineeringTranslationConfig.GetApiTerms(sourceLang, targetLang),  // 可选：术语干预
+                                tm_list = EngineeringTranslationConfig.GetApiTranslationMemory(sourceLang, targetLang)  // 可选：翻译记忆
+                            },
+                            // ✅ 根据官方文档，temperature 默认 0.65，范围 [0, 2)
+                            // 对于专业翻译，使用较低值（0.3）保证翻译稳定性和一致性
+                            temperature = 0.3,
+                            // ✅ 官方建议：仅设置 temperature 或 top_p 其中之一
+                            // top_p 默认 0.8，此处不设置，让模型使用默认值
                         };
                     }
                     else
@@ -820,13 +847,27 @@ public class BailianApiClient
                             {
                                 if (message.TryGetProperty("content", out var content))
                                 {
-                                    var translatedText = content.GetString() ?? text;
+                                    var rawResponse = content.GetString() ?? text;
 
-                                    // ✅ 清理特殊标识符（如 <|endofcontent|>）
-                                    translatedText = CleanTranslationText(translatedText);
+                                    // ✅ 调试日志：记录原始响应
+                                    if (rawResponse.Length > 200)
+                                    {
+                                        Log.Debug($"[批量翻译原始响应] 索引{index}, 长度={rawResponse.Length}, 前100字符: {rawResponse.Substring(0, 100)}");
+                                    }
+
+                                    // ✅ 深度清洗翻译文本
+                                    var translatedText = CleanTranslationText(rawResponse);
+
+                                    // ✅ 异常检测：记录过长的翻译结果（但不再使用智能提取避免误判）
+                                    if (translatedText.Length > text.Length * 5 && translatedText.Length > 100)
+                                    {
+                                        Log.Warning($"[批量翻译异常] 索引{index}, 清洗后过长: 原文={text.Length}字符, 译文={translatedText.Length}字符");
+                                        Log.Warning($"[原文] {text}");
+                                        Log.Warning($"[译文] {translatedText.Substring(0, Math.Min(200, translatedText.Length))}");
+                                    }
 
                                     // ✅ 调试日志：记录翻译结果
-                                    Log.Debug($"[翻译结果] 索引{index}: 原文={text.Substring(0, Math.Min(30, text.Length))} → 译文={translatedText.Substring(0, Math.Min(30, translatedText.Length))}");
+                                    Log.Debug($"[批量翻译成功] 索引{index}: 原文={text.Substring(0, Math.Min(30, text.Length))} → 译文={translatedText.Substring(0, Math.Min(30, translatedText.Length))}");
 
                                     // 记录Token使用量
                                     if (root.TryGetProperty("usage", out var usage))
@@ -902,18 +943,19 @@ public class BailianApiClient
         string? sourceLanguage = null,
         CancellationToken cancellationToken = default)
     {
-        // 从配置读取模型，如果未指定则使用最优翻译模型
+        // ✅ P0紧急修复：强制使用qwen-mt-flash，避免提示词泄露
+        // 原因：通用对话模型（qwen3-max-preview/qwen-flash）会回显系统提示词
+        // 解决：始终使用专用翻译模型，使用translation_options API，完全无提示词泄露
         if (string.IsNullOrEmpty(model))
         {
-            // ✅ 2025-11-16更新：默认使用qwen-flash（1M上下文，更强推理和专业术语理解）
-            // 替代qwen-mt-flash的原因：
-            // 1. qwen-flash有1M上下文（vs qwen-mt-flash的8K），可一次性翻译整个图纸
-            // 2. qwen-flash推理能力更强，更好理解复杂工程规范和专业术语
-            // 3. qwen-flash支持思考模式，翻译质量更高
-            model = _configManager.GetString(
-                "Bailian:TextTranslationModel",
-                BailianModelSelector.Models.QwenFlash // qwen-flash：1M上下文+混合思考模式
-            );
+            model = BailianModelSelector.Models.QwenMTFlash; // 强制使用qwen-mt-flash
+            Log.Information("单文本翻译强制使用专用翻译模型: qwen-mt-flash（避免提示词泄露）");
+        }
+        else if (!model.Contains("mt-flash") && !model.Contains("mt-turbo") && !model.Contains("mt-plus"))
+        {
+            // 如果配置的是通用对话模型，覆盖为qwen-mt-flash
+            Log.Warning($"检测到通用对话模型配置: {model}，自动切换为 qwen-mt-flash（避免提示词泄露）");
+            model = BailianModelSelector.Models.QwenMTFlash;
         }
 
         Log.Debug($"翻译使用模型: {model}");
@@ -952,7 +994,8 @@ public class BailianApiClient
             // 判断是否为专用翻译模型（qwen-mt系列）
             if (model.Contains("mt-flash") || model.Contains("mt-turbo") || model.Contains("mt-plus"))
             {
-                // ✅ 专用翻译模型：使用translation_options参数（OpenAI兼容模式顶层参数）
+                // ✅ qwen-mt-flash专用翻译API格式（完全符合阿里云百炼官方文档）
+                // 官方文档：https://help.aliyun.com/zh/model-studio/qwen-mt-api
                 Log.Debug($"使用专用翻译模型API格式: {model}");
                 requestBody = new
                 {
@@ -965,16 +1008,20 @@ public class BailianApiClient
                             content = text
                         }
                     },
-                    // ✅ 直接在顶层放置translation_options（OpenAI兼容接口）
-                    // ✅ 2025-11-15升级：添加tm_list翻译记忆，引导模型风格
+                    // ✅ 根据官方文档，HTTP调用时 translation_options 放在顶层（不是 extra_body）
                     translation_options = new
                     {
-                        source_lang = sourceLang,
-                        target_lang = targetLang,
-                        domains = EngineeringTranslationConfig.DomainPrompt,
-                        terms = EngineeringTranslationConfig.GetApiTerms(sourceLang, targetLang),
-                        tm_list = EngineeringTranslationConfig.GetApiTranslationMemory(sourceLang, targetLang)
-                    }
+                        source_lang = sourceLang,        // 必选：源语言英文全称或"auto"
+                        target_lang = targetLang,         // 必选：目标语言英文全称
+                        domains = EngineeringTranslationConfig.DomainPrompt,  // 可选：领域提示（仅英文）
+                        terms = EngineeringTranslationConfig.GetApiTerms(sourceLang, targetLang),  // 可选：术语干预
+                        tm_list = EngineeringTranslationConfig.GetApiTranslationMemory(sourceLang, targetLang)  // 可选：翻译记忆
+                    },
+                    // ✅ 根据官方文档，temperature 默认 0.65，范围 [0, 2)
+                    // 对于专业翻译，使用较低值（0.3）保证翻译稳定性和一致性
+                    temperature = 0.3,
+                    // ✅ 官方建议：仅设置 temperature 或 top_p 其中之一
+                    // top_p 默认 0.8，此处不设置，让模型使用默认值
                 };
             }
             else
@@ -1033,10 +1080,28 @@ public class BailianApiClient
                     {
                         if (message.TryGetProperty("content", out var content))
                         {
-                            var translatedText = content.GetString() ?? text;
+                            var rawResponse = content.GetString() ?? text;
 
-                            // ✅ 清理特殊标识符（如 <|endofcontent|>）
-                            translatedText = CleanTranslationText(translatedText);
+                            // ✅ P0增强：记录原始响应（用于调试）
+                            if (rawResponse.Length > 200)
+                            {
+                                Log.Debug($"[翻译API原始响应] 长度={rawResponse.Length}, 前200字符: {rawResponse.Substring(0, 200)}");
+                            }
+                            else
+                            {
+                                Log.Debug($"[翻译API原始响应] {rawResponse}");
+                            }
+
+                            // ✅ 深度清洗翻译文本
+                            var translatedText = CleanTranslationText(rawResponse);
+
+                            // ✅ 异常检测：记录过长的翻译结果（但不再使用智能提取避免误判）
+                            if (translatedText.Length > text.Length * 5 && translatedText.Length > 100)
+                            {
+                                Log.Warning($"[翻译结果异常] 清洗后过长: 原文={text.Length}字符, 译文={translatedText.Length}字符");
+                                Log.Warning($"[原文] {text}");
+                                Log.Warning($"[译文] {translatedText.Substring(0, Math.Min(200, translatedText.Length))}");
+                            }
 
                             // 记录Token使用量
                             if (root.TryGetProperty("usage", out var usage))
@@ -1046,7 +1111,7 @@ public class BailianApiClient
                                 TrackTokenUsage(inputTokens, outputTokens);
                             }
 
-                            Log.Debug($"翻译成功: {text.Substring(0, Math.Min(20, text.Length))}... -> {translatedText.Substring(0, Math.Min(20, translatedText.Length))}...");
+                            Log.Debug($"[翻译成功] 原文: {text.Substring(0, Math.Min(30, text.Length))} -> 译文: {translatedText.Substring(0, Math.Min(30, translatedText.Length))}");
                             return translatedText;
                         }
                     }
