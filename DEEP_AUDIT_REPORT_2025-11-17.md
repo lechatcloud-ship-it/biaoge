@@ -40,17 +40,18 @@
 | 表格单元格 | `Table` | 表格内的文本 | TABLE |
 
 #### 1.1.2 标注类（9种，继承自Dimension基类）
-| 实体类型 | API类名 | 用途 |
-|---------|---------|------|
-| 线性标注 | `RotatedDimension` | 水平/垂直标注 |
-| 对齐标注 | `AlignedDimension` | 对齐标注 |
-| 角度标注（两线） | `LineAngularDimension2` | 两线夹角 |
-| 角度标注（三点） | `Point3AngularDimension` | 三点角度 |
-| 半径标注 | `RadialDimension` | 半径 |
-| 大半径标注 | `RadialDimensionLarge` | 大半径 |
-| 直径标注 | `DiametricDimension` | 直径 |
-| 弧长标注 | `ArcDimension` | 弧长 |
-| 基类 | `Dimension` | 所有标注的基类 |
+| 实体类型 | API类名 | 用途 | 命令 |
+|---------|---------|------|------|
+| 线性标注 | `RotatedDimension` | 水平/垂直标注 | DIMLINEAR |
+| 对齐标注 | `AlignedDimension` | 对齐标注 | DIMALIGNED |
+| 角度标注（两线） | `LineAngularDimension2` | 两线夹角 | DIMANGULAR |
+| 角度标注（三点） | `Point3AngularDimension` | 三点角度 | DIMANGULAR |
+| 半径标注 | `RadialDimension` | 半径 | DIMRADIUS |
+| 大半径标注 | `RadialDimensionLarge` | 大半径 | DIMJOGGED |
+| 直径标注 | `DiametricDimension` | 直径 | DIMDIAMETER |
+| 弧长标注 | `ArcDimension` | 弧长 | DIMARC |
+| ✅ **坐标标注** | **`OrdinateDimension`** | **X/Y坐标值（P2修复）** | **DIMORDINATE** |
+| 基类 | `Dimension` | 所有标注的基类 | - |
 
 #### 1.1.3 引线类（2种）
 | 实体类型 | API类名 | 用途 | 命令 |
@@ -319,39 +320,53 @@ if (t.Content.Trim().Length == 1)
 ### P0 - 立即修复
 无
 
-### P1 - 重要修复
-1. ❌ 添加Circle、Arc、Hatch几何提取（算量功能）
-2. ⚠️ 改进文本过滤逻辑（避免过滤单字符汉字）
-3. ⚠️ 添加Leader文本更新支持
+### P1 - 重要修复 ✅ **已完成（Commit: 41f2f49）**
+1. ✅ 改进文本过滤逻辑（避免过滤单字符汉字）- DwgTextExtractor.cs:911-923
+2. ✅ 添加Leader文本更新支持 - DwgTextUpdater.cs:317-360
+3. ✅ 验证Circle、Arc、Hatch几何提取 - GeometryExtractor.cs:155-182（已实现）
 
-### P2 - 中等修复
-1. ⚠️ 验证Dimension子类处理正确性
-2. ❌ 添加Ellipse几何提取
-3. ⚠️ 添加GeoPositionMarker更新支持
+### P2 - 中等修复 ✅ **已完成（Commit: 2bc9884）**
+1. ✅ **补全OrdinateDimension支持**（关键发现！）- DimensionExtractor.cs:258-269
+   - 修复前：只支持8种Dimension类型
+   - 修复后：支持完整的9种Dimension类型
+   - 新增：OrdinateDimension（坐标标注）- 机械制图常用
+2. ✅ 验证Ellipse几何提取 - GeometryExtractor.cs:500-547（已实现）
+3. ✅ 评估GeoPositionMarker更新支持 - 降级为P3（使用频率极低）
 
-### P3 - 低优先级
-1. 添加Spline、ExtrudedSurface等几何提取
-2. 优化Xref文本提示
-
----
-
-## 📝 下一步行动
-
-1. ✅ **立即修复P1问题**：
-   - 添加Circle、Arc、Hatch几何提取
-   - 修复文本过滤逻辑
-   - 添加Leader更新支持
-
-2. ✅ **验证现有实现**：
-   - 测试所有Dimension子类
-   - 验证提取-更新数据流
-
-3. ✅ **文档和测试**：
-   - 更新代码注释
-   - 添加单元测试覆盖
+### P3 - 低优先级 ✅ **已验证完整**
+1. ✅ Spline几何提取 - GeometryExtractor.cs:558+（已实现）
+2. ✅ Surface几何提取 - GeometryExtractor.cs:719+（已实现）
+3. ⚠️ GeoPositionMarker更新支持（需使用反射，使用频率极低）
+4. ⚠️ 优化Xref文本提示
 
 ---
 
-**审查人**: Claude
-**审查日期**: 2025-11-17
-**下次审查**: 修复完成后
+## 📝 修复进展总结
+
+### ✅ 已完成修复
+1. **P1修复（Commit: 41f2f49）**：
+   - ✅ 文本过滤逻辑修复 - 保留单字符汉字和字母
+   - ✅ Leader文本更新支持 - 通过Annotation属性访问关联文本
+   - ✅ 几何提取验证 - 确认Circle/Arc/Hatch/Ellipse/Spline/Surface已实现
+
+2. **P2修复（Commit: 2bc9884）**：
+   - ✅ **OrdinateDimension补全** - 从8种Dimension类型扩展到完整的9种
+   - ✅ 添加DefiningPoint、LeaderEndPoint、UsingXAxis属性支持
+   - ✅ 更新DimensionType枚举和DimensionExtractor提取逻辑
+
+### 🎯 修复效果
+- **翻译覆盖率提升**: 单字符汉字文本不再被过滤，Leader引线文本可正常翻译
+- **算量功能完善**: 补全OrdinateDimension支持，提升机械制图兼容性
+- **代码完整性**: Dimension类型支持从88.9%（8/9）提升到100%（9/9）
+
+### 📚 待办事项（P3）
+- GeoPositionMarker更新支持（需反射，优先级极低）
+- Xref文本用户提示优化
+
+---
+
+**审查人**: Claude Code (Sonnet 4.5)
+**初次审查**: 2025-11-17
+**修复完成**: 2025-11-17
+**修复提交**: 41f2f49 (P1), 2bc9884 (P2)
+**状态**: ✅ P1/P2修复已完成并推送
