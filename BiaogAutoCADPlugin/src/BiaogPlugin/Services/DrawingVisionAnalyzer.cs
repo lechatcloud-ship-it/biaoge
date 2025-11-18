@@ -128,29 +128,14 @@ namespace BiaogPlugin.Services
                     var db = doc.Database;
                     var ed = doc.Editor;
 
-                    // 方法1：使用PNGOUT命令（最简单，但需要AutoCAD支持）
-                    // ed.Command("PNGOUT", tempPath, "All", "");
-
-                    // 方法2：使用Plot API导出（更可控，推荐）
-                    ExportViewUsingPlotApi(tempPath);
+                    // ✅ 方法1：使用PNGOUT命令（简单有效）
+                    // 注：Plot API实现复杂，当前版本使用PNGOUT命令
+                    ed.Command("_.PNGOUT", tempPath, "_Display");
                 }
 
                 Log.Information($"视图已导出为PNG: {tempPath}");
                 return tempPath;
             });
-        }
-
-        /// <summary>
-        /// ✅ 使用Plot API导出视图（高质量PNG，300 DPI）
-        /// ⚠️ 暂未实现：Plot API较复杂，当前版本使用PNGOUT命令替代
-        /// </summary>
-        private void ExportViewUsingPlotApi(string outputPath)
-        {
-            // TODO: 实现Plot API导出
-            // Plot API需要引用 Autodesk.AutoCAD.PlottingServices命名空间
-            // 目前使用简化实现
-            Log.Warning("Plot API导出功能暂未实现，请使用PNGOUT命令替代");
-            throw new NotImplementedException("Plot API导出功能暂未实现");
         }
 
         /// <summary>
