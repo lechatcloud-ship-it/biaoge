@@ -700,13 +700,13 @@ namespace BiaogPlugin
                 Log.Information("开始执行一键算量并导出");
 
                 // ===== 步骤1：提取文本实体 =====
-                ed.WriteMessage("\n【步骤1/4】正在提取图纸文本...");
+                ed.WriteMessage("\n【步骤1/5】正在提取图纸文本...");
                 var textExtractor = new DwgTextExtractor();
                 var textEntities = textExtractor.ExtractAllText();
                 ed.WriteMessage($" 完成！提取到{textEntities.Count}个文本实体");
 
                 // ===== 步骤2：识别构件 =====
-                ed.WriteMessage("\n【步骤2/4】正在识别构件（柱梁板墙、钢筋等）...");
+                ed.WriteMessage("\n【步骤2/5】正在识别构件（柱梁板墙、钢筋等）...");
                 var bailianClient = ServiceLocator.Get<BailianApiClient>();
                 var componentRecognizer = new ComponentRecognizer(bailianClient);
                 var components = await componentRecognizer.RecognizeFromTextEntitiesAsync(textEntities, useAiVerification: false);
