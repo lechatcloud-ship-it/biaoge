@@ -49,51 +49,56 @@ namespace BiaogPlugin.Services
             var record = new UnlockRecord();
 
             using (var docLock = doc.LockDocument())
-            using (var tr = db.TransactionManager.StartTransaction())
             {
-                try
+                // ✅ 修复：第一个事务 - 解锁图层和对象
+                using (var tr = db.TransactionManager.StartTransaction())
                 {
-                    // 步骤1: 解锁所有图层
-                    var layerTable = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
-                    foreach (ObjectId layerId in layerTable)
+                    try
                     {
-                        var layer = (LayerTableRecord)tr.GetObject(layerId, OpenMode.ForRead);
-                        if (layer.IsLocked)
+                        // 步骤1: 解锁所有图层
+                        var layerTable = (LayerTable)tr.GetObject(db.LayerTableId, OpenMode.ForRead);
+                        foreach (ObjectId layerId in layerTable)
                         {
-                            layer.UpgradeOpen();
-                            layer.IsLocked = false;
-                            record.UnlockedLayers.Add(layerId);
-                            Log.Information($"解锁图层: {layer.Name}");
+                            var layer = (LayerTableRecord)tr.GetObject(layerId, OpenMode.ForRead);
+                            if (layer.IsLocked)
+                            {
+                                layer.UpgradeOpen();
+                                layer.IsLocked = false;
+                                record.UnlockedLayers.Add(layerId);
+                                Log.Information($"解锁图层: {layer.Name}");
+                            }
                         }
+
+                        // 步骤2: 解锁所有被锁定的对象（遍历所有空间）
+                        UnlockObjectsInSpace(db.ModelSpace, tr, record);
+                        UnlockObjectsInSpace(db.PaperSpace, tr, record);
+
+                        tr.Commit();
+                        Log.Information($"✅ 图层和对象解锁完成: {record.UnlockedLayers.Count}个图层, {record.UnlockedObjects.Count}个对象");
                     }
-
-                    // 步骤2: 解锁所有被锁定的对象（遍历所有空间）
-                    UnlockObjectsInSpace(db.ModelSpace, tr, record);
-                    UnlockObjectsInSpace(db.PaperSpace, tr, record);
-
-                    // 步骤3: XRef绑定（如果需要）
-                    if (bindXRefs)
+                    catch (Exception ex)
                     {
-                        BindAllXRefs(db, tr, record, ed);
+                        Log.Error(ex, "解锁图层和对象失败");
+                        tr.Abort();
+                        throw;
                     }
-
-                    tr.Commit();
-                    Log.Information($"✅ 图纸解锁完成: {record.UnlockedLayers.Count}个图层, {record.UnlockedObjects.Count}个对象");
-
-                    if (bindXRefs && record.BoundXRefs.Count > 0)
-                    {
-                        ed.WriteMessage($"\n已绑定 {record.BoundXRefs.Count} 个外部引用: {string.Join(", ", record.BoundXRefs)}");
-                    }
-
-                    return record;
                 }
-                catch (Exception ex)
+
+                // ✅ 修复：第二个事务 - XRef绑定（独立管理）
+                if (bindXRefs)
                 {
-                    Log.Error(ex, "解锁图纸失败");
-                    tr.Abort();
-                    throw;
+                    BindAllXRefsIndependent(db, record, ed);
                 }
             }
+
+            Log.Information($"✅ 图纸解锁完成: {record.UnlockedLayers.Count}个图层, {record.UnlockedObjects.Count}个对象");
+
+            if (bindXRefs && record.BoundXRefs.Count > 0)
+            {
+                ed.WriteMessage($"\n已绑定 {record.BoundXRefs.Count} 个外部引用: {string.Join(", ", record.BoundXRefs)}");
+            }
+
+            return record;
         }
 
         /// <summary>
@@ -147,23 +152,31 @@ namespace BiaogPlugin.Services
         /// 绑定类型：
         /// - Bind: 绑定为独立块（推荐）
         /// - Insert: 插入并合并到当前图纸
+        ///
+        /// ✅ 修复：独立管理事务，不接收外部Transaction参数
         /// </summary>
-        private static void BindAllXRefs(Database db, Transaction tr, UnlockRecord record, Editor ed)
+        private static void BindAllXRefsIndependent(Database db, UnlockRecord record, Editor ed)
         {
             try
             {
-                var blockTable = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
                 var xrefsToProcess = new List<ObjectId>();
 
-                // 收集所有XRef块
-                foreach (ObjectId btrId in blockTable)
+                // ✅ 第一个事务：收集所有XRef块
+                using (var tr = db.TransactionManager.StartTransaction())
                 {
-                    var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
-                    if (btr.IsFromExternalReference)
+                    var blockTable = (BlockTable)tr.GetObject(db.BlockTableId, OpenMode.ForRead);
+
+                    foreach (ObjectId btrId in blockTable)
                     {
-                        xrefsToProcess.Add(btrId);
-                        Log.Information($"检测到外部引用: {btr.Name}");
+                        var btr = (BlockTableRecord)tr.GetObject(btrId, OpenMode.ForRead);
+                        if (btr.IsFromExternalReference)
+                        {
+                            xrefsToProcess.Add(btrId);
+                            Log.Information($"检测到外部引用: {btr.Name}");
+                        }
                     }
+
+                    tr.Commit();
                 }
 
                 if (xrefsToProcess.Count == 0)
@@ -172,10 +185,7 @@ namespace BiaogPlugin.Services
                     return;
                 }
 
-                // 提交当前事务，准备绑定操作
-                tr.Commit();
-
-                // 绑定XRef（需要在事务外执行）
+                // ✅ 第二个事务：绑定XRef
                 using (var bindTr = db.TransactionManager.StartTransaction())
                 {
                     foreach (var xrefId in xrefsToProcess)
@@ -200,9 +210,6 @@ namespace BiaogPlugin.Services
                     }
                     bindTr.Commit();
                 }
-
-                // 重新开始事务（因为之前的已提交）
-                tr = db.TransactionManager.StartTransaction();
             }
             catch (Exception ex)
             {

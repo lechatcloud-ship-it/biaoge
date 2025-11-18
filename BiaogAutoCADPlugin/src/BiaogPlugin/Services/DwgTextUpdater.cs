@@ -613,7 +613,8 @@ namespace BiaogPlugin.Services
                         OriginalContent = text.Content,
                         NewContent = translationMap[text.Content],
                         Layer = text.Layer,
-                        EntityType = text.Type
+                        EntityType = text.Type,
+                        Tag = text.Tag  // ✅ 关键修复：Table单元格位置信息（Row{row}_Col{col}）
                     });
                 }
             }
@@ -653,7 +654,7 @@ namespace BiaogPlugin.Services
                         if (ent is DBText dbText)
                             currentContent = dbText.TextString;
                         else if (ent is MText mText)
-                            currentContent = mText.Contents;
+                            currentContent = mText.Text;  // ✅ 修复：读取纯文本Text而非含格式的Contents
                         else if (ent is AttributeReference attRef)
                             currentContent = attRef.TextString;
 
