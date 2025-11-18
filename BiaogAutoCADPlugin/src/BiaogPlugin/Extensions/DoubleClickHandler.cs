@@ -18,6 +18,7 @@ namespace BiaogPlugin.Extensions
         private static bool _isEnabled = false;
         private static DateTime _lastClickTime = DateTime.MinValue;
         private static ObjectId _lastClickedObjectId = ObjectId.Null;
+        private static readonly object _clickLock = new object(); // 线程安全保护
         private const int DoubleClickInterval = 500; // 毫秒
 
         /// <summary>
@@ -175,27 +176,36 @@ namespace BiaogPlugin.Extensions
 
                 var currentObjectId = objIds[0];
 
-                // 检测双击（两次点击同一对象，时间间隔小于阈值）
-                var now = DateTime.Now;
-                var timeSinceLastClick = (now - _lastClickTime).TotalMilliseconds;
-
-                if (currentObjectId == _lastClickedObjectId && timeSinceLastClick < DoubleClickInterval)
+                // ✅ 线程安全：使用lock保护静态字段读写，防止多文档并发竞态条件
+                bool isDoubleClick = false;
+                lock (_clickLock)
                 {
-                    // 检测到双击
-                    Log.Debug($"检测到双击文本实体: {currentObjectId}");
+                    // 检测双击（两次点击同一对象，时间间隔小于阈值）
+                    var now = DateTime.Now;
+                    var timeSinceLastClick = (now - _lastClickTime).TotalMilliseconds;
 
-                    // 重置状态
-                    _lastClickTime = DateTime.MinValue;
-                    _lastClickedObjectId = ObjectId.Null;
+                    if (currentObjectId == _lastClickedObjectId && timeSinceLastClick < DoubleClickInterval)
+                    {
+                        // 检测到双击
+                        isDoubleClick = true;
 
-                    // 处理双击
-                    HandleDoubleClick(doc, currentObjectId);
+                        // 重置状态
+                        _lastClickTime = DateTime.MinValue;
+                        _lastClickedObjectId = ObjectId.Null;
+                    }
+                    else
+                    {
+                        // 记录单击
+                        _lastClickTime = now;
+                        _lastClickedObjectId = currentObjectId;
+                    }
                 }
-                else
+
+                // ✅ 在锁外处理双击，避免长时间持锁导致性能问题
+                if (isDoubleClick)
                 {
-                    // 记录单击
-                    _lastClickTime = now;
-                    _lastClickedObjectId = currentObjectId;
+                    Log.Debug($"检测到双击文本实体: {currentObjectId}");
+                    HandleDoubleClick(doc, currentObjectId);
                 }
             }
             catch (System.Exception ex)
