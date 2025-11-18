@@ -55,7 +55,8 @@ public class AIComponentRecognizer
     public async Task<List<ComponentRecognitionResult>> RecognizeAsync(
         List<TextEntity> textEntities,
         List<string>? layerNames = null,
-        CalculationPrecision precision = CalculationPrecision.Budget)
+        CalculationPrecision precision = CalculationPrecision.Budget,
+        System.Threading.CancellationToken cancellationToken = default)
     {
         Log.Information("开始AI构件识别: {Count}个文本实体, 精度模式:{Precision}",
             textEntities.Count, precision);

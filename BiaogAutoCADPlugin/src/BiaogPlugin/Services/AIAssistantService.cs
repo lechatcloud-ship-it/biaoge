@@ -71,9 +71,11 @@ namespace BiaogPlugin.Services
         /// </summary>
         /// <param name="userMessage">用户消息</param>
         /// <param name="onContentChunk">正文内容流式回调</param>
+        /// <param name="cancellationToken">取消令牌</param>
         public async Task<AssistantResponse> ChatStreamAsync(
             string userMessage,
-            Action<string>? onContentChunk = null)
+            Action<string>? onContentChunk = null,
+            System.Threading.CancellationToken cancellationToken = default)
         {
             try
             {
@@ -123,7 +125,8 @@ namespace BiaogPlugin.Services
                         onChunk: chunk => onContentChunk?.Invoke(chunk),
                         temperature: 0.7f,
                         tools: openAITools,
-                        enableThinking: false  // OpenAI SDK 不支持 enable_thinking 参数
+                        enableThinking: false,  // OpenAI SDK 不支持 enable_thinking 参数
+                        cancellationToken: cancellationToken
                     );
                 }
                 else
@@ -175,10 +178,12 @@ namespace BiaogPlugin.Services
 
                     foreach (var toolCall in agentDecision.ToolCalls)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
+
                         Log.Information($"执行工具: {toolCall.Name}");
                         onContentChunk?.Invoke($"\n[工具调用] {toolCall.Name}\n");
 
-                        string toolResult = await ExecuteTool(toolCall, onContentChunk);
+                        string toolResult = await ExecuteTool(toolCall, onContentChunk, cancellationToken);
 
                         // ✅ 商业级最佳实践：添加工具结果到历史（阿里云百炼官方格式）
                         // 参考：https://help.aliyun.com/zh/model-studio/qwen-function-calling
@@ -203,7 +208,8 @@ namespace BiaogPlugin.Services
                         summary = await _openAIClient.CompleteStreamingAsync(
                             messages: summaryMessages,
                             onChunk: chunk => onContentChunk?.Invoke(chunk),
-                            temperature: 0.7f
+                            temperature: 0.7f,
+                            cancellationToken: cancellationToken
                         );
                     }
                     else
@@ -212,7 +218,8 @@ namespace BiaogPlugin.Services
                         summary = await _bailianClient.ChatCompletionStreamAsync(
                             messages: summaryMessages,
                             model: _agentModel,
-                            onStreamChunk: chunk => onContentChunk?.Invoke(chunk)
+                            onStreamChunk: chunk => onContentChunk?.Invoke(chunk),
+                            cancellationToken: cancellationToken
                         );
                     }
 
@@ -258,7 +265,7 @@ namespace BiaogPlugin.Services
         /// ✅ 路由所有AutoCAD工具到AutoCADToolExecutor
         /// 参考：AGENT_TOOLS_DESIGN.md
         /// </summary>
-        private async Task<string> ExecuteTool(ToolCall toolCall, Action<string>? onStreamChunk)
+        private async Task<string> ExecuteTool(ToolCall toolCall, Action<string>? onStreamChunk, System.Threading.CancellationToken cancellationToken)
         {
             try
             {
