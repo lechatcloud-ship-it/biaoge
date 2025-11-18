@@ -41,10 +41,12 @@ namespace BiaogPlugin.Services
         /// </summary>
         /// <param name="targetLanguage">目标语言代码（如"en"、"ja"）</param>
         /// <param name="progress">进度回调</param>
+        /// <param name="cancellationToken">取消令牌</param>
         /// <returns>翻译统计信息</returns>
         public async Task<TranslationStatistics> TranslateCurrentDrawing(
             string targetLanguage,
-            IProgress<TranslationProgress>? progress = null)
+            IProgress<TranslationProgress>? progress = null,
+            System.Threading.CancellationToken cancellationToken = default)
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
             if (doc == null)
@@ -171,6 +173,8 @@ namespace BiaogPlugin.Services
                 {
                     foreach (var text in uniqueTexts)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
+
                         var cached = await _cacheService.GetTranslationAsync(text, targetLanguage);
                         if (cached != null)
                         {
@@ -220,7 +224,7 @@ namespace BiaogPlugin.Services
                         uncachedTexts,
                         targetLanguage,
                         apiProgress,
-                        CancellationToken.None
+                        cancellationToken
                     );
 
                     // 防御性验证：确保返回结果数量正确
@@ -234,6 +238,7 @@ namespace BiaogPlugin.Services
                     // 添加到翻译映射
                     for (int i = 0; i < uncachedTexts.Count; i++)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
                         translationMap[uncachedTexts[i]] = translations[i];
                     }
 
@@ -282,6 +287,8 @@ namespace BiaogPlugin.Services
 
                         foreach (var textEntity in translatableTexts)
                         {
+                            cancellationToken.ThrowIfCancellationRequested();
+
                             if (translationMap.TryGetValue(textEntity.Content, out var translatedText)
                                 && !string.IsNullOrEmpty(translatedText))
                             {

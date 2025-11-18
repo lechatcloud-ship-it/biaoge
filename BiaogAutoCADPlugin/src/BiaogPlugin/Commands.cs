@@ -521,7 +521,8 @@ namespace BiaogPlugin
                 var stats = await LayerTranslationService.TranslateLayerTexts(
                     selectedLayers,
                     targetLanguage,
-                    progress
+                    progress,
+                    System.Threading.CancellationToken.None  // TODO: 后续实现全局取消机制
                 );
 
                 // 8. 显示结果
@@ -572,7 +573,7 @@ namespace BiaogPlugin
                     ed.WriteMessage($"\r{p.Stage}: {p.Percentage}%    ");
                 });
 
-                await controller.TranslateCurrentDrawing(targetLanguage, progress);
+                await controller.TranslateCurrentDrawing(targetLanguage, progress, System.Threading.CancellationToken.None);  // TODO: 后续实现全局取消机制
 
                 ed.WriteMessage($"\n翻译完成！");
                 Log.Information($"翻译完成: {languageName}");
