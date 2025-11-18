@@ -1306,6 +1306,19 @@ public class BailianApiClient
         bool enableParallelToolCalls = true,
         CancellationToken cancellationToken = default)
     {
+        // ✅ P1修复：验证thinking budget参数范围（阿里云百炼API限制）
+        if (thinkingBudget.HasValue && (thinkingBudget.Value < 1 || thinkingBudget.Value > 8192))
+        {
+            throw new ArgumentOutOfRangeException(nameof(thinkingBudget),
+                $"Thinking budget必须在1-8192之间，当前值: {thinkingBudget.Value}");
+        }
+
+        // ✅ P1修复：验证消息链的正确性（防止API拒绝）
+        if (!ValidateMessageChain(messages, out string validationError))
+        {
+            throw new ArgumentException($"消息链验证失败: {validationError}", nameof(messages));
+        }
+
         // 从配置读取模型，如果未指定则使用对话模型
         if (string.IsNullOrEmpty(model))
         {
@@ -1523,6 +1536,19 @@ public class BailianApiClient
         bool enableParallelToolCalls = true,
         CancellationToken cancellationToken = default)
     {
+        // ✅ P1修复：验证thinking budget参数范围（阿里云百炼API限制）
+        if (thinkingBudget.HasValue && (thinkingBudget.Value < 1 || thinkingBudget.Value > 8192))
+        {
+            throw new ArgumentOutOfRangeException(nameof(thinkingBudget),
+                $"Thinking budget必须在1-8192之间，当前值: {thinkingBudget.Value}");
+        }
+
+        // ✅ P1修复：验证消息链的正确性（防止API拒绝）
+        if (!ValidateMessageChain(messages, out string validationError))
+        {
+            throw new ArgumentException($"消息链验证失败: {validationError}", nameof(messages));
+        }
+
         // 从配置读取模型，如果未指定则使用对话模型
         if (string.IsNullOrEmpty(model))
         {
@@ -1760,6 +1786,52 @@ public class BailianApiClient
             Log.Error(ex, "视觉模型API调用失败");
             throw;
         }
+    }
+
+    /// <summary>
+    /// 验证消息链的正确性（阿里云百炼Function Calling规范）
+    /// </summary>
+    /// <remarks>
+    /// 根据阿里云百炼API规范，tool消息必须满足：
+    /// 1. tool消息前面必须有assistant消息
+    /// 2. assistant消息必须包含tool_calls
+    /// 3. tool消息的tool_call_id必须匹配assistant消息中的某个tool_calls[].id
+    /// </remarks>
+    private bool ValidateMessageChain(List<ChatMessage> messages, out string error)
+    {
+        error = string.Empty;
+        ChatMessage? lastAssistant = null;
+
+        for (int i = 0; i < messages.Count; i++)
+        {
+            var msg = messages[i];
+
+            if (msg.Role.ToLower() == "assistant")
+            {
+                lastAssistant = msg;
+            }
+            else if (msg.Role.ToLower() == "tool")
+            {
+                // tool消息必须有对应的assistant消息
+                if (lastAssistant == null || lastAssistant.ToolCalls == null || lastAssistant.ToolCalls.Count == 0)
+                {
+                    error = $"消息{i}: tool消息前面没有包含tool_calls的assistant消息 " +
+                           $"(tool_call_id={msg.ToolCallId}, name={msg.Name})";
+                    return false;
+                }
+
+                // 验证tool_call_id匹配
+                bool hasMatch = lastAssistant.ToolCalls.Any(tc => tc.Id == msg.ToolCallId);
+                if (!hasMatch)
+                {
+                    error = $"消息{i}: tool_call_id不匹配 " +
+                           $"(tool_call_id={msg.ToolCallId}, available_ids=[{string.Join(", ", lastAssistant.ToolCalls.Select(tc => tc.Id))}])";
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 }
 
