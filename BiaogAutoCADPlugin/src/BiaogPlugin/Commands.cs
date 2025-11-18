@@ -70,6 +70,11 @@ namespace BiaogPlugin
         public void TranslateDrawing()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -117,6 +122,11 @@ namespace BiaogPlugin
             Services.CommandExceptionHandler.ExecuteSafely(async () =>
             {
                 var doc = Application.DocumentManager.MdiActiveDocument;
+                if (doc == null)
+                {
+                    Log.Warning("没有活动的文档");
+                    return;
+                }
                 var ed = doc.Editor;
                 var db = doc.Database;
 
@@ -388,6 +398,11 @@ namespace BiaogPlugin
         public async void TranslateByLayer()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -513,6 +528,11 @@ namespace BiaogPlugin
         private async Task QuickTranslate(string targetLanguage, string languageName)
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -551,6 +571,11 @@ namespace BiaogPlugin
         public async void VisionAnalyzeDrawing()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -631,6 +656,11 @@ namespace BiaogPlugin
         public void CalculateQuantities()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -688,6 +718,11 @@ namespace BiaogPlugin
         public async void CalculateAndExport()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -779,6 +814,11 @@ namespace BiaogPlugin
         public void OpenSettings()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -804,6 +844,11 @@ namespace BiaogPlugin
         public void OpenCostManagement()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -837,6 +882,11 @@ namespace BiaogPlugin
         public void ToggleDoubleClickTranslation()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -873,6 +923,11 @@ namespace BiaogPlugin
         public void ToggleInputMethodSwitch()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -909,6 +964,11 @@ namespace BiaogPlugin
         public void ShowFeatureStatus()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -966,6 +1026,11 @@ namespace BiaogPlugin
         public void StartAIAssistant()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -993,6 +1058,11 @@ namespace BiaogPlugin
         public void ResetAIPanel()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -1038,6 +1108,11 @@ namespace BiaogPlugin
         public void ResetPalettes()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -1107,6 +1182,11 @@ namespace BiaogPlugin
         public void ToggleTranslationPalette()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -1131,6 +1211,11 @@ namespace BiaogPlugin
         public void ToggleCalculationPalette()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -1155,6 +1240,11 @@ namespace BiaogPlugin
         public void ToggleAIPalette()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -1183,6 +1273,11 @@ namespace BiaogPlugin
         public void ShowKeybindings()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -1208,6 +1303,11 @@ namespace BiaogPlugin
         public void ExportKeybindings()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -1245,6 +1345,11 @@ namespace BiaogPlugin
         public void InstallKeybindings()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -1312,6 +1417,11 @@ namespace BiaogPlugin
         public void ShowQuickStart()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             ed.WriteMessage("\n╔══════════════════════════════════════════════════════════╗");
@@ -1366,6 +1476,11 @@ namespace BiaogPlugin
         public void ShowHelp()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -1407,6 +1522,11 @@ namespace BiaogPlugin
         public void ShowVersion()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
@@ -1429,6 +1549,11 @@ namespace BiaogPlugin
         public void ShowAbout()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -1471,6 +1596,11 @@ namespace BiaogPlugin
         public void ClearCache()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -1501,6 +1631,11 @@ namespace BiaogPlugin
         public async void RunDiagnostic()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -1559,6 +1694,11 @@ namespace BiaogPlugin
         public void DiagnoseTextExtraction()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
             var db = doc.Database;
 
@@ -1706,6 +1846,11 @@ namespace BiaogPlugin
         public void ShowPerformanceReport()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -1773,6 +1918,11 @@ namespace BiaogPlugin
         public void ResetPerformanceStats()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -1802,6 +1952,11 @@ namespace BiaogPlugin
         public void ShowTokenUsage()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -1851,6 +2006,11 @@ namespace BiaogPlugin
         public void ResetTokenUsage()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -1884,6 +2044,11 @@ namespace BiaogPlugin
         public async void QuickExportExcel()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -1963,6 +2128,11 @@ namespace BiaogPlugin
         public async void QuickCountComponents()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -2003,6 +2173,11 @@ namespace BiaogPlugin
         public void CountTextEntities()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -2055,6 +2230,11 @@ namespace BiaogPlugin
         public void ShowLayerInfo()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
             var db = doc.Database;
 
@@ -2113,6 +2293,11 @@ namespace BiaogPlugin
         public void BackupDrawing()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -2165,6 +2350,11 @@ namespace BiaogPlugin
         public void TestExtract()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -2208,6 +2398,11 @@ namespace BiaogPlugin
         public async void ShowTranslationHistory()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -2294,6 +2489,11 @@ namespace BiaogPlugin
         public async void UndoLastTranslation()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
             var db = doc.Database;
 
@@ -2415,6 +2615,11 @@ namespace BiaogPlugin
         public async void ClearTranslationHistory()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -2463,6 +2668,11 @@ namespace BiaogPlugin
         public async void SmartReplace()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
             var db = doc.Database;
 
@@ -2726,6 +2936,11 @@ namespace BiaogPlugin
         public void ShowRibbon()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -2752,6 +2967,11 @@ namespace BiaogPlugin
         public void ReloadRibbon()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -2798,6 +3018,11 @@ namespace BiaogPlugin
         public void ShowUIStatus()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
@@ -2888,6 +3113,11 @@ namespace BiaogPlugin
         public void DiagnoseQuantityCalculation()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
+            if (doc == null)
+            {
+                Log.Warning("没有活动的文档");
+                return;
+            }
             var ed = doc.Editor;
 
             try
