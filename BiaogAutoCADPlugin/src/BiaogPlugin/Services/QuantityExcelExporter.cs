@@ -73,8 +73,8 @@ namespace BiaogPlugin.Services
             var worksheet = package.Workbook.Worksheets.Add("工程量清单");
 
             // ===== 标题行 =====
-            worksheet.Cells["A1"].Value = "分部分项工程量清单";
-            worksheet.Cells["A1:J1"].Merge = true;
+            worksheet.Cells["A1"].Value = "分部分项工程量清单（GB 50854-2013）";
+            worksheet.Cells["A1:M1"].Merge = true;
             worksheet.Cells["A1"].Style.Font.Size = 16;
             worksheet.Cells["A1"].Style.Font.Bold = true;
             worksheet.Cells["A1"].Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
@@ -82,7 +82,8 @@ namespace BiaogPlugin.Services
 
             // ===== 表头行 =====
             int row = 3;
-            var headers = new[] { "序号", "构件类型", "图层", "数量", "长(m)", "宽(m)", "高(m)", "面积(m²)", "体积(m³)", "模板(m²)", "置信度" };
+            // ✅ GB 50854-2013标准表头：项目编码、项目名称、计量单位、工程量（5要素）
+            var headers = new[] { "序号", "项目编码", "项目名称", "计量单位", "工程量", "长(m)", "宽(m)", "高(m)", "模板(m²)", "图层", "数量", "置信度" };
             for (int col = 1; col <= headers.Length; col++)
             {
                 var cell = worksheet.Cells[row, col];
@@ -120,17 +121,23 @@ namespace BiaogPlugin.Services
 
                 foreach (var component in group)
                 {
-                    worksheet.Cells[row, 1].Value = index++;
-                    worksheet.Cells[row, 2].Value = component.Type;
-                    worksheet.Cells[row, 3].Value = component.Layer;
-                    worksheet.Cells[row, 4].Value = component.Quantity;
-                    worksheet.Cells[row, 5].Value = component.Length > 0 ? component.Length : (double?)null;
-                    worksheet.Cells[row, 6].Value = component.Width > 0 ? component.Width : (double?)null;
-                    worksheet.Cells[row, 7].Value = component.Height > 0 ? component.Height : (double?)null;
-                    worksheet.Cells[row, 8].Value = component.Area > 0 ? component.Area : (double?)null;
-                    worksheet.Cells[row, 9].Value = component.Volume > 0 ? component.Volume : (double?)null;
-                    worksheet.Cells[row, 10].Value = component.FormworkArea > 0 ? component.FormworkArea : (double?)null;
-                    worksheet.Cells[row, 11].Value = $"{component.Confidence:P0}";
+                    // ✅ GB 50854-2013五要素
+                    string projectCode = GBProjectCodeGenerator.GetProjectCode(component.Type);
+                    string measurementUnit = GBProjectCodeGenerator.GetMeasurementUnit(component.Type);
+                    double quantity = measurementUnit == "m³" ? component.Volume : component.Area;
+
+                    worksheet.Cells[row, 1].Value = index++;                                    // 序号
+                    worksheet.Cells[row, 2].Value = projectCode;                                // 项目编码
+                    worksheet.Cells[row, 3].Value = component.Type;                             // 项目名称
+                    worksheet.Cells[row, 4].Value = measurementUnit;                            // 计量单位
+                    worksheet.Cells[row, 5].Value = quantity > 0 ? quantity : (double?)null;   // 工程量
+                    worksheet.Cells[row, 6].Value = component.Length > 0 ? component.Length : (double?)null;
+                    worksheet.Cells[row, 7].Value = component.Width > 0 ? component.Width : (double?)null;
+                    worksheet.Cells[row, 8].Value = component.Height > 0 ? component.Height : (double?)null;
+                    worksheet.Cells[row, 9].Value = component.FormworkArea > 0 ? component.FormworkArea : (double?)null;
+                    worksheet.Cells[row, 10].Value = component.Layer;                           // 图层
+                    worksheet.Cells[row, 11].Value = component.Quantity;                        // 数量
+                    worksheet.Cells[row, 12].Value = $"{component.Confidence:P0}";             // 置信度
 
                     // 小计累加
                     subtotalArea += component.Area;
@@ -138,7 +145,7 @@ namespace BiaogPlugin.Services
                     subtotalFormwork += component.FormworkArea;
 
                     // 设置数字格式
-                    worksheet.Cells[row, 5, row, 10].Style.Numberformat.Format = "0.00";
+                    worksheet.Cells[row, 5, row, 9].Style.Numberformat.Format = "0.00";
 
                     // 边框
                     worksheet.Cells[row, 1, row, headers.Length].Style.Border.BorderAround(ExcelBorderStyle.Thin);
@@ -148,13 +155,13 @@ namespace BiaogPlugin.Services
 
                 // 小计行
                 var subtotalRow = row;
-                worksheet.Cells[subtotalRow, 1, subtotalRow, 7].Merge = true;
+                worksheet.Cells[subtotalRow, 1, subtotalRow, 4].Merge = true;
                 worksheet.Cells[subtotalRow, 1].Value = $"小计（{group.Key}）";
                 worksheet.Cells[subtotalRow, 1].Style.Font.Bold = true;
-                worksheet.Cells[subtotalRow, 8].Value = subtotalArea;
-                worksheet.Cells[subtotalRow, 9].Value = subtotalVolume;
-                worksheet.Cells[subtotalRow, 10].Value = subtotalFormwork;
-                worksheet.Cells[subtotalRow, 8, subtotalRow, 10].Style.Numberformat.Format = "0.00";
+                worksheet.Cells[subtotalRow, 5].Value = subtotalArea + subtotalVolume;  // 工程量小计（面积+体积）
+                worksheet.Cells[subtotalRow, 9].Value = subtotalFormwork;               // 模板小计
+                worksheet.Cells[subtotalRow, 5].Style.Numberformat.Format = "0.00";
+                worksheet.Cells[subtotalRow, 9].Style.Numberformat.Format = "0.00";
                 worksheet.Cells[subtotalRow, 1, subtotalRow, headers.Length].Style.Fill.PatternType = ExcelFillStyle.Solid;
                 worksheet.Cells[subtotalRow, 1, subtotalRow, headers.Length].Style.Fill.BackgroundColor.SetColor(Color.LightYellow);
                 row++;
@@ -162,14 +169,15 @@ namespace BiaogPlugin.Services
 
             // ===== 总计行 =====
             var totalRow = row;
-            worksheet.Cells[totalRow, 1, totalRow, 7].Merge = true;
+            worksheet.Cells[totalRow, 1, totalRow, 4].Merge = true;
             worksheet.Cells[totalRow, 1].Value = "总计";
             worksheet.Cells[totalRow, 1].Style.Font.Bold = true;
             worksheet.Cells[totalRow, 1].Style.Font.Size = 12;
-            worksheet.Cells[totalRow, 8].Value = components.Sum(c => c.Area);
-            worksheet.Cells[totalRow, 9].Value = components.Sum(c => c.Volume);
-            worksheet.Cells[totalRow, 10].Value = components.Sum(c => c.FormworkArea);
-            worksheet.Cells[totalRow, 8, totalRow, 10].Style.Numberformat.Format = "0.00";
+            double totalQuantity = components.Sum(c => c.Area) + components.Sum(c => c.Volume);
+            worksheet.Cells[totalRow, 5].Value = totalQuantity;                         // 总工程量
+            worksheet.Cells[totalRow, 9].Value = components.Sum(c => c.FormworkArea);   // 总模板
+            worksheet.Cells[totalRow, 5].Style.Numberformat.Format = "0.00";
+            worksheet.Cells[totalRow, 9].Style.Numberformat.Format = "0.00";
             worksheet.Cells[totalRow, 1, totalRow, headers.Length].Style.Fill.PatternType = ExcelFillStyle.Solid;
             worksheet.Cells[totalRow, 1, totalRow, headers.Length].Style.Fill.BackgroundColor.SetColor(Color.Orange);
 
