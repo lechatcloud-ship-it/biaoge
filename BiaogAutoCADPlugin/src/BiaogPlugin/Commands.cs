@@ -2073,6 +2073,13 @@ namespace BiaogPlugin
                     int count = 0;
                     foreach (Autodesk.AutoCAD.DatabaseServices.ObjectId layerId in layerTable)
                     {
+                        // ✅ AutoCAD API最佳实践：验证ObjectId有效性
+                        if (layerId.IsNull || layerId.IsErased || layerId.IsEffectivelyErased || !layerId.IsValid)
+                        {
+                            Log.Debug($"跳过无效的图层ID: {layerId}");
+                            continue;
+                        }
+
                         var layer = (Autodesk.AutoCAD.DatabaseServices.LayerTableRecord)tr.GetObject(
                             layerId,
                             Autodesk.AutoCAD.DatabaseServices.OpenMode.ForRead);
@@ -2118,11 +2125,19 @@ namespace BiaogPlugin
 
                 var originalPath = doc.Name;
                 var directory = System.IO.Path.GetDirectoryName(originalPath);
+
+                // ✅ 防御性编程：检查目录路径是否有效
+                if (string.IsNullOrEmpty(directory))
+                {
+                    ed.WriteMessage("\n[错误] 无法确定文件目录");
+                    return;
+                }
+
                 var fileName = System.IO.Path.GetFileNameWithoutExtension(originalPath);
                 var extension = System.IO.Path.GetExtension(originalPath);
 
                 var backupPath = System.IO.Path.Combine(
-                    directory!,
+                    directory,
                     $"{fileName}_backup_{DateTime.Now:yyyyMMdd_HHmmss}{extension}");
 
                 // 复制文件
@@ -2336,9 +2351,10 @@ namespace BiaogPlugin
                     var handle = new Handle(Convert.ToInt64(selectedRecord.ObjectIdHandle, 16));
                     var objId = db.GetObjectId(false, handle, 0);
 
-                    if (objId.IsNull || objId.IsErased)
+                    // ✅ AutoCAD API最佳实践：完整的ObjectId验证
+                    if (objId.IsNull || objId.IsErased || objId.IsEffectivelyErased || !objId.IsValid)
                     {
-                        ed.WriteMessage("\n[错误] 对象已被删除，无法撤销。");
+                        ed.WriteMessage("\n[错误] 对象已被删除或无效，无法撤销。");
                         return;
                     }
 
