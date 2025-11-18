@@ -253,6 +253,17 @@ public class BailianApiClient
         // ========== 第3步：移除系统提示词特征短语 ==========
         var systemPromptKeywords = new[]
         {
+            // ✅ P0紧急修复 2025-11-18：用户报告的实际泄漏模式
+            "工程图纸。使用建筑术语。翻译：说明。保留：代码、数字、单位",
+            "工程图纸。使用建筑术语。翻译：说明。保留：代码、数字、单位。",
+            "工程图纸。使用建筑术语",
+            "翻译：说明。保留：代码、数字、单位",
+            "翻译：说明。保留",
+            "<|startofcontent|>",  // qwen模型特殊标记
+            "<|endofcontent|>",
+            "<|im_start|>",
+            "<|im_end|>",
+
             // ✅ v1.0.9新增：XML Prompt关键词
             "CAD/BIM工程图纸专业翻译专家",
             "将中文CAD工程图纸文本翻译为英文",
@@ -1597,8 +1608,22 @@ public class BailianApiClient
         var response = await SendWithRetryAsync(httpRequest, cancellationToken);
         response.EnsureSuccessStatusCode();
 
+        // ✅ P0修复: 防御性null检查，防止ReadFromJsonAsync返回null或属性不存在
         var result = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-        var choices = result.GetProperty("choices");
+        if (result.ValueKind == JsonValueKind.Null || result.ValueKind == JsonValueKind.Undefined)
+        {
+            var rawContent = await response.Content.ReadAsStringAsync();
+            Log.Error("API返回null或undefined JSON: {RawContent}", rawContent);
+            throw new InvalidOperationException($"API返回无效JSON: {rawContent.Substring(0, Math.Min(200, rawContent.Length))}");
+        }
+
+        if (!result.TryGetProperty("choices", out var choices))
+        {
+            var rawContent = await response.Content.ReadAsStringAsync();
+            Log.Error("API响应缺少choices字段: {RawContent}", rawContent);
+            throw new InvalidOperationException("API响应格式错误：缺少choices字段");
+        }
+
         if (choices.GetArrayLength() == 0)
         {
             throw new Exception("API返回空响应");
@@ -1749,22 +1774,41 @@ public class BailianApiClient
             using var doc = JsonDocument.Parse(responseContent);
             var root = doc.RootElement;
 
-            // 提取内容
-            var content = root
-                .GetProperty("choices")[0]
-                .GetProperty("message")
-                .GetProperty("content")
-                .GetString() ?? "";
+            // ✅ P0修复: 防御性JSON导航，防止链式GetProperty抛异常
+            string content = "";
+            if (root.TryGetProperty("choices", out var choicesElement) &&
+                choicesElement.GetArrayLength() > 0)
+            {
+                var firstChoice = choicesElement[0];
+                if (firstChoice.TryGetProperty("message", out var messageElement) &&
+                    messageElement.TryGetProperty("content", out var contentElement))
+                {
+                    content = contentElement.GetString() ?? "";
+                }
+                else
+                {
+                    Log.Warning("视觉模型响应缺少message.content字段");
+                }
+            }
+            else
+            {
+                Log.Error("视觉模型响应缺少choices字段或为空数组: {Response}", responseContent);
+                throw new InvalidOperationException("视觉模型API返回格式错误：缺少有效的choices数组");
+            }
 
             // 提取Token使用量
             if (root.TryGetProperty("usage", out var usage))
             {
-                var inputTokens = usage.GetProperty("prompt_tokens").GetInt32();
-                var outputTokens = usage.GetProperty("completion_tokens").GetInt32();
+                if (usage.TryGetProperty("prompt_tokens", out var promptTokens) &&
+                    usage.TryGetProperty("completion_tokens", out var completionTokens))
+                {
+                    var inputTokens = promptTokens.GetInt32();
+                    var outputTokens = completionTokens.GetInt32();
 
-                TrackTokenUsage(inputTokens, outputTokens);
-                Log.Debug("视觉模型Token使用: 输入{InputTokens}, 输出{OutputTokens}",
-                    inputTokens, outputTokens);
+                    TrackTokenUsage(inputTokens, outputTokens);
+                    Log.Debug("视觉模型Token使用: 输入{InputTokens}, 输出{OutputTokens}",
+                        inputTokens, outputTokens);
+                }
             }
 
             Log.Information("视觉模型调用成功，响应长度:{Length}字符", content.Length);

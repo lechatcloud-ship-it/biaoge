@@ -128,6 +128,13 @@ namespace BiaogPlugin.Services
                         enableThinking: false,  // OpenAI SDK 不支持 enable_thinking 参数
                         cancellationToken: cancellationToken
                     );
+
+                    // ✅ P1修复: 防御性null检查，防止CompleteStreamingAsync返回null
+                    if (agentDecision == null)
+                    {
+                        Log.Error("CompleteStreamingAsync返回null");
+                        throw new InvalidOperationException("AI模型返回空响应");
+                    }
                 }
                 else
                 {
@@ -139,11 +146,11 @@ namespace BiaogPlugin.Services
                 var assistantMessage = new BiaogPlugin.Services.ChatMessage
                 {
                     Role = "assistant",
-                    Content = agentDecision.Content
+                    Content = agentDecision.Content ?? ""  // ✅ P1修复: 防止Content为null
                 };
 
                 // ✅ 如果有工具调用，必须保存完整的ToolCalls信息（防止会话恢复时丢失导致API错误）
-                if (agentDecision.ToolCalls.Count > 0)
+                if (agentDecision.ToolCalls != null && agentDecision.ToolCalls.Count > 0)  // ✅ P1修复: 添加null检查
                 {
                     assistantMessage.ToolCalls = agentDecision.ToolCalls
                         .Select((tc, index) =>
@@ -223,17 +230,24 @@ namespace BiaogPlugin.Services
                         );
                     }
 
+                    // ✅ P1修复: 防御性null检查，防止总结阶段返回null
+                    if (summary == null)
+                    {
+                        Log.Error("总结阶段返回null");
+                        throw new InvalidOperationException("AI总结响应为空");
+                    }
+
                     _chatHistory.Add(new BiaogPlugin.Services.ChatMessage
                     {
                         Role = "assistant",
-                        Content = summary.Content
+                        Content = summary.Content ?? ""  // ✅ P1修复: 防止Content为null
                     });
 
                     return new AssistantResponse
                     {
                         Success = true,
-                        Message = summary.Content,
-                        ToolCalls = agentDecision.ToolCalls.Select(tc => new AssistantToolCall
+                        Message = summary.Content ?? "",  // ✅ P1修复: 防止Content为null
+                        ToolCalls = agentDecision.ToolCalls?.Select(tc => new AssistantToolCall  // ✅ P1修复: 添加null条件运算符
                         {
                             Name = tc.Name,
                             Arguments = tc.Arguments
