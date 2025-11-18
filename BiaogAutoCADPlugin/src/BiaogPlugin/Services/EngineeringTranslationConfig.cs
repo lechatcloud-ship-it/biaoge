@@ -30,35 +30,55 @@ namespace BiaogPlugin.Services
         ///
         /// 用户反馈："所有翻译全部按照建筑工程行业的专业术语来翻译图纸"
         ///
-        /// 系统参数（极简配置）：
-        /// - DomainPrompt: ~16 tokens (建筑工程专业术语)
+        /// 系统参数（2025-11-18更新）：
+        /// - DomainPrompt: ~85 tokens (完整描述性段落，符合官方最佳实践)
         /// - Terms术语表: ~60 tokens (12条核心工程术语)
         /// - TM翻译记忆: ~80 tokens (4条核心翻译示例)
-        /// - 系统参数总计: ~156 tokens (比最初700少78%)
+        /// - 系统参数总计: ~225 tokens
         ///
         /// 可用空间计算：
         /// - 输入限制: 8192 tokens
-        /// - 系统参数: -156 tokens
+        /// - 系统参数: -225 tokens
         /// - 安全余量: -500 tokens
-        /// - 实际可用: 7536 tokens
+        /// - 实际可用: 7467 tokens
         ///
         /// Token估算：1字符 约等于 1 token
-        /// 最终设置: 7500字符（留36 tokens余量）
+        /// 最终设置: 7400字符（留67 tokens余量）
         /// </summary>
-        public const int MaxCharsPerBatch = 7500;  // 极简优化：系统参数156 tokens，实际可用7536 tokens
+        public const int MaxCharsPerBatch = 7400;  // 2025-11-18更新：系统参数225 tokens，实际可用7467 tokens
 
         /// <summary>
         /// 工程建筑领域提示词
         ///
-        /// ✅ P0紧急修复：根据阿里云百炼官方文档，domains应该是简短的领域提示
-        /// 官方文档：domains (optional): Domain hint string (English only) for contextual guidance
+        /// ✅ P0根本修复 2025-11-18：根据阿里云百炼官方文档和Qwen-MT最佳实践
+        /// domains应该是完整的**描述性段落**（而非指令式短语），说明领域上下文、术语类型和翻译风格
         ///
-        /// 用户最新反馈："所有翻译全部按照建筑工程行业的专业术语来翻译图纸"
-        /// 简洁指令：依赖大模型理解能力，不枚举具体示例
-        /// 估算：约16 tokens
+        /// 官方文档参考：
+        /// - https://qwenlm.github.io/blog/qwen-mt/
+        /// - https://help.aliyun.com/zh/model-studio/machine-translation
+        ///
+        /// **错误用法** (会导致提示词泄漏)：
+        /// "Engineering drawings. Use construction terminology. Translate: descriptions. Preserve: codes, numbers, units."
+        /// 问题：指令式命令，模型误认为是待翻译内容或输出指令
+        ///
+        /// **正确用法** (描述性自然语言段落)：
+        /// - 使用自然语言描述（非指令式）
+        /// - 说明文本来源领域
+        /// - 指出专业术语特征
+        /// - 强调风格要求
+        ///
+        /// 估算：约85 tokens
         /// </summary>
         public static readonly string DomainPrompt =
-            "Engineering drawings. Use construction terminology. Translate: descriptions. Preserve: codes, numbers, units.";
+            "This text is from construction and civil engineering drawings, including structural " +
+            "design specifications, architectural plans, MEP (mechanical, electrical, plumbing) " +
+            "systems, and building material specifications. The content involves professional " +
+            "engineering terminology following international standards (GB, ACI, AISC, ASHRAE, IBC). " +
+            "Pay attention to technical identifiers such as drawing numbers, material strength " +
+            "grades (e.g., C30 concrete, Q235 steel, HRB400 reinforcement), measurement units, " +
+            "axis references, and standard codes. Translate in a professional technical documentation " +
+            "style suitable for engineers and construction professionals, preserving all technical " +
+            "identifiers and formatting.";
 
         /// <summary>
         /// 不应翻译的术语/模式规则
