@@ -1055,7 +1055,7 @@ namespace BiaogPlugin
         /// 快捷命令：当AI助手无法弹出时使用此命令
         /// </summary>
         [CommandMethod("BIAOGE_RESET_AI", CommandFlags.Modal)]
-        public void ResetAIPanel()
+        public async void ResetAIPanel()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
             if (doc == null)
@@ -1072,11 +1072,13 @@ namespace BiaogPlugin
 
                 // 清理现有面板
                 PaletteManager.Cleanup();
-                System.Threading.Thread.Sleep(50);
+                // ✅ 使用Task.Delay替代Thread.Sleep，避免阻塞UI线程
+                await System.Threading.Tasks.Task.Delay(50);
 
                 // 重新初始化
                 PaletteManager.Initialize();
-                System.Threading.Thread.Sleep(50);
+                // ✅ 使用Task.Delay替代Thread.Sleep，避免阻塞UI线程
+                await System.Threading.Tasks.Task.Delay(50);
 
                 // 显示AI助手
                 PaletteManager.ShowAIPalette();
