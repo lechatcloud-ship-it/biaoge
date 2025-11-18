@@ -797,9 +797,31 @@ namespace BiaogPlugin.Services
                     var handleStr = item.GetString();
                     if (!string.IsNullOrEmpty(handleStr))
                     {
-                        var handle = new Handle(Convert.ToInt64(handleStr, 16));
-                        var objId = db.GetObjectId(false, handle, 0);
-                        result.Add(objId);
+                        try
+                        {
+                            var handle = new Handle(Convert.ToInt64(handleStr, 16));
+                            var objId = db.GetObjectId(false, handle, 0);
+
+                            // ✅ AutoCAD API最佳实践：验证ObjectId有效性
+                            if (objId.IsNull || !objId.IsValid)
+                            {
+                                Log.Warning($"跳过无效ObjectId: Handle={handleStr}");
+                                continue;
+                            }
+
+                            // ✅ 检查对象是否已删除
+                            if (objId.IsErased)
+                            {
+                                Log.Warning($"跳过已删除ObjectId: Handle={handleStr}");
+                                continue;
+                            }
+
+                            result.Add(objId);
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning(ex, $"解析ObjectId失败: Handle={handleStr}");
+                        }
                     }
                 }
             }
