@@ -21,6 +21,30 @@ namespace BiaogPlugin
     /// </summary>
     public class Commands
     {
+        #region 常量定义
+
+        /// <summary>
+        /// 列表显示的最大项目数（用于结果展示）
+        /// </summary>
+        private const int MaxDisplayItems = 10;
+
+        /// <summary>
+        /// 历史记录显示的最大数量
+        /// </summary>
+        private const int MaxHistoryRecords = 20;
+
+        /// <summary>
+        /// UI延迟时间（毫秒）- 用于面板初始化
+        /// </summary>
+        private const int UIDelayMilliseconds = 50;
+
+        /// <summary>
+        /// 构件识别置信度阈值（70%）
+        /// </summary>
+        private const double ComponentRecognitionConfidenceThreshold = 0.7;
+
+        #endregion
+
         #region 初始化命令
 
         /// <summary>
@@ -619,8 +643,8 @@ namespace BiaogPlugin
                 ed.WriteMessage($"\n\n✅ 分析完成！识别了 {results.Count} 个构件：");
                 ed.WriteMessage("\n");
 
-                // 显示前10个结果
-                int displayCount = Math.Min(10, results.Count);
+                // 显示前N个结果
+                int displayCount = Math.Min(MaxDisplayItems, results.Count);
                 for (int i = 0; i < displayCount; i++)
                 {
                     var component = results[i];
@@ -1073,12 +1097,12 @@ namespace BiaogPlugin
                 // 清理现有面板
                 PaletteManager.Cleanup();
                 // ✅ 使用Task.Delay替代Thread.Sleep，避免阻塞UI线程
-                await System.Threading.Tasks.Task.Delay(50);
+                await System.Threading.Tasks.Task.Delay(UIDelayMilliseconds);
 
                 // 重新初始化
                 PaletteManager.Initialize();
                 // ✅ 使用Task.Delay替代Thread.Sleep，避免阻塞UI线程
-                await System.Threading.Tasks.Task.Delay(50);
+                await System.Threading.Tasks.Task.Delay(UIDelayMilliseconds);
 
                 // 显示AI助手
                 PaletteManager.ShowAIPalette();
@@ -1751,11 +1775,11 @@ namespace BiaogPlugin
                     ed.WriteMessage($"\n  {group.Key}: {group.Count()} 个文本");
                 }
 
-                // ===== 4. 按图层统计（Top 10） =====
-                ed.WriteMessage("\n\n【按图层统计 (Top 10)】");
+                // ===== 4. 按图层统计（Top N） =====
+                ed.WriteMessage($"\n\n【按图层统计 (Top {MaxDisplayItems})】");
                 var layerGroups = allTexts.GroupBy(t => t.Layer)
                     .OrderByDescending(g => g.Count())
-                    .Take(10);
+                    .Take(MaxDisplayItems);
 
                 foreach (var group in layerGroups)
                 {
@@ -2087,9 +2111,9 @@ namespace BiaogPlugin
                 var recognizer = new ComponentRecognizer(bailianClient);
                 var results = await recognizer.RecognizeFromTextEntitiesAsync(textEntities, useAiVerification: false);
 
-                // 过滤低置信度（默认0.7）
-                results = results.Where(r => r.Confidence >= 0.7).ToList();
-                ed.WriteMessage($"\n识别到 {results.Count} 个构件（置信度≥70%）");
+                // 过滤低置信度
+                results = results.Where(r => r.Confidence >= ComponentRecognitionConfidenceThreshold).ToList();
+                ed.WriteMessage($"\n识别到 {results.Count} 个构件（置信度≥{ComponentRecognitionConfidenceThreshold:P0}）");
 
                 // 计算工程量
                 var calculator = new QuantityCalculator();
@@ -2216,15 +2240,15 @@ namespace BiaogPlugin
                     ed.WriteMessage($"\n  {group.Key,-20} × {group.Count(),4}");
                 }
 
-                ed.WriteMessage("\n\n【按图层统计（前10个）】");
-                foreach (var group in byLayer.Take(10))
+                ed.WriteMessage($"\n\n【按图层统计（前{MaxDisplayItems}个）】");
+                foreach (var group in byLayer.Take(MaxDisplayItems))
                 {
                     ed.WriteMessage($"\n  {group.Key,-20} × {group.Count(),4}");
                 }
 
-                if (byLayer.Count > 10)
+                if (byLayer.Count > MaxDisplayItems)
                 {
-                    ed.WriteMessage($"\n  ... 还有 {byLayer.Count - 10} 个图层");
+                    ed.WriteMessage($"\n  ... 还有 {byLayer.Count - MaxDisplayItems} 个图层");
                 }
 
                 ed.WriteMessage($"\n\n  总计: {texts.Count} 个文本实体");
@@ -2536,7 +2560,8 @@ namespace BiaogPlugin
 
                 // 显示最近的翻译记录供用户选择
                 ed.WriteMessage("\n最近的翻译记录:");
-                for (int i = 0; i < Math.Min(10, translateRecords.Count); i++)
+                int recordDisplayCount = Math.Min(MaxDisplayItems, translateRecords.Count);
+                for (int i = 0; i < recordDisplayCount; i++)
                 {
                     var record = translateRecords[i];
                     ed.WriteMessage($"\n{i + 1}. {record.Timestamp:MM-dd HH:mm:ss} - {record.OriginalText} → {record.TranslatedText}");
@@ -2547,7 +2572,7 @@ namespace BiaogPlugin
                     DefaultValue = 1,
                     AllowNone = false,
                     LowerLimit = 0,
-                    UpperLimit = Math.Min(10, translateRecords.Count)
+                    UpperLimit = recordDisplayCount
                 };
 
                 var promptResult = ed.GetInteger(promptOptions);
