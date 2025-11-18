@@ -10,7 +10,12 @@ namespace BiaogPlugin.Services
     public static class EngineeringTranslationConfig
     {
         /// <summary>
-        /// Qwen-MT-Flash专用翻译模型的Token限制（2025最新官方规格）
+        /// Qwen-MT-Flash专用翻译模型的Token限制（实际API规格）
+        ///
+        /// ✅ 用户确认的正确规格 (2025-11-18):
+        /// - 上下文长度: 16K tokens（输入+输出）
+        /// - 最大输入: 8K tokens
+        /// - 最大输出: 8K tokens
         /// </summary>
         public const int MaxInputTokens = 8192;   // qwen-mt-flash输入限制
         public const int MaxOutputTokens = 8192;  // qwen-mt-flash输出限制
@@ -18,34 +23,31 @@ namespace BiaogPlugin.Services
         /// <summary>
         /// 单次翻译的最大字符数
         ///
-        /// ✅ P0修复：修正为qwen-mt-flash实际限制（8K上下文，NOT 1M）
-        /// qwen-mt-flash性能参数（官方文档）：
-        /// - 最大输入长度: 8192 tokens
-        /// - 最大输出长度: 8192 tokens
-        /// - 总上下文: 16384 tokens
+        /// ✅ 用户确认的正确规格 (2025-11-18):
+        /// qwen-mt-flash实际性能参数：
+        /// - 上下文长度: 16K tokens（输入+输出）
+        /// - 最大输入: 8K tokens
+        /// - 最大输出: 8K tokens
         /// - RPM: 1000 QPS（单条并发）
-        /// - 成功率: 99.8%
         ///
-        /// 批次大小计算（2025-11-17 精简优化后）：
+        /// 批次大小计算（基于实际8K输入限制）：
         ///
-        /// 用户反馈："所有翻译全部按照建筑工程行业的专业术语来翻译图纸"
-        ///
-        /// 系统参数（2025-11-18更新）：
-        /// - DomainPrompt: ~85 tokens (完整描述性段落，符合官方最佳实践)
+        /// 系统参数（使用translation_options格式）：
+        /// - DomainPrompt: ~85 tokens (领域提示段落)
         /// - Terms术语表: ~60 tokens (12条核心工程术语)
         /// - TM翻译记忆: ~80 tokens (4条核心翻译示例)
         /// - 系统参数总计: ~225 tokens
         ///
         /// 可用空间计算：
-        /// - 输入限制: 8192 tokens
+        /// - 输入限制: 8,192 tokens
         /// - 系统参数: -225 tokens
-        /// - 安全余量: -500 tokens
-        /// - 实际可用: 7467 tokens
+        /// - 安全余量: -500 tokens (预留缓冲)
+        /// - 实际可用: 7,467 tokens
         ///
-        /// Token估算：1字符 约等于 1 token
-        /// 最终设置: 7400字符（留67 tokens余量）
+        /// Token估算：1字符 ≈ 1 token (中英文混合平均)
+        /// 最终设置: 7,400字符（安全余量67 tokens）
         /// </summary>
-        public const int MaxCharsPerBatch = 7400;  // 2025-11-18更新：系统参数225 tokens，实际可用7467 tokens
+        public const int MaxCharsPerBatch = 7400;  // 基于实际8K输入限制，系统参数225 tokens
 
         /// <summary>
         /// 工程建筑领域提示词

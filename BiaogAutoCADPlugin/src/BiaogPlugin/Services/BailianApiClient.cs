@@ -33,7 +33,19 @@ public class BailianApiClient
     private readonly ConfigManager _configManager;
     private string? _apiKey;
 
-    // API端点 - 统一使用 OpenAI 兼容模式（2025官方推荐）
+    // ===== API端点配置 =====
+    //
+    // ✅ 统一使用 OpenAI 兼容模式（2025官方推荐）
+    //
+    // 说明：阿里云百炼支持在OpenAI兼容端点中使用专用翻译参数：
+    // - 对话/Agent/Vision: 使用标准OpenAI格式 (messages数组)
+    // - 翻译: 使用OpenAI格式 + translation_options扩展参数
+    //
+    // 这种统一端点的方式简化了客户端实现，无需维护多个端点。
+    // 阿里云会根据请求中是否包含 translation_options 自动路由到翻译引擎。
+    //
+    // 注：官方也提供专用翻译端点 /api/v1/services/translation/translate
+    //     但使用不同的请求格式 (input对象而非messages数组)
     private const string ChatCompletionEndpoint = "/compatible-mode/v1/chat/completions";
 
     // 重试配置（阿里云官方推荐）
@@ -1190,32 +1202,39 @@ public class BailianApiClient
 
             Log.Information($"文本已分段：总计{segments.Count}段");
 
-            // ✅ 逐段翻译
-            var translatedSegments = new List<string>();
-            for (int i = 0; i < segments.Count; i++)
+            // ✅ 并行翻译（提升性能，避免太慢）
+            // 使用SemaphoreSlim控制并发数，避免触发API限流
+            var translatedSegments = new string[segments.Count];
+            using var semaphore = new SemaphoreSlim(5); // 最多5个并发请求
+
+            var tasks = segments.Select(async (segment, index) =>
             {
-                Log.Debug($"翻译第{i + 1}/{segments.Count}段 (长度:{segments[i].Length}字符)");
-
-                var translated = await TranslateAsync(
-                    segments[i],
-                    targetLanguage,
-                    model,
-                    sourceLanguage,
-                    cancellationToken
-                );
-
-                translatedSegments.Add(translated);
-
-                // ✅ 避免触发API限流，段间延迟100ms
-                if (i < segments.Count - 1)
+                await semaphore.WaitAsync(cancellationToken);
+                try
                 {
-                    await Task.Delay(100, cancellationToken);
+                    Log.Debug($"翻译第{index + 1}/{segments.Count}段 (长度:{segment.Length}字符)");
+
+                    var translated = await TranslateAsync(
+                        segment,
+                        targetLanguage,
+                        model,
+                        sourceLanguage,
+                        cancellationToken
+                    );
+
+                    translatedSegments[index] = translated;
                 }
-            }
+                finally
+                {
+                    semaphore.Release();
+                }
+            }).ToList();
+
+            await Task.WhenAll(tasks);
 
             // ✅ 合并翻译结果
             var result = string.Join("\n", translatedSegments);
-            Log.Information($"分段翻译完成：{segments.Count}段 → {result.Length}字符");
+            Log.Information($"分段翻译完成：{segments.Count}段 → {result.Length}字符（并行翻译）");
 
             return result;
         }
