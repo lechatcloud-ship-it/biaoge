@@ -1913,7 +1913,13 @@ namespace BiaogPlugin
                 options.Keywords.Default = "N";
 
                 var result = ed.GetKeywords(options);
-                if (result.Status == PromptStatus.OK && result.StringResult == "Y")
+                if (result.Status != PromptStatus.OK)
+                {
+                    ed.WriteMessage("\n操作已取消。");
+                    return;
+                }
+
+                if (result.StringResult == "Y")
                 {
                     var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
                     var reportPath = System.IO.Path.Combine(desktopPath, $"BiaogPlugin_Performance_{DateTime.Now:yyyyMMdd_HHmmss}.txt");
@@ -1927,6 +1933,10 @@ namespace BiaogPlugin
 
                     System.IO.File.WriteAllText(reportPath, fullReport);
                     ed.WriteMessage($"\n性能报告已保存到: {reportPath}");
+                }
+                else
+                {
+                    ed.WriteMessage("\n未保存报告。");
                 }
 
                 Log.Information("显示性能报告");
@@ -2768,9 +2778,16 @@ namespace BiaogPlugin
                 useAIOptions.Keywords.Default = "手动";
 
                 var useAIResult = ed.GetKeywords(useAIOptions);
+
+                if (useAIResult.Status != PromptStatus.OK)
+                {
+                    ed.WriteMessage("\n操作已取消。");
+                    return;
+                }
+
                 string replaceText = "";
 
-                if (useAIResult.Status == PromptStatus.OK && useAIResult.StringResult == "是")
+                if (useAIResult.StringResult == "是")
                 {
                     // 使用AI建议
                     ed.WriteMessage("\n正在使用AI分析并建议替换内容...");
@@ -2820,6 +2837,7 @@ namespace BiaogPlugin
                         }
                         else
                         {
+                            ed.WriteMessage("\n操作已取消。");
                             return;
                         }
                     }

@@ -405,7 +405,11 @@ namespace BiaogPlugin.Extensions
             try
             {
                 PromptSelectionResult selResult = ed.SelectImplied();
-                if (selResult.Status != PromptStatus.OK) return;
+                if (selResult.Status != PromptStatus.OK)
+                {
+                    // SelectImplied失败通常意味着没有选择对象，静默返回即可
+                    return;
+                }
 
                 var texts = new List<string>();
 
@@ -462,7 +466,11 @@ namespace BiaogPlugin.Extensions
             try
             {
                 PromptSelectionResult selResult = ed.SelectImplied();
-                if (selResult.Status != PromptStatus.OK) return;
+                if (selResult.Status != PromptStatus.OK)
+                {
+                    // SelectImplied失败通常意味着没有选择对象，静默返回即可
+                    return;
+                }
 
                 using (var tr = db.TransactionManager.StartTransaction())
                 {
