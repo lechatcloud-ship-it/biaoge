@@ -2075,6 +2075,13 @@ namespace BiaogPlugin
 
                 // 识别构件
                 var bailianClient = ServiceLocator.GetService<BailianApiClient>();
+                if (bailianClient == null)
+                {
+                    ed.WriteMessage("\n[错误] 百炼API客户端未初始化");
+                    Log.Error("ServiceLocator.GetService<BailianApiClient>() 返回null");
+                    return;
+                }
+
                 var recognizer = new ComponentRecognizer(bailianClient);
                 var results = await recognizer.RecognizeFromTextEntitiesAsync(textEntities, useAiVerification: false);
 
@@ -2145,6 +2152,13 @@ namespace BiaogPlugin
 
                 // 识别构件（不使用AI）
                 var bailianClient = ServiceLocator.GetService<BailianApiClient>();
+                if (bailianClient == null)
+                {
+                    ed.WriteMessage("\n[错误] 百炼API客户端未初始化");
+                    Log.Error("ServiceLocator.GetService<BailianApiClient>() 返回null");
+                    return;
+                }
+
                 var recognizer = new ComponentRecognizer(bailianClient);
                 var results = await recognizer.RecognizeFromTextEntitiesAsync(textEntities, useAiVerification: false);
 
