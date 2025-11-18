@@ -235,7 +235,8 @@ namespace BiaogPlugin.Services
         public static async Task<TranslationStatistics> TranslateLayerTexts(
             List<string> layerNames,
             string targetLanguage,
-            IProgress<TranslationProgress>? progress = null)
+            IProgress<TranslationProgress>? progress = null,
+            System.Threading.CancellationToken cancellationToken = default)
         {
             try
             {
@@ -277,7 +278,7 @@ namespace BiaogPlugin.Services
                     textEntities.Select(t => t.Content).ToList(),
                     targetLanguage,
                     apiProgress,
-                    System.Threading.CancellationToken.None
+                    cancellationToken
                 );
 
                 // 3. 更新DWG - 构建更新请求
@@ -286,6 +287,8 @@ namespace BiaogPlugin.Services
 
                 for (int i = 0; i < textEntities.Count && i < translations.Count; i++)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     if (!string.IsNullOrEmpty(translations[i]))
                     {
                         updateRequests.Add(new TextUpdateRequest
@@ -308,6 +311,8 @@ namespace BiaogPlugin.Services
                         var historyRecords = new List<TranslationHistory.HistoryRecord>();
                         for (int i = 0; i < textEntities.Count && i < translations.Count; i++)
                         {
+                            cancellationToken.ThrowIfCancellationRequested();
+
                             if (!string.IsNullOrEmpty(translations[i]))
                             {
                                 historyRecords.Add(new TranslationHistory.HistoryRecord
