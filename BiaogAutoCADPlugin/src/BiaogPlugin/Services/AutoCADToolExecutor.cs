@@ -797,9 +797,31 @@ namespace BiaogPlugin.Services
                     var handleStr = item.GetString();
                     if (!string.IsNullOrEmpty(handleStr))
                     {
-                        var handle = new Handle(Convert.ToInt64(handleStr, 16));
-                        var objId = db.GetObjectId(false, handle, 0);
-                        result.Add(objId);
+                        try
+                        {
+                            var handle = new Handle(Convert.ToInt64(handleStr, 16));
+                            var objId = db.GetObjectId(false, handle, 0);
+
+                            // ✅ AutoCAD API最佳实践：验证ObjectId有效性
+                            if (objId.IsNull || !objId.IsValid)
+                            {
+                                Log.Warning($"跳过无效ObjectId: Handle={handleStr}");
+                                continue;
+                            }
+
+                            // ✅ 检查对象是否已删除
+                            if (objId.IsErased)
+                            {
+                                Log.Warning($"跳过已删除ObjectId: Handle={handleStr}");
+                                continue;
+                            }
+
+                            result.Add(objId);
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning(ex, $"解析ObjectId失败: Handle={handleStr}");
+                        }
                     }
                 }
             }
@@ -919,11 +941,14 @@ namespace BiaogPlugin.Services
                             }
                             else if (entity is Region region)
                             {
-                                // Region使用GeometricExtents估算面积
-                                var bounds = region.GeometricExtents;
-                                double length = bounds.MaxPoint.X - bounds.MinPoint.X;
-                                double width = bounds.MaxPoint.Y - bounds.MinPoint.Y;
-                                totalArea += length * width;
+                                // ✅ AutoCAD API最佳实践：使用Region.AreaProperties获取真实面积
+                                // 参考：https://help.autodesk.com/view/OARX/2025/ENU/?guid=OARX-ManagedRefGuide-Autodesk_AutoCAD_DatabaseServices_Region_AreaProperties
+                                Point3d origin = Point3d.Origin;
+                                Vector3d xAxis = Vector3d.XAxis;
+                                Vector3d yAxis = Vector3d.YAxis;
+
+                                var areaProps = region.AreaProperties(ref origin, ref xAxis, ref yAxis);
+                                totalArea += Math.Abs(areaProps.Area);  // ✅ 真实面积，非边界框
                                 count++;
                             }
                         }

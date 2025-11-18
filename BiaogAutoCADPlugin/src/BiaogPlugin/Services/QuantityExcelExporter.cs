@@ -155,11 +155,30 @@ namespace BiaogPlugin.Services
 
                 // 小计行
                 var subtotalRow = row;
-                worksheet.Cells[subtotalRow, 1, subtotalRow, 4].Merge = true;
+                worksheet.Cells[subtotalRow, 1, subtotalRow, 3].Merge = true;
                 worksheet.Cells[subtotalRow, 1].Value = $"小计（{group.Key}）";
                 worksheet.Cells[subtotalRow, 1].Style.Font.Bold = true;
-                worksheet.Cells[subtotalRow, 5].Value = subtotalArea + subtotalVolume;  // 工程量小计（面积+体积）
-                worksheet.Cells[subtotalRow, 9].Value = subtotalFormwork;               // 模板小计
+
+                // ✅ GB 50854-2013修复：按计量单位正确汇总，不混合m²和m³
+                string measurementUnit = GBProjectCodeGenerator.GetMeasurementUnit(group.Key);
+                worksheet.Cells[subtotalRow, 4].Value = measurementUnit;  // 显示单位
+
+                double subtotal = 0;
+                if (measurementUnit == "m³")
+                {
+                    subtotal = subtotalVolume;  // 只汇总体积
+                }
+                else if (measurementUnit == "m²")
+                {
+                    subtotal = subtotalArea;  // 只汇总面积
+                }
+                else if (measurementUnit == "t")
+                {
+                    subtotal = group.Sum(c => c.SteelWeight / 1000);  // 钢筋重量（kg→t）
+                }
+
+                worksheet.Cells[subtotalRow, 5].Value = subtotal;  // 工程量小计（单位统一）
+                worksheet.Cells[subtotalRow, 9].Value = subtotalFormwork;  // 模板小计
                 worksheet.Cells[subtotalRow, 5].Style.Numberformat.Format = "0.00";
                 worksheet.Cells[subtotalRow, 9].Style.Numberformat.Format = "0.00";
                 worksheet.Cells[subtotalRow, 1, subtotalRow, headers.Length].Style.Fill.PatternType = ExcelFillStyle.Solid;
@@ -168,18 +187,82 @@ namespace BiaogPlugin.Services
             }
 
             // ===== 总计行 =====
+            // ✅ GB 50854-2013修复：分行显示不同单位的汇总（不混合m²、m³、t）
             var totalRow = row;
-            worksheet.Cells[totalRow, 1, totalRow, 4].Merge = true;
-            worksheet.Cells[totalRow, 1].Value = "总计";
+
+            // 总计标题行
+            worksheet.Cells[totalRow, 1, totalRow, headers.Length].Merge = true;
+            worksheet.Cells[totalRow, 1].Value = "━━━━━ 总 计 ━━━━━";
             worksheet.Cells[totalRow, 1].Style.Font.Bold = true;
             worksheet.Cells[totalRow, 1].Style.Font.Size = 12;
-            double totalQuantity = components.Sum(c => c.Area) + components.Sum(c => c.Volume);
-            worksheet.Cells[totalRow, 5].Value = totalQuantity;                         // 总工程量
-            worksheet.Cells[totalRow, 9].Value = components.Sum(c => c.FormworkArea);   // 总模板
-            worksheet.Cells[totalRow, 5].Style.Numberformat.Format = "0.00";
-            worksheet.Cells[totalRow, 9].Style.Numberformat.Format = "0.00";
+            worksheet.Cells[totalRow, 1].Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
             worksheet.Cells[totalRow, 1, totalRow, headers.Length].Style.Fill.PatternType = ExcelFillStyle.Solid;
             worksheet.Cells[totalRow, 1, totalRow, headers.Length].Style.Fill.BackgroundColor.SetColor(Color.Orange);
+            row++;
+
+            // 混凝土总计（m³）
+            double totalConcrete = components.Where(c => c.Volume > 0 && !c.Type.Contains("钢筋")).Sum(c => c.Volume);
+            if (totalConcrete > 0)
+            {
+                worksheet.Cells[row, 1, row, 2].Merge = true;
+                worksheet.Cells[row, 1].Value = "混凝土构件";
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 3].Value = "（柱、梁、板、墙等）";
+                worksheet.Cells[row, 4].Value = "m³";
+                worksheet.Cells[row, 5].Value = totalConcrete;
+                worksheet.Cells[row, 5].Style.Numberformat.Format = "0.00";
+                worksheet.Cells[row, 1, row, headers.Length].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                worksheet.Cells[row, 1, row, headers.Length].Style.Fill.BackgroundColor.SetColor(Color.LightGoldenrodYellow);
+                row++;
+            }
+
+            // 模板总计（m²）
+            double totalFormwork = components.Sum(c => c.FormworkArea);
+            if (totalFormwork > 0)
+            {
+                worksheet.Cells[row, 1, row, 2].Merge = true;
+                worksheet.Cells[row, 1].Value = "模板";
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 3].Value = "（混凝土构件模板）";
+                worksheet.Cells[row, 4].Value = "m²";
+                worksheet.Cells[row, 5].Value = totalFormwork;
+                worksheet.Cells[row, 5].Style.Numberformat.Format = "0.00";
+                worksheet.Cells[row, 1, row, headers.Length].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                worksheet.Cells[row, 1, row, headers.Length].Style.Fill.BackgroundColor.SetColor(Color.LightGoldenrodYellow);
+                row++;
+            }
+
+            // 钢筋总计（t）
+            double totalSteel = components.Where(c => c.SteelWeight > 0).Sum(c => c.SteelWeight / 1000);
+            if (totalSteel > 0)
+            {
+                worksheet.Cells[row, 1, row, 2].Merge = true;
+                worksheet.Cells[row, 1].Value = "钢筋";
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 3].Value = "（详见钢筋明细表）";
+                worksheet.Cells[row, 4].Value = "t";
+                worksheet.Cells[row, 5].Value = totalSteel;
+                worksheet.Cells[row, 5].Style.Numberformat.Format = "0.000";
+                worksheet.Cells[row, 1, row, headers.Length].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                worksheet.Cells[row, 1, row, headers.Length].Style.Fill.BackgroundColor.SetColor(Color.LightGoldenrodYellow);
+                row++;
+            }
+
+            // 其他面积类（m²）
+            double totalArea = components.Where(c => c.Area > 0 && c.Volume == 0 && c.FormworkArea == 0).Sum(c => c.Area);
+            if (totalArea > 0)
+            {
+                worksheet.Cells[row, 1, row, 2].Merge = true;
+                worksheet.Cells[row, 1].Value = "其他面积类";
+                worksheet.Cells[row, 1].Style.Font.Bold = true;
+                worksheet.Cells[row, 3].Value = "（门窗、装饰等）";
+                worksheet.Cells[row, 4].Value = "m²";
+                worksheet.Cells[row, 5].Value = totalArea;
+                worksheet.Cells[row, 5].Style.Numberformat.Format = "0.00";
+                worksheet.Cells[row, 1, row, headers.Length].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                worksheet.Cells[row, 1, row, headers.Length].Style.Fill.BackgroundColor.SetColor(Color.LightGoldenrodYellow);
+                row++;
+            }
 
             // 自动调整列宽
             worksheet.Cells.AutoFitColumns();
