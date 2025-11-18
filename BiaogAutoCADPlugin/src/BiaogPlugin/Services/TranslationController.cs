@@ -83,11 +83,19 @@ namespace BiaogPlugin.Services
                         // bindXRefs参数：是否自动绑定外部引用（默认true，确保外部文本可翻译）
                         unlockRecord = DwgUnlockService.UnlockDrawingForTranslation(bindXRefs: xrefCount > 0);
 
-                        if (xrefCount > 0 && unlockRecord.BoundXRefs.Count > 0)
+                        if (unlockRecord == null)
                         {
-                            ed.WriteMessage($"\n✅ 已绑定 {unlockRecord.BoundXRefs.Count} 个外部引用为本地块");
+                            Log.Warning("解锁服务返回null，跳过解锁报告");
+                            ed.WriteMessage("\n⚠️ 解锁服务未返回结果");
                         }
-                        ed.WriteMessage($"\n✅ 图纸解锁完成: {unlockRecord.UnlockedLayers.Count}个图层已解锁");
+                        else
+                        {
+                            if (xrefCount > 0 && unlockRecord.BoundXRefs.Count > 0)
+                            {
+                                ed.WriteMessage($"\n✅ 已绑定 {unlockRecord.BoundXRefs.Count} 个外部引用为本地块");
+                            }
+                            ed.WriteMessage($"\n✅ 图纸解锁完成: {unlockRecord.UnlockedLayers.Count}个图层已解锁");
+                        }
                     }
                     else
                     {
@@ -215,6 +223,14 @@ namespace BiaogPlugin.Services
                         CancellationToken.None
                     );
 
+                    // 防御性验证：确保返回结果数量正确
+                    if (translations.Count != uncachedTexts.Count)
+                    {
+                        var errorMsg = $"翻译结果数量不匹配: 期望{uncachedTexts.Count}, 实际{translations.Count}";
+                        Log.Error(errorMsg);
+                        throw new InvalidOperationException(errorMsg);
+                    }
+
                     // 添加到翻译映射
                     for (int i = 0; i < uncachedTexts.Count; i++)
                     {
@@ -257,7 +273,7 @@ namespace BiaogPlugin.Services
                 ed.WriteMessage($"\n○ 跳过: {updateResult.SkippedCount}");
 
                 // 记录翻译历史
-                if (_configManager != null && _configManager.Config.Translation.EnableHistory)
+                if (_configManager.Config.Translation.EnableHistory)
                 {
                     var history = ServiceLocator.GetService<TranslationHistory>();
                     if (history != null && updateResult.SuccessCount > 0)
@@ -325,15 +341,8 @@ namespace BiaogPlugin.Services
             string targetLanguage,
             IProgress<TranslationProgress>? progress = null)
         {
-            // 与TranslateCurrentDrawing类似，但只处理选定的文本
-            var statistics = new TranslationStatistics
-            {
-                TotalTextCount = selectedTexts.Count
-            };
-
-            // TODO: 实现选定文本翻译逻辑
-
-            return statistics;
+            throw new NotImplementedException(
+                "选定文本翻译功能尚未实现。请使用全图翻译命令（BIAOGE_TRANSLATE_ZH 或 BIAOGE_TRANSLATE_EN）");
         }
 
         /// <summary>
@@ -344,16 +353,8 @@ namespace BiaogPlugin.Services
             string targetLanguage,
             IProgress<TranslationProgress>? progress = null)
         {
-            var layerTexts = _extractor.ExtractTextByLayer(layerName);
-
-            var statistics = new TranslationStatistics
-            {
-                TotalTextCount = layerTexts.Count
-            };
-
-            // TODO: 实现图层翻译逻辑
-
-            return statistics;
+            throw new NotImplementedException(
+                "图层翻译功能尚未实现。请使用全图翻译命令（BIAOGE_TRANSLATE_ZH 或 BIAOGE_TRANSLATE_EN）");
         }
 
         /// <summary>
@@ -363,11 +364,8 @@ namespace BiaogPlugin.Services
             List<string> texts,
             string targetLanguage)
         {
-            var translationMap = new Dictionary<string, string>();
-
-            // TODO: 实现预览逻辑
-
-            return translationMap;
+            throw new NotImplementedException(
+                "翻译预览功能尚未实现。请使用实际翻译命令进行测试");
         }
     }
 }
