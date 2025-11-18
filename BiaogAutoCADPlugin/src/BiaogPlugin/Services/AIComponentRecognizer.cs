@@ -96,9 +96,10 @@ public class AIComponentRecognizer
         // ===== Step 2: VL模型验证（仅低置信度项） =====
         if (precision >= CalculationPrecision.Budget && snapshot != null)
         {
-            // 筛选低置信度构件（<0.8）
+            // ✅ P0修复: 提高AI验证阈值到0.9，确保规则引擎0.85置信度的构件也能被AI验证
+            // 原阈值0.8过低，导致大部分构件跳过AI验证，用户报告"AI验证率0%"
             var lowConfidence = results
-                .Where(r => r.Confidence < 0.8)
+                .Where(r => r.Confidence < 0.9)
                 .ToList();
 
             if (lowConfidence.Count > 0)
