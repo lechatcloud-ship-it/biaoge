@@ -747,7 +747,8 @@ public class BailianApiClient
 
         // ✅ 处理正常长度的文本（原批量翻译逻辑）
         // 并发控制 - 限制同时进行的请求数量（避免触发限流）
-        var semaphore = new SemaphoreSlim(10); // 最多10个并发请求
+        // ⚠️ 重要：SemaphoreSlim必须在所有tasks完成后Dispose（在finally块中）
+        using var semaphore = new SemaphoreSlim(10); // 最多10个并发请求
 
         for (int i = 0; i < normalTexts.Count; i++)
         {
