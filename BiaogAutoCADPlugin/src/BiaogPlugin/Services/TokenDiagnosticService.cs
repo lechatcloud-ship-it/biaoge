@@ -16,6 +16,15 @@ namespace BiaogPlugin.Services
     public class TokenDiagnosticService
     {
         /// <summary>
+        /// 共享HttpClient实例 - 防止Socket耗尽
+        /// </summary>
+        /// <remarks>
+        /// HttpClient设计为单例使用，避免每次请求创建新实例导致socket耗尽。
+        /// 参考：https://aspnetmonsters.com/2016/08/2016-08-27-httpclientwrong/
+        /// </remarks>
+        private static readonly HttpClient _sharedHttpClient = new HttpClient();
+
+        /// <summary>
         /// Token使用报告
         /// </summary>
         public class TokenUsageReport
@@ -86,15 +95,14 @@ namespace BiaogPlugin.Services
                     throw new InvalidOperationException("API密钥未配置");
                 }
 
-                // 发送请求
-                var httpClient = new HttpClient();
+                // 发送请求（使用共享HttpClient）
                 var httpRequest = new HttpRequestMessage(HttpMethod.Post, "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions")
                 {
                     Content = JsonContent.Create(requestBody)
                 };
                 httpRequest.Headers.Add("Authorization", $"Bearer {apiKey}");
 
-                var response = await httpClient.SendAsync(httpRequest);
+                var response = await _sharedHttpClient.SendAsync(httpRequest);
                 var responseJson = await response.Content.ReadAsStringAsync();
 
                 Log.Debug($"Token诊断响应: {responseJson}");
@@ -183,15 +191,13 @@ namespace BiaogPlugin.Services
                     }
                 };
 
-                var httpClient = new HttpClient();
-
-                // 请求1
+                // 请求1（使用共享HttpClient）
                 var req1 = new HttpRequestMessage(HttpMethod.Post, "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions")
                 {
                     Content = JsonContent.Create(requestWith)
                 };
                 req1.Headers.Add("Authorization", $"Bearer {apiKey}");
-                var resp1 = await httpClient.SendAsync(req1);
+                var resp1 = await _sharedHttpClient.SendAsync(req1);
                 var json1 = await resp1.Content.ReadAsStringAsync();
                 var tokens1 = ExtractPromptTokens(json1);
 
@@ -201,7 +207,7 @@ namespace BiaogPlugin.Services
                     Content = JsonContent.Create(requestWithout)
                 };
                 req2.Headers.Add("Authorization", $"Bearer {apiKey}");
-                var resp2 = await httpClient.SendAsync(req2);
+                var resp2 = await _sharedHttpClient.SendAsync(req2);
                 var json2 = await resp2.Content.ReadAsStringAsync();
                 var tokens2 = ExtractPromptTokens(json2);
 
