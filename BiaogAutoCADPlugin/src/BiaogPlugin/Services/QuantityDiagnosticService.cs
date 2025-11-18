@@ -35,7 +35,7 @@ namespace BiaogPlugin.Services
         /// <summary>
         /// 运行完整的算量诊断并生成详细报告
         /// </summary>
-        public string RunFullDiagnostic()
+        public async System.Threading.Tasks.Task<string> RunFullDiagnostic()
         {
             var report = new StringBuilder();
             report.AppendLine("╔═══════════════════════════════════════════════════════════════╗");
@@ -188,7 +188,8 @@ namespace BiaogPlugin.Services
             List<ComponentRecognitionResult> components;
             try
             {
-                components = _componentRecognizer.RecognizeFromTextEntitiesAsync(textEntities, useAiVerification: false).Result;
+                // ✅ 使用await替代.Result，避免死锁风险
+                components = await _componentRecognizer.RecognizeFromTextEntitiesAsync(textEntities, useAiVerification: false);
                 report.AppendLine($"✅ 识别到构件总数: {components.Count}个");
                 report.AppendLine();
 

@@ -3151,7 +3151,7 @@ namespace BiaogPlugin
         /// - 验证算量功能是否正常工作
         /// </summary>
         [CommandMethod("BIAOGE_DIAGNOSE_QUANTITY", CommandFlags.Modal)]
-        public void DiagnoseQuantityCalculation()
+        public async void DiagnoseQuantityCalculation()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
             if (doc == null)
@@ -3172,7 +3172,7 @@ namespace BiaogPlugin
 
                 // 运行诊断
                 var diagnosticService = new QuantityDiagnosticService();
-                var report = diagnosticService.RunFullDiagnostic();
+                var report = await diagnosticService.RunFullDiagnostic();
 
                 // 显示报告
                 ed.WriteMessage("\n" + report);
