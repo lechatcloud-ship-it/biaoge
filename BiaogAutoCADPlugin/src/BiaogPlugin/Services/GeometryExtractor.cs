@@ -264,21 +264,18 @@ namespace BiaogPlugin.Services
                     return null;
                 }
 
-                // ✅ 使用Shoelace公式计算闭合多段线面积
-                // 注意：需要Transaction来访问顶点，但当前方法没有Transaction参数
-                // 解决方案：使用边界框估算（简化处理）
+                // ✅ 使用边界框估算面积（简化处理）
+                // 注意：Polyline2d没有Area属性，需要Transaction访问顶点才能用Shoelace公式
+                // 这里使用边界框估算，对于规则矩形区域误差较小
                 var bounds = polyline2d.GeometricExtents;
-                double area = (bounds.MaxPoint.X - bounds.MinPoint.X) * (bounds.MaxPoint.Y - bounds.MinPoint.Y);
+                double length = bounds.MaxPoint.X - bounds.MinPoint.X;
+                double width = bounds.MaxPoint.Y - bounds.MinPoint.Y;
+                double area = length * width;
 
                 if (area < 1e-6)
                 {
                     return null;
                 }
-
-                // 获取边界框
-                var bounds = polyline2d.GeometricExtents;
-                double length = bounds.MaxPoint.X - bounds.MinPoint.X;
-                double width = bounds.MaxPoint.Y - bounds.MinPoint.Y;
 
                 // 计算质心（简化：使用边界框中心）
                 Point3d centroid = new Point3d(

@@ -273,33 +273,34 @@ namespace BiaogPlugin.Services
         }
 
         /// <summary>
-        /// 判断两个构件是否在空间上相关（简化判断）
+        /// 判断两个构件是否在空间上相关（修正版）
         ///
-        /// 判断依据：
-        /// 1. 同一图层（优先）
-        /// 2. 位置接近（距离<5m）
-        /// 3. Z坐标相近（高程差<1m）
+        /// ❌ 修复前错误：同一图层直接返回true（1层和10层的柱子可能在同一图层，但相距很远！）
+        /// ✅ 修复后正确：同一图层 AND 距离接近才返回true
         ///
-        /// 注意：这是简化判断，完整实现需要3D几何相交检测
+        /// 判断依据（优先级从高到低）：
+        /// 1. 同一图层 AND 平面距离<5m（大部分情况）
+        /// 2. 不同图层 BUT 距离很近(<2m) AND Z坐标相近(<1m)（跨图层扣减）
+        ///
+        /// 注意：这是简化判断，完整实现需要3D几何相交检测（Bounding Box Intersection）
         /// </summary>
         private bool IsSpatiallyRelated(ComponentRecognitionResult c1, ComponentRecognitionResult c2)
         {
-            // 简化判断1：同一图层
-            if (c1.Layer == c2.Layer)
-            {
-                return true;
-            }
-
-            // 简化判断2：位置接近（平面距离<5m）
+            // 预先计算距离和高程差（避免重复计算）
             double distance = c1.Position.DistanceTo(c2.Position);
-            if (distance < 5.0)
+            double zDiff = Math.Abs(c1.Position.Z - c2.Position.Z);
+
+            // 判断1：同一图层 AND 距离接近（优先判断，覆盖大部分情况）
+            // 原理：同一楼层的构件通常在同一图层，且距离较近
+            if (c1.Layer == c2.Layer && distance < 5.0)
             {
                 return true;
             }
 
-            // 简化判断3：Z坐标相近（高程差<1m）
-            double zDiff = Math.Abs(c1.Position.Z - c2.Position.Z);
-            if (zDiff < 1.0 && distance < 20.0)
+            // 判断2：不同图层 BUT 距离很近 AND Z坐标相近（跨图层扣减）
+            // 原理：某些情况下构件在不同图层，但实际上在空间中相交（例如跨图层的板和柱）
+            // 使用更严格的条件：距离<2m（而非5m），确保只捕获真正相交的情况
+            if (distance < 2.0 && zDiff < 1.0)
             {
                 return true;
             }
