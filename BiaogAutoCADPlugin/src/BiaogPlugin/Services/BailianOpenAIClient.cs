@@ -252,10 +252,18 @@ public class BailianOpenAIClient
                     // 累积函数参数
                     if (toolCallUpdate.FunctionArgumentsUpdate != null)
                     {
-                        var argsText = toolCallUpdate.FunctionArgumentsUpdate.ToString();
-                        if (!string.IsNullOrEmpty(argsText))
+                        try
                         {
-                            accumulator.FunctionArguments.Append(argsText);
+                            // ✅ BinaryData安全转换：优先使用ToString()，失败则跳过
+                            var argsText = toolCallUpdate.FunctionArgumentsUpdate.ToString();
+                            if (!string.IsNullOrEmpty(argsText))
+                            {
+                                accumulator.FunctionArguments.Append(argsText);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Log.Warning(ex, "解析FunctionArgumentsUpdate失败，跳过此片段");
                         }
                     }
 
