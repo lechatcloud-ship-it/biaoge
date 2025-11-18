@@ -165,6 +165,7 @@ namespace BiaogPlugin.Extensions
                 var selection = ed.SelectImplied();
                 if (selection.Status != PromptStatus.OK)
                 {
+                    // SelectImplied失败通常意味着没有选择对象，静默返回即可（事件处理器）
                     return;
                 }
 
