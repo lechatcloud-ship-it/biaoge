@@ -941,11 +941,14 @@ namespace BiaogPlugin.Services
                             }
                             else if (entity is Region region)
                             {
-                                // Region使用GeometricExtents估算面积
-                                var bounds = region.GeometricExtents;
-                                double length = bounds.MaxPoint.X - bounds.MinPoint.X;
-                                double width = bounds.MaxPoint.Y - bounds.MinPoint.Y;
-                                totalArea += length * width;
+                                // ✅ AutoCAD API最佳实践：使用Region.AreaProperties获取真实面积
+                                // 参考：https://help.autodesk.com/view/OARX/2025/ENU/?guid=OARX-ManagedRefGuide-Autodesk_AutoCAD_DatabaseServices_Region_AreaProperties
+                                Point3d origin = Point3d.Origin;
+                                Vector3d xAxis = Vector3d.XAxis;
+                                Vector3d yAxis = Vector3d.YAxis;
+
+                                var areaProps = region.AreaProperties(ref origin, ref xAxis, ref yAxis);
+                                totalArea += Math.Abs(areaProps.Area);  // ✅ 真实面积，非边界框
                                 count++;
                             }
                         }
